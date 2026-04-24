@@ -2,7 +2,7 @@ import { mkdir, rm } from 'fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appendEntry, readEntries } from '../src/ledger';
 
-const ROOT = '/tmp/pay-cli-ledger-test';
+const ROOT = '/tmp/pay-ledger-test';
 
 describe('ledger', () => {
   let originalHome: string | undefined;

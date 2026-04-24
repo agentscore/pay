@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    labels: ["dependencies", "javascript"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    ignore:
+      - dependency-name: "eslint"
+      - dependency-name: "@eslint/js"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    labels: ["dependencies", "ci"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
