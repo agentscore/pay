@@ -1,12 +1,12 @@
 {
-  "name": "@agent-score/x402",
+  "name": "@agent-score/pay",
   "version": "0.1.0",
-  "description": "CLI wallet for one-shell-command x402 payments on Base and Solana",
+  "description": "CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and MPP (Tempo)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "agentscore-x402": "./dist/index.js"
+    "agentscore-pay": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -23,6 +23,8 @@
   "keywords": [
     "agentscore",
     "x402",
+    "mpp",
+    "tempo",
     "cli",
     "wallet",
     "base",
@@ -54,6 +56,7 @@
     "@x402/fetch": "^2.10.0",
     "@x402/svm": "^2.10.0",
     "commander": "^14.0.1",
+    "mppx": "^0.6.3",
     "qrcode-terminal": "^0.12.0",
     "viem": "^2.39.3"
   },

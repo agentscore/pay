@@ -1,18 +1,18 @@
-# @agent-score/x402
+# @agent-score/pay
 
-CLI wallet for one-shell-command x402 payments on Base and Solana.
+CLI wallet for one-shell-command agent payments across **x402** (Base, Solana) and **MPP** (Tempo).
 
-Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay x402-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP: one command, body preserved, agent never sees a private key on the wire.
+Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire — but works across every rail an AgentScore-gated merchant might accept.
 
 ## Install
 
 ```bash
 # Run directly (no global install required)
-npx @agent-score/x402 --help
+npx @agent-score/pay --help
 
 # Or install globally
-npm i -g @agent-score/x402
-agentscore-x402 --help
+npm i -g @agent-score/pay
+agentscore-pay --help
 ```
 
 Requires Node 20+.
@@ -20,65 +20,69 @@ Requires Node 20+.
 ## Quick start
 
 ```bash
-# 1. Create an encrypted local keystore
-agentscore-x402 wallet create --chain base
+# 1. Create an encrypted local keystore (pick your chain)
+agentscore-pay wallet create --chain base
 
-# 2. Fund it (prints Coinbase Onramp URL + QR + polls balance)
-agentscore-x402 fund --chain base --amount 10
+# 2. Fund it (Coinbase Onramp URL + QR; Tempo uses `tempo wallet fund`)
+agentscore-pay fund --chain base --amount 10
 
-# 3. Pay an x402 endpoint — body is preserved through the 402 round-trip
-agentscore-x402 pay POST https://agents.martinestate.com/purchase \
+# 3. Pay — body preserved through the 402 round-trip
+agentscore-pay pay POST https://agents.martinestate.com/purchase \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"cabernet-sauvignon-2021","quantity":1,"email":"a@b.co","shipping":{...}}' \
   --max-spend 250
 ```
 
-Works the same on Solana:
+Same flow on Solana or Tempo — just change `--chain`:
 
 ```bash
-agentscore-x402 wallet create --chain solana
-agentscore-x402 fund --chain solana --amount 10
-agentscore-x402 pay POST https://merchant.example/api --chain solana -d '...' --max-spend 5
+agentscore-pay wallet create --chain solana
+agentscore-pay pay POST https://merchant.example/api --chain solana -d '...' --max-spend 5
+
+agentscore-pay wallet create --chain tempo
+agentscore-pay pay POST https://agents.martinestate.com/purchase --chain tempo -d '...' --max-spend 250
 ```
+
+## Rails
+
+| Chain | Protocol | Library | Network |
+|---|---|---|---|
+| `base` | x402 (EIP-3009) | `@x402/fetch` + `@x402/evm` | `eip155:8453` |
+| `solana` | x402 (SPL Token) | `@x402/fetch` + `@x402/svm` | `solana:5eykt...` |
+| `tempo` | MPP | `mppx/client` | chain 4217 |
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `wallet create [--chain base\|solana]` | Generate a new keystore (AES-256-GCM + scrypt) at `~/.agentscore/wallets/<chain>.json` |
-| `wallet import <key> [--chain base\|solana]` | Import an existing key (hex for base, base64 keypair for solana) |
-| `wallet address [--chain base\|solana]` | Print the address |
-| `balance [--chain base\|solana]` | Show USDC balance across configured chains |
-| `qr [--chain base\|solana] [--amount N]` | Terminal ASCII QR for receiving USDC (raw address or [EIP-681](https://eips.ethereum.org/EIPS/eip-681) / `solana:` URI when amount is set) |
-| `fund [--chain base\|solana] [--amount N]` | Print Coinbase Onramp URL + QR, poll balance until deposit lands |
-| `pay <METHOD> <URL> [-d body] [-H 'Name: value']... [--chain c] [--max-spend N] [-v]` | Send HTTP request, auto-handle x402 402 → sign → retry |
+| `wallet create [--chain c]` | Generate keystore (AES-256-GCM + scrypt) at `~/.agentscore/wallets/<chain>.json` |
+| `wallet import <key> [--chain c]` | Import an existing key (hex for EVM chains, base64 for Solana) |
+| `wallet address [--chain c]` | Print the address |
+| `balance [--chain c]` | Show USDC balance across configured chains |
+| `qr [--chain c] [--amount N]` | Terminal ASCII QR for receiving USDC |
+| `fund [--chain c] [--amount N]` | Print Coinbase Onramp URL + QR, poll balance (Tempo: prints `tempo wallet fund` hint) |
+| `pay <METHOD> <URL> [-d body] [-H 'Name: value']... [--chain c] [--max-spend N] [-v]` | HTTP request + auto-handle 402 → sign → retry |
 
 ## Funding
 
-The wallet holds USDC only — no ETH or SOL required. x402 payments use EIP-3009 (Base) and SPL Token (Solana), both of which are gasless for the signer; the facilitator pays gas.
+- **Base, Solana** — `fund` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR you can scan from any mobile wallet.
+- **Tempo** — Coinbase Onramp does not cover Tempo. Use `tempo wallet fund` or transfer USDC.e (chain 4217) from an existing Tempo wallet.
 
-`fund` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR you can scan from any mobile wallet. If you already have USDC elsewhere, just transfer to the address.
+The wallet holds USDC only — no ETH or SOL required. Both x402 rails and MPP/Tempo are gasless for the signer (the facilitator pays).
 
 ## Security
 
-- Keystore is AES-256-GCM encrypted with a scrypt-derived key (`N=131072, r=8, p=1`).
+- Keystore is AES-256-GCM encrypted with a scrypt-derived key (`N=131072, r=8, p=1`), one file per chain.
 - Files are written with `0600` permissions, parent dir `0700`.
-- Passphrase is prompted per signing operation unless `AGENTSCORE_X402_PASSPHRASE` is set in the environment (useful for autonomous agents).
+- Passphrase is prompted per signing operation unless `AGENTSCORE_X402_PASSPHRASE` is set (useful for autonomous agents).
 - No telemetry. No auto-update. No plaintext keys on disk.
-
-## Supported chains (MVP)
-
-- **Base mainnet** — `eip155:8453`, USDC `0x8335...2913`, via CDP facilitator
-- **Solana mainnet** — `solana:5eykt...`, USDC `EPjF...Dt1v`, via CDP facilitator
-
-Polygon / Arbitrum / World / Tempo / additional chains land in a polish follow-up.
 
 ## Relationship to other AgentScore packages
 
 - [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
 - [`@agent-score/gate`](https://www.npmjs.com/package/@agent-score/gate) — merchant-side trust-gating middleware
 - [`@agent-score/mcp`](https://www.npmjs.com/package/@agent-score/mcp) — MCP server for AgentScore tools
-- **`@agent-score/x402`** (this package) — agent-side CLI wallet for x402 rails
+- **`@agent-score/pay`** (this package) — agent-side CLI wallet across x402 and MPP rails
 
 Wallet-to-operator linking happens merchant-side via `captureWallet` in `@agent-score/gate` — this CLI does not duplicate the `POST /v1/credentials/wallets` call.
 

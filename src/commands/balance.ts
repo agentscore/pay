@@ -1,13 +1,24 @@
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
+import * as tempoChain from '../chains/tempo';
 import { SUPPORTED_CHAINS, type Chain } from '../constants';
 import { loadKeystore } from '../keystore';
 
 async function chainBalance(chain: Chain): Promise<{ address: string; raw: bigint; formatted: string } | null> {
   try {
     const ks = await loadKeystore(chain);
-    const raw = chain === 'base' ? await baseChain.balance(ks.address) : await solanaChain.balance(ks.address);
-    const formatted = chain === 'base' ? baseChain.formatBalance(raw) : solanaChain.formatBalance(raw);
+    const raw =
+      chain === 'base'
+        ? await baseChain.balance(ks.address)
+        : chain === 'solana'
+          ? await solanaChain.balance(ks.address)
+          : await tempoChain.balance(ks.address);
+    const formatted =
+      chain === 'base'
+        ? baseChain.formatBalance(raw)
+        : chain === 'solana'
+          ? solanaChain.formatBalance(raw)
+          : tempoChain.formatBalance(raw);
     return { address: ks.address, raw, formatted };
   } catch {
     return null;

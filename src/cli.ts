@@ -21,8 +21,8 @@ function collectHeader(value: string, previous: Record<string, string>): Record<
 }
 
 export function buildCli(): Command {
-  const program = new Command('agentscore-x402')
-    .description('CLI wallet for one-shell-command x402 payments on Base and Solana')
+  const program = new Command('agentscore-pay')
+    .description('CLI wallet for one-shell-command agent payments (x402 on Base + Solana, MPP on Tempo)')
     .version(typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0-dev');
 
   const wallet = program.command('wallet').description('Manage the local keystore');
