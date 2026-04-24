@@ -104,18 +104,47 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 | Command | Purpose |
 |---|---|
-| `wallet create [--chain c]` | Generate keystore(s). Omit `--chain` to create all three in one prompt. |
-| `wallet import <key> --chain c` | Import existing key (hex for EVM, base64 for Solana) |
+| `wallet create [--chain c] [--mnemonic]` | Generate keystore(s). Omit `--chain` to create all three. Pass `--mnemonic` to derive from a BIP-39 seed. |
+| `wallet import [<key>] --chain c` / `wallet import --mnemonic "<phrase>"` | Import raw private key (hex/base64) OR a 12/24-word phrase |
 | `wallet address --chain c` | Print the address |
-| `wallet export --chain c --danger` | Decrypt + print the private key (type-to-confirm; `--skip-confirm` for scripting) |
-| `balance [--chain c]` | USDC balance across chains |
-| `qr --chain c [--amount N]` | ASCII QR or EIP-681 / `solana:` URI |
-| `fund --chain c [--amount N]` | Onramp URL + QR + balance poll (Tempo: hints `tempo wallet fund`) |
+| `wallet export --chain c --danger [--skip-confirm]` | Decrypt + print the private key |
+| `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
+| `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
+| `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
+| `fund --chain c [--amount N] [--network n]` | Onramp URL + QR + balance poll (Tempo: hints `tempo wallet fund`) |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
-| `pay <method> <url> [-d body] [-H header]... [--chain c] [--max-spend N] [--dry-run] [-v]` | HTTP request + auto 402 handling |
-| `whoami` | Wallet + balance summary + active config |
+| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--dry-run] [-v]` | HTTP request + auto 402 handling |
+| `whoami [--network n]` | Wallet + balance summary + active config |
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
+
+## Mnemonic-based wallets
+
+```bash
+# Generate a BIP-39 seed and derive all three chains at once
+agentscore-pay wallet create --mnemonic
+
+# Later, on another machine: import the phrase
+agentscore-pay wallet import --mnemonic "legal winner thank year wave sausage worth useful legal winner thank yellow"
+
+# Retrieve the stored phrase (prompted for passphrase + type-to-confirm)
+agentscore-pay wallet show-mnemonic --danger
+```
+
+Derivation paths: EVM uses `m/44'/60'/0'/0/0` (standard), Solana uses `m/44'/501'/0'/0'` (SLIP-10 Ed25519). The same phrase regenerates identical keys on every machine.
+
+## Multiple wallet profiles
+
+Set `AGENTSCORE_PAY_HOME` to point at a different state directory:
+
+```bash
+# One profile for production merchants
+AGENTSCORE_PAY_HOME=~/.agentscore-prod agentscore-pay wallet create
+
+# Another profile for testnet development
+AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay wallet create
+AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay pay --network testnet ...
+```
 
 ## Funding
 
@@ -139,6 +168,7 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 | Variable | Purpose |
 |---|---|
 | `AGENTSCORE_PAY_PASSPHRASE` | skip interactive passphrase prompt |
+| `AGENTSCORE_PAY_HOME` | override state dir (default `~/.agentscore`) — lets you run multiple wallet profiles |
 | `BASE_RPC_URL` | override Base mainnet RPC endpoint |
 | `BASE_SEPOLIA_RPC_URL` | override Base Sepolia RPC endpoint |
 | `SOLANA_RPC_URL` | override Solana mainnet RPC endpoint |
