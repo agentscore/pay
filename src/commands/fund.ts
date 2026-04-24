@@ -3,17 +3,17 @@ import qrcode from 'qrcode-terminal';
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
-import { onrampUrl, type Chain } from '../constants';
+import { onrampUrl, type Chain, type Network } from '../constants';
 import { loadKeystore } from '../keystore';
 import { emitProgress, isJson, writeJson, writeLine } from '../output';
 
 const POLL_INTERVAL_MS = 5_000;
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 
-async function readBalance(chain: Chain, address: string): Promise<bigint> {
-  if (chain === 'base') return baseChain.balance(address);
-  if (chain === 'solana') return solanaChain.balance(address);
-  return tempoChain.balance(address);
+async function readBalance(chain: Chain, address: string, network: Network): Promise<bigint> {
+  if (chain === 'base') return baseChain.balance(address, network);
+  if (chain === 'solana') return solanaChain.balance(address, network);
+  return tempoChain.balance(address, network);
 }
 
 function formatBalance(chain: Chain, raw: bigint): string {
@@ -22,16 +22,16 @@ function formatBalance(chain: Chain, raw: bigint): string {
   return tempoChain.formatBalance(raw);
 }
 
-function buildQrUri(chain: Chain, address: string, amountUsd?: number): string {
-  if (chain === 'base') return baseChain.qrUri(address, amountUsd);
-  if (chain === 'solana') return solanaChain.qrUri(address, amountUsd);
-  return tempoChain.qrUri(address, amountUsd);
+function buildQrUri(chain: Chain, address: string, amountUsd?: number, network: Network = 'mainnet'): string {
+  if (chain === 'base') return baseChain.qrUri(address, amountUsd, network);
+  if (chain === 'solana') return solanaChain.qrUri(address, amountUsd, network);
+  return tempoChain.qrUri(address, amountUsd, network);
 }
 
-export async function fund(chain: Chain, amountUsd?: number): Promise<void> {
+export async function fund(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
   const ks = await loadKeystore(chain);
-  const onramp = onrampUrl(chain, ks.address, amountUsd);
-  const uri = buildQrUri(chain, ks.address, amountUsd);
+  const onramp = network === 'mainnet' ? onrampUrl(chain, ks.address, amountUsd) : null;
+  const uri = buildQrUri(chain, ks.address, amountUsd, network);
 
   if (isJson()) {
     writeJson({
@@ -63,12 +63,12 @@ export async function fund(chain: Chain, amountUsd?: number): Promise<void> {
     writeLine('Polling balance every 5s. Ctrl+C to exit.');
   }
 
-  const initial = await readBalance(chain, ks.address);
+  const initial = await readBalance(chain, ks.address, network);
   const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
   let current = initial;
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
-    current = await readBalance(chain, ks.address);
+    current = await readBalance(chain, ks.address, network);
     if (current > initial) {
       const formatted = formatBalance(chain, current);
       if (isJson()) {

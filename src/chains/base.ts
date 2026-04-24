@@ -1,9 +1,13 @@
 import { createPublicClient, erc20Abi, http, publicActions } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
-import { USDC } from '../constants';
+import { base, baseSepolia } from 'viem/chains';
+import { evmConfig, type Network } from '../constants';
 
 type Hex = `0x${string}`;
+
+function chainFor(network: Network) {
+  return network === 'mainnet' ? base : baseSepolia;
+}
 
 export function generateKey(): Buffer {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(32)));
@@ -14,11 +18,12 @@ export function keyToAddress(key: Buffer): string {
   return privateKeyToAccount(hex).address;
 }
 
-export function createSigner(key: Buffer) {
+export function createSigner(key: Buffer, network: Network = 'mainnet') {
   const hex = ('0x' + key.toString('hex')) as Hex;
   const account = privateKeyToAccount(hex);
-  const transport = http(USDC.base.mainnet.rpcUrl);
-  const publicClient = createPublicClient({ chain: base, transport });
+  const cfg = evmConfig('base', network);
+  const transport = http(cfg.rpcUrl);
+  const publicClient = createPublicClient({ chain: chainFor(network), transport });
   return {
     address: account.address,
     signTypedData: account.signTypedData.bind(account),
@@ -26,23 +31,25 @@ export function createSigner(key: Buffer) {
   };
 }
 
-export async function balance(address: string): Promise<bigint> {
+export async function balance(address: string, network: Network = 'mainnet'): Promise<bigint> {
+  const cfg = evmConfig('base', network);
   const publicClient = createPublicClient({
-    chain: base,
-    transport: http(USDC.base.mainnet.rpcUrl),
+    chain: chainFor(network),
+    transport: http(cfg.rpcUrl),
   }).extend(publicActions);
   return publicClient.readContract({
-    address: USDC.base.mainnet.address,
+    address: cfg.address,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address as Hex],
   });
 }
 
-export function qrUri(address: string, amountUsd?: number): string {
+export function qrUri(address: string, amountUsd?: number, network: Network = 'mainnet'): string {
+  const cfg = evmConfig('base', network);
   if (!amountUsd || amountUsd <= 0) return address;
-  const amount = BigInt(Math.round(amountUsd * 10 ** USDC.base.mainnet.decimals));
-  return `ethereum:${USDC.base.mainnet.address}@${USDC.base.mainnet.chainId}/transfer?address=${address}&uint256=${amount}`;
+  const amount = BigInt(Math.round(amountUsd * 10 ** cfg.decimals));
+  return `ethereum:${cfg.address}@${cfg.chainId}/transfer?address=${address}&uint256=${amount}`;
 }
 
 export function formatBalance(raw: bigint): string {

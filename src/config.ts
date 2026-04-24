@@ -1,14 +1,11 @@
 import { readFile } from 'fs/promises';
-import { homedir } from 'os';
-import { join } from 'path';
 import { SUPPORTED_CHAINS, type Chain } from './constants';
+import { configPath } from './paths';
+
+export { configPath } from './paths';
 
 export interface Config {
   preferred_chains?: Chain[];
-}
-
-export function configPath(): string {
-  return join(homedir(), '.agentscore', 'config.json');
 }
 
 export async function loadConfig(): Promise<Config> {

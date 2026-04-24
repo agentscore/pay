@@ -2,7 +2,7 @@ import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { loadConfig } from '../config';
-import { SUPPORTED_CHAINS, type Chain } from '../constants';
+import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { keystoreExists, keystorePath, loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
 
@@ -14,15 +14,15 @@ interface ChainSummary {
   keystore?: string;
 }
 
-async function summarize(chain: Chain): Promise<ChainSummary> {
+async function summarize(chain: Chain, network: Network): Promise<ChainSummary> {
   if (!(await keystoreExists(chain))) return { chain, has_wallet: false };
   const ks = await loadKeystore(chain);
   const raw =
     chain === 'base'
-      ? await baseChain.balance(ks.address)
+      ? await baseChain.balance(ks.address, network)
       : chain === 'solana'
-        ? await solanaChain.balance(ks.address)
-        : await tempoChain.balance(ks.address);
+        ? await solanaChain.balance(ks.address, network)
+        : await tempoChain.balance(ks.address, network);
   const formatted =
     chain === 'base'
       ? baseChain.formatBalance(raw)
@@ -38,9 +38,9 @@ async function summarize(chain: Chain): Promise<ChainSummary> {
   };
 }
 
-export async function whoami(): Promise<void> {
+export async function whoami(network: Network = 'mainnet'): Promise<void> {
   const [rows, config] = await Promise.all([
-    Promise.all(SUPPORTED_CHAINS.map((c) => summarize(c))),
+    Promise.all(SUPPORTED_CHAINS.map((c) => summarize(c, network))),
     loadConfig(),
   ]);
 

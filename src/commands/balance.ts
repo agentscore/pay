@@ -1,7 +1,7 @@
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
-import { SUPPORTED_CHAINS, type Chain } from '../constants';
+import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { keystoreExists, loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
 
@@ -13,15 +13,15 @@ interface BalanceRow {
   has_wallet: boolean;
 }
 
-async function readChain(chain: Chain): Promise<BalanceRow> {
+async function readChain(chain: Chain, network: Network): Promise<BalanceRow> {
   if (!(await keystoreExists(chain))) return { chain, has_wallet: false };
   const ks = await loadKeystore(chain);
   const raw =
     chain === 'base'
-      ? await baseChain.balance(ks.address)
+      ? await baseChain.balance(ks.address, network)
       : chain === 'solana'
-        ? await solanaChain.balance(ks.address)
-        : await tempoChain.balance(ks.address);
+        ? await solanaChain.balance(ks.address, network)
+        : await tempoChain.balance(ks.address, network);
   const formatted =
     chain === 'base'
       ? baseChain.formatBalance(raw)
@@ -31,9 +31,9 @@ async function readChain(chain: Chain): Promise<BalanceRow> {
   return { chain, address: ks.address, usdc: formatted, raw: raw.toString(), has_wallet: true };
 }
 
-export async function balance(filter?: Chain): Promise<void> {
+export async function balance(filter?: Chain, network: Network = 'mainnet'): Promise<void> {
   const chains = filter ? [filter] : [...SUPPORTED_CHAINS];
-  const rows = await Promise.all(chains.map((c) => readChain(c)));
+  const rows = await Promise.all(chains.map((c) => readChain(c, network)));
   rows.sort((a, b) => a.chain.localeCompare(b.chain));
 
   if (isJson()) {

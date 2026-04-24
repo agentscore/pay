@@ -1,7 +1,9 @@
 import { appendFile, mkdir, readFile } from 'fs/promises';
-import { homedir } from 'os';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
+import { ledgerPath } from './paths';
 import type { Chain } from './constants';
+
+export { ledgerPath } from './paths';
 
 export interface LedgerEntry {
   timestamp: string;
@@ -14,10 +16,6 @@ export interface LedgerEntry {
   protocol: 'x402' | 'mpp';
   price_usd?: string;
   ok: boolean;
-}
-
-export function ledgerPath(): string {
-  return join(homedir(), '.agentscore', 'history.jsonl');
 }
 
 export async function appendEntry(entry: LedgerEntry): Promise<void> {
