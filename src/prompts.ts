@@ -1,6 +1,6 @@
 import { cancel, isCancel, password as clackPassword } from '@clack/prompts';
 
-const ENV_PASSPHRASE = 'AGENTSCORE_X402_PASSPHRASE';
+const ENV_PASSPHRASE = 'AGENTSCORE_PAY_PASSPHRASE';
 
 export async function promptPassphrase(message = 'Enter wallet passphrase'): Promise<string> {
   if (process.env[ENV_PASSPHRASE]) return process.env[ENV_PASSPHRASE] as string;
