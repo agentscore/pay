@@ -6,6 +6,7 @@ import { Mppx, tempo } from 'mppx/client';
 import { USDC, type Chain } from '../constants';
 import { CliError } from '../errors';
 import { appendEntry } from '../ledger';
+import { enforce, loadLimits } from '../limits';
 import { emitProgress, isJson, writeJson, writeLine, writeText } from '../output';
 import { promptPassphrase } from '../prompts';
 import { selectRail } from '../selection';
@@ -156,18 +157,21 @@ async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit): 
     throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — use MPP for Tempo.`);
   }
 
-  if (opts.maxSpendUsd !== undefined) {
-    const max = opts.maxSpendUsd;
-    client.onBeforePaymentCreation(async ({ selectedRequirements }) => {
-      const req = selectedRequirements as { decimals?: number; maxAmountRequired?: string };
-      const decimals = Number(req.decimals ?? 6);
-      const priceRaw = BigInt(req.maxAmountRequired ?? '0');
-      const priceUsd = Number(priceRaw) / 10 ** decimals;
-      if (priceUsd > max) {
-        return { abort: true, reason: `Payment ${priceUsd} USDC exceeds --max-spend ${max}` };
-      }
-    });
-  }
+  const host = safeHost(opts.url);
+  const limits = await loadLimits();
+  client.onBeforePaymentCreation(async ({ selectedRequirements }) => {
+    const req = selectedRequirements as { decimals?: number; maxAmountRequired?: string };
+    const decimals = Number(req.decimals ?? 6);
+    const priceRaw = BigInt(req.maxAmountRequired ?? '0');
+    const priceUsd = Number(priceRaw) / 10 ** decimals;
+    if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
+      return { abort: true, reason: `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}` };
+    }
+    const verdict = await enforce(limits, { priceUsd, host });
+    if (!verdict.allowed) {
+      return { abort: true, reason: `Local limit violated (${verdict.violated}=${verdict.limit}, would be ${verdict.would_be}).` };
+    }
+  });
 
   const fetchWithPay = wrapFetchWithPayment(fetch, client);
   return fetchWithPay(opts.url, init);
@@ -175,30 +179,34 @@ async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit): 
 
 async function payViaMpp(wallet: Wallet, opts: PayOptions, init: RequestInit): Promise<Response> {
   const account = createMppAccount(wallet);
+  const host = safeHost(opts.url);
+  const limits = await loadLimits();
   const client = Mppx.create({
     methods: [tempo({ account })],
     fetch,
-    onChallenge:
-      opts.maxSpendUsd === undefined
-        ? undefined
-        : async (challenge) => {
-            const max = opts.maxSpendUsd as number;
-            const requests =
-              (challenge as { paymentRequests?: Array<{ amount?: string; decimals?: number }> }).paymentRequests ?? [];
-            for (const r of requests) {
-              const decimals = Number(r.decimals ?? 6);
-              const priceRaw = BigInt(r.amount ?? '0');
-              const priceUsd = Number(priceRaw) / 10 ** decimals;
-              if (priceUsd > max) {
-                throw new CliError(
-                  'max_spend_exceeded',
-                  `Payment ${priceUsd} USDC exceeds --max-spend ${max}`,
-                  { extra: { price_usd: priceUsd, max_spend_usd: max } },
-                );
-              }
-            }
-            return undefined;
-          },
+    onChallenge: async (challenge) => {
+      const requests =
+        (challenge as { paymentRequests?: Array<{ amount?: string; decimals?: number }> }).paymentRequests ?? [];
+      for (const r of requests) {
+        const decimals = Number(r.decimals ?? 6);
+        const priceRaw = BigInt(r.amount ?? '0');
+        const priceUsd = Number(priceRaw) / 10 ** decimals;
+        if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
+          throw new CliError(
+            'max_spend_exceeded',
+            `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}`,
+            { extra: { price_usd: priceUsd, max_spend_usd: opts.maxSpendUsd } },
+          );
+        }
+        const verdict = await enforce(limits, { priceUsd, host });
+        if (!verdict.allowed) {
+          throw new CliError('limit_exceeded', `Local limit violated: ${verdict.violated}=${verdict.limit}`, {
+            extra: { violated: verdict.violated, limit: verdict.limit, would_be: verdict.would_be },
+          });
+        }
+      }
+      return undefined;
+    },
   });
   return client.fetch(opts.url, init);
 }

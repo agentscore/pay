@@ -3,9 +3,10 @@ import { balance } from './commands/balance';
 import { check } from './commands/check';
 import { fund } from './commands/fund';
 import { history } from './commands/history';
+import { limitsClear, limitsSet, limitsShow } from './commands/limits';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
-import { walletAddress, walletCreate, walletImport } from './commands/wallet';
+import { walletAddress, walletCreate, walletExport, walletImport } from './commands/wallet';
 import { whoami } from './commands/whoami';
 import { SUPPORTED_CHAINS, type Chain } from './constants';
 import { resolveMode, setMode } from './output';
@@ -97,6 +98,17 @@ export function buildCli(): Command {
       await walletAddress(opts.chain);
     });
 
+  wallet
+    .command('export')
+    .description('Decrypt and print a private key. DANGER — only run if you trust the surrounding environment.')
+    .addOption(chainOption(true))
+    .option('--danger', 'explicitly acknowledge the risk of printing a private key')
+    .option('--skip-confirm', 'skip the "type EXPORT" prompt (for scripting)')
+    .action(async (opts: { chain: Chain; danger?: boolean; skipConfirm?: boolean }) => {
+      applyMode(program);
+      await walletExport(opts);
+    });
+
   program
     .command('balance')
     .description('Show USDC balance across configured chains')
@@ -124,6 +136,32 @@ export function buildCli(): Command {
     .action(async (opts: { chain: Chain; amount?: number }) => {
       applyMode(program);
       await fund(opts.chain, opts.amount);
+    });
+
+  const limits = program.command('limits').description('Persistent local spending allowances (per-call, daily, per-merchant)');
+  limits
+    .command('show', { isDefault: true })
+    .description('Print current limits (read from ~/.agentscore/limits.json)')
+    .action(async () => {
+      applyMode(program);
+      await limitsShow();
+    });
+  limits
+    .command('set')
+    .description('Set one or more limits (USD). Merges with existing limits.')
+    .option('--daily <usd>', 'maximum USD spent across all merchants in a rolling 24h window', (v) => Number(v))
+    .option('--per-call <usd>', 'maximum USD on a single pay call', (v) => Number(v))
+    .option('--per-merchant <usd>', 'maximum USD per merchant (by host) across all history', (v) => Number(v))
+    .action(async (opts: { daily?: number; perCall?: number; perMerchant?: number }) => {
+      applyMode(program);
+      await limitsSet(opts);
+    });
+  limits
+    .command('clear')
+    .description('Remove ~/.agentscore/limits.json')
+    .action(async () => {
+      applyMode(program);
+      await limitsClear();
     });
 
   program

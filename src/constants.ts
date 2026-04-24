@@ -1,6 +1,9 @@
 export const SUPPORTED_CHAINS = ['base', 'solana', 'tempo'] as const;
 export type Chain = (typeof SUPPORTED_CHAINS)[number];
 
+export const SUPPORTED_NETWORKS = ['mainnet', 'testnet'] as const;
+export type Network = (typeof SUPPORTED_NETWORKS)[number];
+
 export const USDC = {
   base: {
     mainnet: {
@@ -60,4 +63,33 @@ export function onrampUrl(chain: Chain, address: string, amountUsd?: number): st
   });
   if (amountUsd && amountUsd > 0) params.set('presetFiatAmount', String(amountUsd));
   return `${base}?${params.toString()}`;
+}
+
+export type EvmConfig = {
+  address: `0x${string}`;
+  decimals: number;
+  rpcUrl: string;
+  network: string;
+  chainId: number;
+};
+
+export type SvmConfig = {
+  mint: string;
+  decimals: number;
+  rpcUrl: string;
+  network: string;
+};
+
+export function evmConfig(chain: 'base' | 'tempo', network: Network = 'mainnet'): EvmConfig {
+  if (chain === 'base') {
+    const src = network === 'mainnet' ? USDC.base.mainnet : USDC.base.sepolia;
+    return { ...src };
+  }
+  const src = network === 'mainnet' ? USDC.tempo.mainnet : USDC.tempo.testnet;
+  return { address: src.address, decimals: src.decimals, rpcUrl: src.rpcUrl, network: `eip155:${src.chainId}`, chainId: src.chainId };
+}
+
+export function svmConfig(network: Network = 'mainnet'): SvmConfig {
+  const src = network === 'mainnet' ? USDC.solana.mainnet : USDC.solana.devnet;
+  return { mint: src.mint, decimals: src.decimals, rpcUrl: src.rpcUrl, network: src.network };
 }
