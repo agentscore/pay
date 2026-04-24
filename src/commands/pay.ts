@@ -5,7 +5,8 @@ import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { Mppx, tempo } from 'mppx/client';
 import { USDC, type Chain } from '../constants';
 import { CliError } from '../errors';
-import { emitProgress, isJson, writeJson, writeText } from '../output';
+import { appendEntry } from '../ledger';
+import { emitProgress, isJson, writeJson, writeLine, writeText } from '../output';
 import { promptPassphrase } from '../prompts';
 import { selectRail } from '../selection';
 import { createMppAccount, createX402Signer, loadWallet, type Wallet } from '../wallets';
@@ -20,6 +21,7 @@ export interface PayOptions {
   headers?: Record<string, string>;
   maxSpendUsd?: number;
   verbose?: boolean;
+  dryRun?: boolean;
 }
 
 export async function pay(opts: PayOptions): Promise<void> {
@@ -31,6 +33,32 @@ export async function pay(opts: PayOptions): Promise<void> {
       balance_usdc: candidate.balance_usdc,
       reason: opts.chain ? 'user_override' : 'auto',
     });
+  }
+
+  if (opts.dryRun) {
+    const dryPayload = {
+      dry_run: true,
+      selected_chain: candidate.chain,
+      signer: candidate.address,
+      balance_usdc: candidate.balance_usdc,
+      method: opts.method,
+      url: opts.url,
+      protocol: candidate.chain === 'tempo' ? 'mpp' : 'x402',
+      headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}), 'X-Wallet-Address': candidate.address },
+      body: opts.body ?? null,
+      max_spend_usd: opts.maxSpendUsd ?? null,
+    };
+    if (isJson()) {
+      writeJson(dryPayload);
+    } else {
+      writeLine('[dry-run] would sign and send:');
+      writeLine(`  ${opts.method} ${opts.url}`);
+      writeLine(`  chain=${candidate.chain} signer=${candidate.address} balance=$${candidate.balance_usdc}`);
+      writeLine(`  protocol=${dryPayload.protocol}`);
+      if (opts.maxSpendUsd !== undefined) writeLine(`  max-spend=$${opts.maxSpendUsd}`);
+      if (opts.body) writeLine(`  body=${opts.body}`);
+    }
+    return;
   }
 
   const passphrase = await promptPassphrase();
@@ -61,25 +89,33 @@ export async function pay(opts: PayOptions): Promise<void> {
     throw mapNetworkError(err);
   }
 
-  if (opts.verbose) {
-    emitProgress('response', { status: res.status, status_text: res.statusText });
-  }
+  if (opts.verbose) emitProgress('response', { status: res.status, status_text: res.statusText });
 
   const text = await res.text();
+  const parsed = tryParseJson(text);
+
+  const host = safeHost(opts.url);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    chain: wallet.chain,
+    signer: wallet.address,
+    method: opts.method,
+    url: opts.url,
+    host,
+    status: res.status,
+    protocol: (wallet.chain === 'tempo' ? 'mpp' : 'x402') as 'mpp' | 'x402',
+    ok: res.ok,
+  };
+  await appendEntry(entry);
+
   if (isJson()) {
-    let body: unknown = text;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
     writeJson({
       ok: res.ok,
       status: res.status,
       status_text: res.statusText,
       chain: wallet.chain,
       signer: wallet.address,
-      body,
+      body: parsed ?? text,
     });
   } else {
     writeText(text);
@@ -89,6 +125,23 @@ export async function pay(opts: PayOptions): Promise<void> {
     throw new CliError('merchant_error', `Merchant returned ${res.status} ${res.statusText}`, {
       extra: { status: res.status, chain: wallet.chain },
     });
+  }
+}
+
+function tryParseJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function safeHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
   }
 }
 
