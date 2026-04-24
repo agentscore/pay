@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      glob: "**/*.{ts,tsx,mjs}"
+      run: bunx eslint --max-warnings 0 {staged_files}
+
+pre-push:
+  commands:
+    typecheck:
+      run: bunx tsc --noEmit
