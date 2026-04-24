@@ -5,6 +5,7 @@ import {
 } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
 import { svmConfig, type Network } from '../constants';
+import { wrapRpcError } from '../errors';
 
 export function generateKey(): Buffer {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(32)));
@@ -24,13 +25,17 @@ export async function balance(ownerBase58: string, network: Network = 'mainnet')
   const rpc = createSolanaRpc(cfg.rpcUrl);
   const owner = solAddress(ownerBase58);
   const mint = solAddress(cfg.mint);
-  const accounts = await rpc
-    .getTokenAccountsByOwner(owner, { mint }, { encoding: 'base64' })
-    .send();
-  if (!accounts.value.length) return 0n;
-  const ata = accounts.value[0].pubkey;
-  const token = await fetchToken(rpc, ata);
-  return token.data.amount;
+  try {
+    const accounts = await rpc
+      .getTokenAccountsByOwner(owner, { mint }, { encoding: 'base64' })
+      .send();
+    if (!accounts.value.length) return 0n;
+    const ata = accounts.value[0].pubkey;
+    const token = await fetchToken(rpc, ata);
+    return token.data.amount;
+  } catch (err) {
+    throw wrapRpcError('solana', network, err);
+  }
 }
 
 export function qrUri(addr: string, amountUsd?: number, network: Network = 'mainnet'): string {

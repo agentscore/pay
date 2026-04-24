@@ -1,6 +1,7 @@
 import { createPublicClient, defineChain, erc20Abi, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { evmConfig, type Network } from '../constants';
+import { wrapRpcError } from '../errors';
 
 type Hex = `0x${string}`;
 
@@ -34,12 +35,16 @@ export async function balance(address: string, network: Network = 'mainnet'): Pr
     chain: chainFor(network),
     transport: http(cfg.rpcUrl),
   });
-  return publicClient.readContract({
-    address: cfg.address,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [address as Hex],
-  });
+  try {
+    return await publicClient.readContract({
+      address: cfg.address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [address as Hex],
+    });
+  } catch (err) {
+    throw wrapRpcError('tempo', network, err);
+  }
 }
 
 export function qrUri(address: string, amountUsd?: number, network: Network = 'mainnet'): string {
