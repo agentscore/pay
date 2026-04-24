@@ -158,7 +158,7 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 ### Mainnet
 
 - **Base, Solana** — `agentscore-pay fund --chain base --amount 10` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR. Click the URL, or scan the QR from any mobile wallet with USDC to send yourself a transfer. `fund` polls balance and confirms when the deposit lands. Default amount is `$10` (~50-200 typical agent calls).
-- **Tempo** — Coinbase Onramp does not cover Tempo. Use `tempo wallet fund` or transfer USDC.e (chain 4217) from an existing Tempo wallet.
+- **Tempo** — Coinbase Onramp does not cover Tempo. If the Tempo CLI is installed (`~/.tempo/bin/tempo` from [tempo.xyz/install](https://tempo.xyz/install), or anywhere on `PATH`), `fund --chain tempo` shells out to `tempo wallet fund` automatically. Otherwise it prints the install URL + instruction. Agent/`--json` mode never auto-invokes — it emits `next_steps.action = "run_tempo_wallet_fund"` so the caller decides.
 - **From an existing wallet (no onramp)** — `agentscore-pay wallet address --chain base` prints the address; send USDC on Base to it from MetaMask, Rabby, Coinbase Wallet, Phantom, or a CEX withdrawal. Same pattern on Solana + Tempo.
 
 ### Testnet
