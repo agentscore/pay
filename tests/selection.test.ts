@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const ROOT = '/tmp/pay-cli-selection-test';
+const ROOT = '/tmp/pay-selection-test';
 
 async function writeKeystore(chain: 'base' | 'solana' | 'tempo', address: string) {
   const file = join(ROOT, '.agentscore', 'wallets', `${chain}.json`);

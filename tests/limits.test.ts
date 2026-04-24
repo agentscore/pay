@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appendEntry } from '../src/ledger';
 import { clearLimits, enforce, loadLimits, saveLimits } from '../src/limits';
 
-const ROOT = '/tmp/pay-cli-limits-test';
+const ROOT = '/tmp/pay-limits-test';
 
 describe('limits', () => {
   let originalHome: string | undefined;

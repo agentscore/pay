@@ -3,7 +3,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config';
 
-const ROOT = '/tmp/pay-cli-config-test';
+const ROOT = '/tmp/pay-config-test';
 
 describe('config', () => {
   let originalHome: string | undefined;
