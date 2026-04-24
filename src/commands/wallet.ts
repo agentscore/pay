@@ -136,3 +136,62 @@ export async function walletAddress(chain: Chain): Promise<void> {
   }
   writeLine(file.address);
 }
+
+export interface WalletExportOptions {
+  chain: Chain;
+  danger?: boolean;
+  skipConfirm?: boolean;
+}
+
+export async function walletExport(opts: WalletExportOptions): Promise<void> {
+  if (!opts.danger) {
+    throw new CliError(
+      'invalid_input',
+      'wallet export requires --danger flag to acknowledge risks.',
+      {
+        nextSteps: {
+          action: 'pass_danger_flag',
+          suggestion: 'Re-run with --danger and expect a type-to-confirm prompt (or --skip-confirm for scripting).',
+        },
+      },
+    );
+  }
+  const { decryptSecret } = await import('../keystore');
+  const { loadKeystore: load } = await import('../keystore');
+  const file = await load(opts.chain);
+
+  if (!opts.skipConfirm) {
+    const { text, isCancel, cancel } = await import('@clack/prompts');
+    const answer = await text({
+      message: `Type EXPORT to confirm exporting ${opts.chain} private key (${file.address})`,
+      validate: (v) => (v === 'EXPORT' ? undefined : 'Type EXPORT exactly to confirm'),
+    });
+    if (isCancel(answer)) {
+      cancel('Cancelled.');
+      throw new CliError('user_cancelled', 'Export cancelled.');
+    }
+  }
+
+  const { promptPassphrase } = await import('../prompts');
+  const passphrase = await promptPassphrase();
+  let secret: Buffer;
+  try {
+    secret = await decryptSecret(file.encryption, passphrase);
+  } catch {
+    throw new CliError('wrong_passphrase', 'Failed to decrypt keystore with the provided passphrase.', {
+      nextSteps: { action: 'retry_passphrase' },
+    });
+  }
+
+  const format = opts.chain === 'solana' ? 'base64' : 'hex';
+  const encoded = format === 'base64' ? secret.toString('base64') : '0x' + secret.toString('hex');
+
+  if (isJson()) {
+    writeJson({ chain: opts.chain, address: file.address, format, private_key: encoded });
+    return;
+  }
+  writeLine(`# Chain:   ${opts.chain}`);
+  writeLine(`# Address: ${file.address}`);
+  writeLine(`# Format:  ${format}`);
+  writeLine(encoded);
+}
