@@ -1,9 +1,12 @@
 import { Command, Option } from 'commander';
 import { balance } from './commands/balance';
+import { check } from './commands/check';
 import { fund } from './commands/fund';
+import { history } from './commands/history';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { walletAddress, walletCreate, walletImport } from './commands/wallet';
+import { whoami } from './commands/whoami';
 import { SUPPORTED_CHAINS, type Chain } from './constants';
 import { resolveMode, setMode } from './output';
 import type { ModeFlags } from './output';
@@ -124,12 +127,46 @@ export function buildCli(): Command {
     });
 
   program
+    .command('history')
+    .description('Show recent payments (reads ~/.agentscore/history.jsonl)')
+    .option('--limit <n>', 'max rows to show (default: all)', (v) => Number(v))
+    .action(async (opts: { limit?: number }) => {
+      applyMode(program);
+      await history({ limit: opts.limit });
+    });
+
+  program
+    .command('whoami')
+    .description('Show wallets + balances across chains + active config preferences')
+    .action(async () => {
+      applyMode(program);
+      await whoami();
+    });
+
+  program
+    .command('check <url>')
+    .description('Probe a URL for a 402 response and show accepted rails without paying')
+    .option('-X, --method <method>', 'HTTP method', 'GET')
+    .option('-d, --data <body>', 'request body')
+    .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
+    .action(
+      async (
+        url: string,
+        opts: { method: string; data?: string; header?: Record<string, string> },
+      ) => {
+        applyMode(program);
+        await check({ method: opts.method.toUpperCase(), url, body: opts.data, headers: opts.header });
+      },
+    );
+
+  program
     .command('pay <method> <url>')
     .description('Send an HTTP request and auto-handle the 402 payment round-trip')
     .addOption(chainOption())
     .option('-d, --data <body>', 'request body')
     .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
     .option('--max-spend <usd>', 'reject payments above this USD amount', (v) => Number(v))
+    .option('--dry-run', 'print the payment plan without signing or sending')
     .option('-v, --verbose', 'log rail selection + balances to stderr')
     .addHelpText(
       'after',
@@ -144,6 +181,7 @@ export function buildCli(): Command {
           data?: string;
           header?: Record<string, string>;
           maxSpend?: number;
+          dryRun?: boolean;
           verbose?: boolean;
         },
       ) => {
@@ -155,6 +193,7 @@ export function buildCli(): Command {
           body: opts.data,
           headers: opts.header,
           maxSpendUsd: opts.maxSpend,
+          dryRun: opts.dryRun,
           verbose: opts.verbose,
         });
       },
