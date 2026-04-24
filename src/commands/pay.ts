@@ -3,7 +3,7 @@ import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { Mppx, tempo } from 'mppx/client';
-import { USDC, type Chain } from '../constants';
+import { evmConfig, svmConfig, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
@@ -16,6 +16,7 @@ import type { ClientSvmSigner } from '@x402/svm';
 
 export interface PayOptions {
   chain?: Chain;
+  network?: Network;
   method: string;
   url: string;
   body?: string;
@@ -26,7 +27,8 @@ export interface PayOptions {
 }
 
 export async function pay(opts: PayOptions): Promise<void> {
-  const candidate = await selectRail({ chainOverride: opts.chain });
+  const network: Network = opts.network ?? 'mainnet';
+  const candidate = await selectRail({ chainOverride: opts.chain, network });
   if (opts.verbose) {
     emitProgress('rail_selected', {
       chain: candidate.chain,
@@ -85,7 +87,9 @@ export async function pay(opts: PayOptions): Promise<void> {
 
   let res: Response;
   try {
-    res = wallet.chain === 'tempo' ? await payViaMpp(wallet, opts, init) : await payViaX402(wallet, opts, init);
+    res = wallet.chain === 'tempo'
+      ? await payViaMpp(wallet, opts, init)
+      : await payViaX402(wallet, opts, init, network);
   } catch (err) {
     throw mapNetworkError(err);
   }
@@ -146,13 +150,15 @@ function safeHost(url: string): string {
   }
 }
 
-async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit): Promise<Response> {
-  const signer = await createX402Signer(wallet);
+async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit, network: Network): Promise<Response> {
+  const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
   if (wallet.chain === 'base') {
-    client.register(USDC.base.mainnet.network, new ExactEvmScheme(signer as ClientEvmSigner));
+    const cfg = evmConfig('base', network);
+    client.register(cfg.network as `${string}:${string}`, new ExactEvmScheme(signer as ClientEvmSigner));
   } else if (wallet.chain === 'solana') {
-    client.register(USDC.solana.mainnet.network, new ExactSvmScheme(signer as ClientSvmSigner));
+    const cfg = svmConfig(network);
+    client.register(cfg.network as `${string}:${string}`, new ExactSvmScheme(signer as ClientSvmSigner));
   } else {
     throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — use MPP for Tempo.`);
   }

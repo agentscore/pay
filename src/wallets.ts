@@ -2,7 +2,7 @@ import * as base from './chains/base';
 import * as solana from './chains/solana';
 import * as tempo from './chains/tempo';
 import { decryptSecret, encryptSecret, keystoreExists, loadKeystore, saveKeystore } from './keystore';
-import type { Chain } from './constants';
+import type { Chain, Network } from './constants';
 
 export interface Wallet {
   chain: Chain;
@@ -41,16 +41,16 @@ export async function loadWallet(chain: Chain, passphrase: string): Promise<Wall
   return { chain, address: file.address, secret };
 }
 
-export async function getBalance(wallet: Wallet): Promise<bigint> {
-  if (wallet.chain === 'base') return base.balance(wallet.address);
-  if (wallet.chain === 'solana') return solana.balance(wallet.address);
-  return tempo.balance(wallet.address);
+export async function getBalance(wallet: Wallet, network: Network = 'mainnet'): Promise<bigint> {
+  if (wallet.chain === 'base') return base.balance(wallet.address, network);
+  if (wallet.chain === 'solana') return solana.balance(wallet.address, network);
+  return tempo.balance(wallet.address, network);
 }
 
-export function getQrUri(wallet: Wallet, amountUsd?: number): string {
-  if (wallet.chain === 'base') return base.qrUri(wallet.address, amountUsd);
-  if (wallet.chain === 'solana') return solana.qrUri(wallet.address, amountUsd);
-  return tempo.qrUri(wallet.address, amountUsd);
+export function getQrUri(wallet: Wallet, amountUsd?: number, network: Network = 'mainnet'): string {
+  if (wallet.chain === 'base') return base.qrUri(wallet.address, amountUsd, network);
+  if (wallet.chain === 'solana') return solana.qrUri(wallet.address, amountUsd, network);
+  return tempo.qrUri(wallet.address, amountUsd, network);
 }
 
 export function formatBalance(chain: Chain, raw: bigint): string {
@@ -59,8 +59,8 @@ export function formatBalance(chain: Chain, raw: bigint): string {
   return tempo.formatBalance(raw);
 }
 
-export async function createX402Signer(wallet: Wallet): Promise<unknown> {
-  if (wallet.chain === 'base') return base.createSigner(wallet.secret);
+export async function createX402Signer(wallet: Wallet, network: Network = 'mainnet'): Promise<unknown> {
+  if (wallet.chain === 'base') return base.createSigner(wallet.secret, network);
   if (wallet.chain === 'solana') return solana.createSigner(wallet.secret);
   throw new Error(`x402 signer not applicable for chain: ${wallet.chain}`);
 }

@@ -4,16 +4,16 @@ import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
-import type { Chain } from '../constants';
+import type { Chain, Network } from '../constants';
 
-export async function qr(chain: Chain, amountUsd?: number): Promise<void> {
+export async function qr(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
   const ks = await loadKeystore(chain);
   const uri =
     chain === 'base'
-      ? baseChain.qrUri(ks.address, amountUsd)
+      ? baseChain.qrUri(ks.address, amountUsd, network)
       : chain === 'solana'
-        ? solanaChain.qrUri(ks.address, amountUsd)
-        : tempoChain.qrUri(ks.address, amountUsd);
+        ? solanaChain.qrUri(ks.address, amountUsd, network)
+        : tempoChain.qrUri(ks.address, amountUsd, network);
 
   if (isJson()) {
     writeJson({

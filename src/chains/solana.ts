@@ -4,7 +4,7 @@ import {
   address as solAddress,
 } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
-import { USDC } from '../constants';
+import { svmConfig, type Network } from '../constants';
 
 export function generateKey(): Buffer {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(32)));
@@ -19,10 +19,11 @@ export async function createSigner(key: Buffer) {
   return createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(key));
 }
 
-export async function balance(ownerBase58: string): Promise<bigint> {
-  const rpc = createSolanaRpc(USDC.solana.mainnet.rpcUrl);
+export async function balance(ownerBase58: string, network: Network = 'mainnet'): Promise<bigint> {
+  const cfg = svmConfig(network);
+  const rpc = createSolanaRpc(cfg.rpcUrl);
   const owner = solAddress(ownerBase58);
-  const mint = solAddress(USDC.solana.mainnet.mint);
+  const mint = solAddress(cfg.mint);
   const accounts = await rpc
     .getTokenAccountsByOwner(owner, { mint }, { encoding: 'base64' })
     .send();
@@ -32,12 +33,13 @@ export async function balance(ownerBase58: string): Promise<bigint> {
   return token.data.amount;
 }
 
-export function qrUri(addr: string, amountUsd?: number): string {
+export function qrUri(addr: string, amountUsd?: number, network: Network = 'mainnet'): string {
+  const cfg = svmConfig(network);
   const base = `solana:${addr}`;
   if (!amountUsd || amountUsd <= 0) return base;
   const params = new URLSearchParams({
-    amount: amountUsd.toFixed(USDC.solana.mainnet.decimals),
-    'spl-token': USDC.solana.mainnet.mint,
+    amount: amountUsd.toFixed(cfg.decimals),
+    'spl-token': cfg.mint,
   });
   return `${base}?${params.toString()}`;
 }

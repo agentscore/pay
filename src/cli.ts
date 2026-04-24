@@ -6,9 +6,16 @@ import { history } from './commands/history';
 import { limitsClear, limitsSet, limitsShow } from './commands/limits';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
-import { walletAddress, walletCreate, walletExport, walletImport } from './commands/wallet';
+import {
+  walletAddress,
+  walletCreate,
+  walletExport,
+  walletImport,
+  walletImportMnemonic,
+  walletShowMnemonic,
+} from './commands/wallet';
 import { whoami } from './commands/whoami';
-import { SUPPORTED_CHAINS, type Chain } from './constants';
+import { SUPPORTED_CHAINS, SUPPORTED_NETWORKS, type Chain, type Network } from './constants';
 import { resolveMode, setMode } from './output';
 import type { ModeFlags } from './output';
 
@@ -19,6 +26,10 @@ type GlobalOpts = { json?: boolean; plain?: boolean };
 function chainOption(required = false): Option {
   const opt = new Option('--chain <chain>', 'blockchain network').choices([...SUPPORTED_CHAINS]);
   return required ? opt.makeOptionMandatory() : opt;
+}
+
+function networkOption(): Option {
+  return new Option('--network <network>', 'which network variant (mainnet or testnet)').choices([...SUPPORTED_NETWORKS]).default('mainnet');
 }
 
 function collectHeader(value: string, previous: Record<string, string>): Record<string, string> {
@@ -47,9 +58,13 @@ Exit codes:
 
 Environment:
   AGENTSCORE_PAY_PASSPHRASE   skip interactive passphrase prompt
+  AGENTSCORE_PAY_HOME         override the state dir (default: ~/.agentscore)
   BASE_RPC_URL                override Base mainnet RPC endpoint
+  BASE_SEPOLIA_RPC_URL        override Base Sepolia RPC endpoint
   SOLANA_RPC_URL              override Solana mainnet RPC endpoint
+  SOLANA_DEVNET_RPC_URL       override Solana Devnet RPC endpoint
   TEMPO_RPC_URL               override Tempo mainnet RPC endpoint
+  TEMPO_TESTNET_RPC_URL       override Tempo testnet RPC endpoint
 
 Config:
   ~/.agentscore/config.json   { "preferred_chains": ["base", "tempo"] }
@@ -71,22 +86,45 @@ export function buildCli(): Command {
     .command('create')
     .description('Generate a new encrypted keystore. Omit --chain to create all three chains.')
     .addOption(chainOption())
+    .option('--mnemonic', 'generate a BIP-39 mnemonic and derive keys from it (stores the mnemonic encrypted alongside the keystores)')
     .addHelpText(
       'after',
-      '\nExamples:\n  agentscore-pay wallet create                 # creates base, solana, tempo\n  agentscore-pay wallet create --chain base    # creates just base\n  AGENTSCORE_PAY_PASSPHRASE=... agentscore-pay wallet create --json  # scripted\n',
+      '\nExamples:\n  agentscore-pay wallet create                 # creates base, solana, tempo (random keys per chain)\n  agentscore-pay wallet create --chain base    # creates just base\n  agentscore-pay wallet create --mnemonic      # BIP-39 seed → derives all three chains\n  AGENTSCORE_PAY_PASSPHRASE=... agentscore-pay wallet create --json  # scripted\n',
     )
-    .action(async (opts: { chain?: Chain }) => {
+    .action(async (opts: { chain?: Chain; mnemonic?: boolean }) => {
       applyMode(program);
-      await walletCreate(opts.chain);
+      await walletCreate(opts);
     });
 
   wallet
-    .command('import <key>')
-    .description('Import an existing key (hex for EVM, base64 for Solana private-key seed)')
-    .addOption(chainOption(true))
-    .action(async (key: string, opts: { chain: Chain }) => {
+    .command('import')
+    .description('Import a key. Use either <key> positional (hex/base64) or --mnemonic to import a BIP-39 phrase.')
+    .argument('[key]', 'hex private key (EVM) or base64 private-key seed (Solana)')
+    .addOption(chainOption())
+    .option('--mnemonic <phrase>', 'BIP-39 mnemonic phrase (12 or 24 words, quoted)')
+    .action(async (key: string | undefined, opts: { chain?: Chain; mnemonic?: string }) => {
       applyMode(program);
+      if (opts.mnemonic) {
+        await walletImportMnemonic(opts.mnemonic, opts.chain);
+        return;
+      }
+      if (!key) {
+        throw new Error('Pass either <key> positional or --mnemonic <phrase>');
+      }
+      if (!opts.chain) {
+        throw new Error('--chain is required when importing a raw key');
+      }
       await walletImport(opts.chain, key);
+    });
+
+  wallet
+    .command('show-mnemonic')
+    .description('Print the stored BIP-39 mnemonic. DANGER — only run in a trusted environment.')
+    .option('--danger', 'explicitly acknowledge the risk of printing the mnemonic')
+    .option('--skip-confirm', 'skip the "type EXPORT" prompt (for scripting)')
+    .action(async (opts: { danger?: boolean; skipConfirm?: boolean }) => {
+      applyMode(program);
+      await walletShowMnemonic(opts);
     });
 
   wallet
@@ -113,29 +151,32 @@ export function buildCli(): Command {
     .command('balance')
     .description('Show USDC balance across configured chains')
     .addOption(chainOption())
-    .action(async (opts: { chain?: Chain }) => {
+    .addOption(networkOption())
+    .action(async (opts: { chain?: Chain; network: Network }) => {
       applyMode(program);
-      await balance(opts.chain);
+      await balance(opts.chain, opts.network);
     });
 
   program
     .command('qr')
     .description('Print an ASCII QR for receiving USDC (raw address or EIP-681 / solana: URI when --amount)')
     .addOption(chainOption(true))
+    .addOption(networkOption())
     .option('--amount <usd>', 'pre-fill amount in USD', (v) => Number(v))
-    .action(async (opts: { chain: Chain; amount?: number }) => {
+    .action(async (opts: { chain: Chain; amount?: number; network: Network }) => {
       applyMode(program);
-      await qr(opts.chain, opts.amount);
+      await qr(opts.chain, opts.amount, opts.network);
     });
 
   program
     .command('fund')
     .description('Print Coinbase Onramp URL + QR, poll balance until deposit lands (Tempo: hints tempo wallet fund)')
     .addOption(chainOption(true))
+    .addOption(networkOption())
     .option('--amount <usd>', 'target amount in USD', (v) => Number(v))
-    .action(async (opts: { chain: Chain; amount?: number }) => {
+    .action(async (opts: { chain: Chain; amount?: number; network: Network }) => {
       applyMode(program);
-      await fund(opts.chain, opts.amount);
+      await fund(opts.chain, opts.amount, opts.network);
     });
 
   const limits = program.command('limits').description('Persistent local spending allowances (per-call, daily, per-merchant)');
@@ -176,9 +217,10 @@ export function buildCli(): Command {
   program
     .command('whoami')
     .description('Show wallets + balances across chains + active config preferences')
-    .action(async () => {
+    .addOption(networkOption())
+    .action(async (opts: { network: Network }) => {
       applyMode(program);
-      await whoami();
+      await whoami(opts.network);
     });
 
   program
@@ -201,6 +243,7 @@ export function buildCli(): Command {
     .command('pay <method> <url>')
     .description('Send an HTTP request and auto-handle the 402 payment round-trip')
     .addOption(chainOption())
+    .addOption(networkOption())
     .option('-d, --data <body>', 'request body')
     .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
     .option('--max-spend <usd>', 'reject payments above this USD amount', (v) => Number(v))
@@ -216,6 +259,7 @@ export function buildCli(): Command {
         url: string,
         opts: {
           chain?: Chain;
+          network: Network;
           data?: string;
           header?: Record<string, string>;
           maxSpend?: number;
@@ -226,6 +270,7 @@ export function buildCli(): Command {
         applyMode(program);
         await pay({
           chain: opts.chain,
+          network: opts.network,
           method: method.toUpperCase(),
           url,
           body: opts.data,

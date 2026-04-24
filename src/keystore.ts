@@ -1,8 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt, type ScryptOptions } from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { homedir } from 'os';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
+import { keystorePath as _keystorePath } from './paths';
 import type { Chain } from './constants';
+
+export { keystorePath } from './paths';
 
 const KDF_N = 131072;
 const KDF_R = 8;
@@ -31,10 +33,6 @@ export interface KeystoreFile {
     cipherAuthTag: string;
     ciphertext: string;
   };
-}
-
-export function keystorePath(chain: Chain): string {
-  return join(homedir(), '.agentscore', 'wallets', `${chain}.json`);
 }
 
 export async function encryptSecret(
@@ -77,14 +75,14 @@ export async function decryptSecret(
 }
 
 export async function saveKeystore(file: KeystoreFile): Promise<string> {
-  const path = keystorePath(file.chain);
+  const path = _keystorePath(file.chain);
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await writeFile(path, JSON.stringify(file, null, 2), { mode: 0o600 });
   return path;
 }
 
 export async function loadKeystore(chain: Chain): Promise<KeystoreFile> {
-  const path = keystorePath(chain);
+  const path = _keystorePath(chain);
   const raw = await readFile(path, 'utf-8');
   const parsed = JSON.parse(raw) as KeystoreFile;
   if (parsed.version !== 1) throw new Error(`Unsupported keystore version: ${parsed.version}`);
@@ -94,7 +92,7 @@ export async function loadKeystore(chain: Chain): Promise<KeystoreFile> {
 
 export async function keystoreExists(chain: Chain): Promise<boolean> {
   try {
-    await readFile(keystorePath(chain), 'utf-8');
+    await readFile(_keystorePath(chain), 'utf-8');
     return true;
   } catch {
     return false;

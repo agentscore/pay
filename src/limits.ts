@@ -1,16 +1,14 @@
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
-import { homedir } from 'os';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import { readEntries } from './ledger';
+import { limitsPath } from './paths';
+
+export { limitsPath } from './paths';
 
 export interface Limits {
   daily_usd?: number;
   per_call_usd?: number;
   per_merchant_usd?: number;
-}
-
-export function limitsPath(): string {
-  return join(homedir(), '.agentscore', 'limits.json');
 }
 
 export async function loadLimits(): Promise<Limits> {

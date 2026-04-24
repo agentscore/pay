@@ -1,15 +1,18 @@
 import { createPublicClient, defineChain, erc20Abi, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { USDC } from '../constants';
+import { evmConfig, type Network } from '../constants';
 
 type Hex = `0x${string}`;
 
-const tempoMainnet = defineChain({
-  id: USDC.tempo.mainnet.chainId,
-  name: 'Tempo',
-  nativeCurrency: { name: 'Tempo', symbol: 'TEMPO', decimals: 18 },
-  rpcUrls: { default: { http: [USDC.tempo.mainnet.rpcUrl] } },
-});
+function chainFor(network: Network) {
+  const cfg = evmConfig('tempo', network);
+  return defineChain({
+    id: cfg.chainId,
+    name: network === 'mainnet' ? 'Tempo' : 'Tempo Testnet',
+    nativeCurrency: { name: 'Tempo', symbol: 'TEMPO', decimals: 18 },
+    rpcUrls: { default: { http: [cfg.rpcUrl] } },
+  });
+}
 
 export function generateKey(): Buffer {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(32)));
@@ -25,23 +28,25 @@ export function createAccount(key: Buffer) {
   return privateKeyToAccount(hex);
 }
 
-export async function balance(address: string): Promise<bigint> {
+export async function balance(address: string, network: Network = 'mainnet'): Promise<bigint> {
+  const cfg = evmConfig('tempo', network);
   const publicClient = createPublicClient({
-    chain: tempoMainnet,
-    transport: http(USDC.tempo.mainnet.rpcUrl),
+    chain: chainFor(network),
+    transport: http(cfg.rpcUrl),
   });
   return publicClient.readContract({
-    address: USDC.tempo.mainnet.address,
+    address: cfg.address,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address as Hex],
   });
 }
 
-export function qrUri(address: string, amountUsd?: number): string {
+export function qrUri(address: string, amountUsd?: number, network: Network = 'mainnet'): string {
+  const cfg = evmConfig('tempo', network);
   if (!amountUsd || amountUsd <= 0) return address;
-  const amount = BigInt(Math.round(amountUsd * 10 ** USDC.tempo.mainnet.decimals));
-  return `ethereum:${USDC.tempo.mainnet.address}@${USDC.tempo.mainnet.chainId}/transfer?address=${address}&uint256=${amount}`;
+  const amount = BigInt(Math.round(amountUsd * 10 ** cfg.decimals));
+  return `ethereum:${cfg.address}@${cfg.chainId}/transfer?address=${address}&uint256=${amount}`;
 }
 
 export function formatBalance(raw: bigint): string {

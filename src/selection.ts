@@ -2,7 +2,7 @@ import * as baseChain from './chains/base';
 import * as solanaChain from './chains/solana';
 import * as tempoChain from './chains/tempo';
 import { loadConfig } from './config';
-import { SUPPORTED_CHAINS, type Chain } from './constants';
+import { SUPPORTED_CHAINS, type Chain, type Network } from './constants';
 import { CliError } from './errors';
 import { keystoreExists, loadKeystore } from './keystore';
 
@@ -16,12 +16,13 @@ export interface Candidate {
 interface SelectInput {
   chainOverride?: Chain;
   minBalanceRaw?: bigint;
+  network?: Network;
 }
 
-async function readBalance(chain: Chain, address: string): Promise<bigint> {
-  if (chain === 'base') return baseChain.balance(address);
-  if (chain === 'solana') return solanaChain.balance(address);
-  return tempoChain.balance(address);
+async function readBalance(chain: Chain, address: string, network: Network): Promise<bigint> {
+  if (chain === 'base') return baseChain.balance(address, network);
+  if (chain === 'solana') return solanaChain.balance(address, network);
+  return tempoChain.balance(address, network);
 }
 
 function formatBalance(chain: Chain, raw: bigint): string {
@@ -30,13 +31,13 @@ function formatBalance(chain: Chain, raw: bigint): string {
   return tempoChain.formatBalance(raw);
 }
 
-export async function listHeldCandidates(): Promise<Candidate[]> {
+export async function listHeldCandidates(network: Network = 'mainnet'): Promise<Candidate[]> {
   const chains = [...SUPPORTED_CHAINS];
   const candidates = await Promise.all(
     chains.map(async (chain) => {
       if (!(await keystoreExists(chain))) return null;
       const ks = await loadKeystore(chain);
-      const raw = await readBalance(chain, ks.address);
+      const raw = await readBalance(chain, ks.address, network);
       return {
         chain,
         address: ks.address,
@@ -49,8 +50,8 @@ export async function listHeldCandidates(): Promise<Candidate[]> {
 }
 
 export async function selectRail(input: SelectInput = {}): Promise<Candidate> {
-  const { chainOverride, minBalanceRaw } = input;
-  const heldCandidates = await listHeldCandidates();
+  const { chainOverride, minBalanceRaw, network = 'mainnet' } = input;
+  const heldCandidates = await listHeldCandidates(network);
 
   if (heldCandidates.length === 0) {
     throw new CliError('no_wallet', 'No wallets on disk.', {
