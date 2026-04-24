@@ -114,7 +114,9 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
 | `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
-| `fund --chain c [--amount N] [--network n]` | Onramp URL + QR + balance poll (Tempo: hints `tempo wallet fund`) |
+| `fund --chain c [--amount N] [--network n]` | Onramp URL + QR + balance poll. Default amount is `10` USD (~50-200 typical agent calls). |
+| `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
+| `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
 | `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--dry-run] [-v]` | HTTP request + auto 402 handling |
 | `whoami [--network n]` | Wallet + balance summary + active config |
@@ -151,10 +153,35 @@ AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay pay --network testnet ...
 
 ## Funding
 
-- **Base, Solana** — `fund` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR you can scan from any mobile wallet.
-- **Tempo** — Coinbase Onramp does not cover Tempo. Use `tempo wallet fund` or transfer USDC.e (chain 4217) from an existing Tempo wallet.
-
 The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP Tempo are both gasless for the signer; the facilitator pays.
+
+### Mainnet
+
+- **Base, Solana** — `agentscore-pay fund --chain base --amount 10` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR. Click the URL, or scan the QR from any mobile wallet with USDC to send yourself a transfer. `fund` polls balance and confirms when the deposit lands. Default amount is `$10` (~50-200 typical agent calls).
+- **Tempo** — Coinbase Onramp does not cover Tempo. Use `tempo wallet fund` or transfer USDC.e (chain 4217) from an existing Tempo wallet.
+- **From an existing wallet (no onramp)** — `agentscore-pay wallet address --chain base` prints the address; send USDC on Base to it from MetaMask, Rabby, Coinbase Wallet, Phantom, or a CEX withdrawal. Same pattern on Solana + Tempo.
+
+### Testnet
+
+- `agentscore-pay faucet --chain base` prints the Circle USDC faucet URL + the Base Sepolia address (copied to clipboard). Paste into the faucet form and wait.
+- Same flow for `--chain solana` (Solana Devnet).
+- Tempo testnet faucet is not public; contact the Tempo team.
+
+### Scripted / deployed agents
+
+- Pre-fund a wallet on your laptop, then `wallet export --chain base --danger --skip-confirm` to get the key.
+- On the server, `AGENTSCORE_PAY_PASSPHRASE=<pass> agentscore-pay wallet import --chain base 0x<hex>` or ship the encrypted `~/.agentscore/wallets/base.json` directly.
+- `AGENTSCORE_PAY_HOME=/opt/agentscore` in the server env isolates state from any other user on the machine.
+- `agentscore-pay limits set --daily 50 --per-call 1` caps spending for autonomous agents.
+
+### Budgeting for a specific merchant
+
+```bash
+# Before making a purchase, check what you can afford
+agentscore-pay fund-estimate https://agents.martinestate.com/purchase \
+  -X POST -d '{"product_id":"cab-2021","quantity":1,...}'
+# → shows price, your balance, calls affordable, and suggested top-up
+```
 
 ## Security
 

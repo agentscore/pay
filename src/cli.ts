@@ -1,7 +1,9 @@
 import { Command, Option } from 'commander';
 import { balance } from './commands/balance';
 import { check } from './commands/check';
+import { faucet } from './commands/faucet';
 import { fund } from './commands/fund';
+import { fundEstimate } from './commands/fund-estimate';
 import { history } from './commands/history';
 import { limitsClear, limitsSet, limitsShow } from './commands/limits';
 import { pay } from './commands/pay';
@@ -173,11 +175,47 @@ export function buildCli(): Command {
     .description('Print Coinbase Onramp URL + QR, poll balance until deposit lands (Tempo: hints tempo wallet fund)')
     .addOption(chainOption(true))
     .addOption(networkOption())
-    .option('--amount <usd>', 'target amount in USD', (v) => Number(v))
+    .option('--amount <usd>', 'target amount in USD (default 10 — ~50-200 typical agent calls)', (v) => Number(v))
     .action(async (opts: { chain: Chain; amount?: number; network: Network }) => {
       applyMode(program);
-      await fund(opts.chain, opts.amount, opts.network);
+      const amount = opts.amount ?? 10;
+      await fund(opts.chain, amount, opts.network);
     });
+
+  program
+    .command('faucet')
+    .description('Print the testnet faucet URL for this chain + your address (copies address to clipboard)')
+    .addOption(chainOption(true))
+    .addOption(new Option('--network <network>', 'testnet variant').choices(['testnet']).default('testnet'))
+    .action(async (opts: { chain: Chain; network: Network }) => {
+      applyMode(program);
+      await faucet(opts.chain, opts.network);
+    });
+
+  program
+    .command('fund-estimate <url>')
+    .description('Probe a 402-gated URL and report how many calls your balance covers (plus a top-up suggestion)')
+    .addOption(chainOption())
+    .addOption(networkOption())
+    .option('-X, --method <method>', 'HTTP method', 'GET')
+    .option('-d, --data <body>', 'request body')
+    .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
+    .action(
+      async (
+        url: string,
+        opts: { chain?: Chain; network: Network; method: string; data?: string; header?: Record<string, string> },
+      ) => {
+        applyMode(program);
+        await fundEstimate({
+          url,
+          method: opts.method.toUpperCase(),
+          body: opts.data,
+          headers: opts.header,
+          chain: opts.chain,
+          network: opts.network,
+        });
+      },
+    );
 
   const limits = program.command('limits').description('Persistent local spending allowances (per-call, daily, per-merchant)');
   limits
