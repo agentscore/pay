@@ -2,9 +2,10 @@ import { x402Client } from '@x402/core/client';
 import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
+import { Mppx, tempo } from 'mppx/client';
 import { USDC, type Chain } from '../constants';
 import { promptPassphrase } from '../prompts';
-import { createX402Signer, loadWallet } from '../wallets';
+import { createMppAccount, createX402Signer, loadWallet } from '../wallets';
 import type { ClientEvmSigner } from '@x402/evm';
 import type { ClientSvmSigner } from '@x402/svm';
 
@@ -21,10 +22,38 @@ export interface PayOptions {
 export async function pay(opts: PayOptions): Promise<void> {
   const passphrase = await promptPassphrase();
   const wallet = await loadWallet(opts.chain, passphrase);
-  const signer = await createX402Signer(wallet);
 
+  const init: RequestInit = { method: opts.method };
+  if (opts.body !== undefined) init.body = opts.body;
+  init.headers = {
+    'Content-Type': 'application/json',
+    ...(opts.headers ?? {}),
+    'X-Wallet-Address': wallet.address,
+  };
+
+  if (opts.verbose) {
+    console.error(`→ ${opts.method} ${opts.url}`);
+    console.error(`  chain: ${opts.chain}  signer: ${wallet.address}`);
+    console.error(`  headers: ${JSON.stringify(init.headers)}`);
+    if (opts.body) console.error(`  body: ${opts.body}`);
+  }
+
+  const res = opts.chain === 'tempo'
+    ? await payViaMpp(wallet, opts, init)
+    : await payViaX402(wallet, opts, init);
+
+  if (opts.verbose) console.error(`← ${res.status} ${res.statusText}`);
+
+  const text = await res.text();
+  process.stdout.write(text);
+  if (!text.endsWith('\n')) process.stdout.write('\n');
+  if (!res.ok) process.exitCode = 1;
+}
+
+async function payViaX402(wallet: Awaited<ReturnType<typeof loadWallet>>, opts: PayOptions, init: RequestInit): Promise<Response> {
+  const signer = await createX402Signer(wallet);
   const client = new x402Client();
-  if (opts.chain === 'base') {
+  if (wallet.chain === 'base') {
     client.register(USDC.base.mainnet.network, new ExactEvmScheme(signer as ClientEvmSigner));
   } else {
     client.register(USDC.solana.mainnet.network, new ExactSvmScheme(signer as ClientSvmSigner));
@@ -44,28 +73,29 @@ export async function pay(opts: PayOptions): Promise<void> {
   }
 
   const fetchWithPay = wrapFetchWithPayment(fetch, client);
-  const init: RequestInit = { method: opts.method };
-  if (opts.body !== undefined) init.body = opts.body;
-  init.headers = {
-    'Content-Type': 'application/json',
-    ...(opts.headers ?? {}),
-    'X-Wallet-Address': wallet.address,
-  };
+  return fetchWithPay(opts.url, init);
+}
 
-  if (opts.verbose) {
-    console.error(`→ ${opts.method} ${opts.url}`);
-    console.error(`  headers: ${JSON.stringify(init.headers)}`);
-    if (opts.body) console.error(`  body: ${opts.body}`);
-  }
-
-  const res = await fetchWithPay(opts.url, init);
-
-  if (opts.verbose) {
-    console.error(`← ${res.status} ${res.statusText}`);
-  }
-
-  const text = await res.text();
-  process.stdout.write(text);
-  if (!text.endsWith('\n')) process.stdout.write('\n');
-  if (!res.ok) process.exitCode = 1;
+async function payViaMpp(wallet: Awaited<ReturnType<typeof loadWallet>>, opts: PayOptions, init: RequestInit): Promise<Response> {
+  const account = createMppAccount(wallet);
+  const client = Mppx.create({
+    methods: [tempo({ account })],
+    fetch,
+    onChallenge: opts.maxSpendUsd === undefined
+      ? undefined
+      : async (challenge) => {
+          const max = opts.maxSpendUsd as number;
+          const requests = (challenge as { paymentRequests?: Array<{ amount?: string; decimals?: number }> }).paymentRequests ?? [];
+          for (const r of requests) {
+            const decimals = Number(r.decimals ?? 6);
+            const priceRaw = BigInt(r.amount ?? '0');
+            const priceUsd = Number(priceRaw) / 10 ** decimals;
+            if (priceUsd > max) {
+              throw new Error(`Payment ${priceUsd} USDC exceeds --max-spend ${max}`);
+            }
+          }
+          return undefined;
+        },
+  });
+  return client.fetch(opts.url, init);
 }

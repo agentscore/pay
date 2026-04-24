@@ -1,4 +1,4 @@
-export const SUPPORTED_CHAINS = ['base', 'solana'] as const;
+export const SUPPORTED_CHAINS = ['base', 'solana', 'tempo'] as const;
 export type Chain = (typeof SUPPORTED_CHAINS)[number];
 
 export const USDC = {
@@ -32,9 +32,24 @@ export const USDC = {
       network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' as const,
     },
   },
+  tempo: {
+    mainnet: {
+      address: '0x20C000000000000000000000b9537d11c60E8b50' as const,
+      decimals: 6,
+      rpcUrl: process.env.TEMPO_RPC_URL || 'https://rpc.tempo.xyz',
+      chainId: 4217,
+    },
+    testnet: {
+      address: '0x20c0000000000000000000000000000000000000' as const,
+      decimals: 6,
+      rpcUrl: process.env.TEMPO_TESTNET_RPC_URL || 'https://rpc.moderato.tempo.xyz',
+      chainId: 42431,
+    },
+  },
 } as const;
 
-export function onrampUrl(chain: Chain, address: string, amountUsd?: number): string {
+export function onrampUrl(chain: Chain, address: string, amountUsd?: number): string | null {
+  if (chain === 'tempo') return null;
   const network = chain === 'base' ? 'base' : 'solana';
   const asset = 'USDC';
   const base = 'https://pay.coinbase.com/buy/select-asset';

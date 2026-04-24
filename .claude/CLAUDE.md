@@ -1,32 +1,40 @@
-# @agent-score/x402
+# @agent-score/pay
 
-CLI wallet for one-shell-command x402 payments on Base and Solana. ESM-only.
+CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and MPP (Tempo). ESM-only.
 
 ## Purpose
 
-Closes the UX gap for shell-tool LLM agents that want to pay x402-gated endpoints. Mirrors `tempo request` ergonomics for MPP: one shell command, body preserved, agent never sees a private key on the wire.
+Closes the UX gap for shell-tool LLM agents that want to pay protocol-gated endpoints. Mirrors `tempo request` ergonomics but covers every rail an AgentScore-gated merchant might accept: one shell command, body preserved, agent never sees a private key on the wire.
 
 ## Architecture
 
-Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/x402`.
+Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/pay`.
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | Shebang + error handler, entry point for the `agentscore-x402` bin |
+| `src/index.ts` | Shebang + error handler, entry point for the `agentscore-pay` bin |
 | `src/cli.ts` | commander program definition |
 | `src/keystore.ts` | AES-256-GCM + scrypt encrypted keystore (generic, chain-agnostic) |
 | `src/wallets.ts` | Wallet factory dispatching to chain modules |
 | `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_X402_PASSPHRASE` env) |
 | `src/constants.ts` | Chain network IDs, USDC addresses, RPC URLs, Coinbase Onramp builder |
-| `src/chains/base.ts` | EVM adapter: viem Account, USDC balance, EIP-681 QR URI |
-| `src/chains/solana.ts` | SVM adapter: `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
+| `src/chains/base.ts` | EVM adapter (x402): viem Account, USDC balance, EIP-681 QR URI |
+| `src/chains/solana.ts` | SVM adapter (x402): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
+| `src/chains/tempo.ts` | EVM adapter (MPP): viem Account on chain 4217, USDC.e balance, EIP-681 QR URI |
 | `src/commands/wallet.ts` | `wallet create/import/address` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
-| `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling |
-| `src/commands/pay.ts` | `pay <METHOD> <URL>` — wraps `@x402/fetch` with EVM or SVM scheme |
-| `tests/` | Vitest unit tests (keystore + QR URI shape) |
+| `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo prints `tempo wallet fund` hint) |
+| `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
+| `tests/` | Vitest unit tests (keystore + QR URI shape per chain) |
 | `dist/` | tsup output — ESM only with shebang banner |
+
+## Chain-to-protocol routing
+
+- `base` / `solana` → x402Client + ExactEvmScheme or ExactSvmScheme, via `wrapFetchWithPayment`
+- `tempo` → `Mppx.create({ methods: [tempo({ account })] })`, via mpp.fetch
+
+Both paths preserve POST bodies through the 402 round-trip. The CLI's passphrase + keystore layer is chain-agnostic.
 
 ## Tooling
 
@@ -70,10 +78,10 @@ bun run build
 
 The publish workflow runs on `ubuntu-latest` (required for npm trusted publishing), builds, publishes to npm with provenance, and creates a GitHub Release.
 
-npm scope is `@agent-score`. User-Agent in x402 payloads uses `@agentscore/x402`.
+npm scope is `@agent-score`. User-Agent in payment payloads uses `@agentscore/pay`.
 
 ## Scope boundary
 
-- **In scope:** pay, balance, qr, fund, wallet CRUD on Base + Solana
-- **Full polish (TEC-232):** Polygon/Arbitrum/World/Tempo, BIP-39, keychain, `history/check/whoami/limits/link`, Coinbase Pay SDK embed, Homebrew/Scoop/Docker, sigstore, native binary
+- **In scope (MVP):** pay, balance, qr, fund, wallet CRUD on Base + Solana + Tempo
+- **Full polish (TEC-232):** Polygon/Arbitrum/World, BIP-39, keychain, `history/check/whoami/limits/link`, Coinbase Pay SDK embed, Homebrew/Scoop/Docker, sigstore, native binary
 - **Out forever:** fiat onramp, custodial wallet, swaps/bridges, GUI, duplicating merchant-side wallet capture
