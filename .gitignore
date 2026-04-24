@@ -5,3 +5,5 @@ coverage
 .env.local
 *.tsbuildinfo
 .DS_Store
+*.bun-build
+.*.bun-build
