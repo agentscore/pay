@@ -1,7 +1,8 @@
 import { run } from './cli';
+import { writeError } from './output';
 
 run(process.argv).catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error(`agentscore-x402: ${msg}`);
-  process.exit(1);
+  const e = err instanceof Error ? err : new Error(String(err));
+  const code = writeError(e);
+  process.exit(code);
 });
