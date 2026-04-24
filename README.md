@@ -1,5 +1,8 @@
 # @agent-score/pay
 
+[![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 CLI wallet for one-shell-command agent payments across **x402** (Base, Solana) and **MPP** (Tempo).
 
 Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire — but works across every rail an AgentScore-gated merchant might accept.
