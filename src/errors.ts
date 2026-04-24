@@ -69,3 +69,26 @@ export class CliError extends Error {
     this.extra = options.extra ?? {};
   }
 }
+
+const RPC_ENV_VARS: Record<string, string> = {
+  base: 'BASE_RPC_URL',
+  'base-testnet': 'BASE_SEPOLIA_RPC_URL',
+  solana: 'SOLANA_RPC_URL',
+  'solana-testnet': 'SOLANA_DEVNET_RPC_URL',
+  tempo: 'TEMPO_RPC_URL',
+  'tempo-testnet': 'TEMPO_TESTNET_RPC_URL',
+};
+
+export function wrapRpcError(chain: string, network: string, err: unknown): CliError {
+  if (err instanceof CliError) return err;
+  const msg = err instanceof Error ? err.message : String(err);
+  const key = network === 'mainnet' ? chain : `${chain}-testnet`;
+  const envVar = RPC_ENV_VARS[key];
+  return new CliError('rpc_error', `${chain} ${network} RPC call failed: ${msg}`, {
+    nextSteps: {
+      action: 'check_rpc_endpoint',
+      suggestion: envVar ? `Set ${envVar} to a non-public RPC if you are hitting rate limits.` : undefined,
+    },
+    extra: { chain, network, original_message: msg },
+  });
+}
