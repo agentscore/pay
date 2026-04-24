@@ -16,7 +16,7 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/cli.ts` | commander program definition |
 | `src/keystore.ts` | AES-256-GCM + scrypt encrypted keystore (generic, chain-agnostic) |
 | `src/wallets.ts` | Wallet factory dispatching to chain modules |
-| `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_X402_PASSPHRASE` env) |
+| `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_PAY_PASSPHRASE` env) |
 | `src/constants.ts` | Chain network IDs, USDC addresses, RPC URLs, Coinbase Onramp builder |
 | `src/chains/base.ts` | EVM adapter (x402): viem Account, USDC balance, EIP-681 QR URI |
 | `src/chains/solana.ts` | SVM adapter (x402): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |

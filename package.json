@@ -38,11 +38,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentscore/x402-cli"
+    "url": "https://github.com/agentscore/pay-cli"
   },
   "homepage": "https://agentscore.sh",
   "bugs": {
-    "url": "https://github.com/agentscore/x402-cli/issues"
+    "url": "https://github.com/agentscore/pay-cli/issues"
   },
   "engines": {
     "node": ">=20"

@@ -74,7 +74,7 @@ The wallet holds USDC only — no ETH or SOL required. Both x402 rails and MPP/T
 
 - Keystore is AES-256-GCM encrypted with a scrypt-derived key (`N=131072, r=8, p=1`), one file per chain.
 - Files are written with `0600` permissions, parent dir `0700`.
-- Passphrase is prompted per signing operation unless `AGENTSCORE_X402_PASSPHRASE` is set (useful for autonomous agents).
+- Passphrase is prompted per signing operation unless `AGENTSCORE_PAY_PASSPHRASE` is set (useful for autonomous agents).
 - No telemetry. No auto-update. No plaintext keys on disk.
 
 ## Relationship to other AgentScore packages
