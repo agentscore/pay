@@ -29,24 +29,33 @@ function buildQrUri(chain: Chain, address: string, amountUsd?: number, network: 
   return tempoChain.qrUri(address, amountUsd, network);
 }
 
+function tempoFundArgs(address: string, network: Network): string[] {
+  const args = ['wallet', 'fund', '--address', address];
+  if (network === 'testnet') args.push('-n', 'testnet');
+  return args;
+}
+
+function tempoFundCommand(binPath: string, address: string, network: Network): string {
+  return `${binPath} ${tempoFundArgs(address, network).join(' ')}`;
+}
+
 async function fundTempo(address: string, network: Network): Promise<boolean> {
   if (isJson()) {
-    // Machine mode: never hijack stdout/stdio for a subprocess. Caller will see
-    // the tempo_wallet_fund action and can choose how to run it.
+    // Machine mode: never hijack stdout/stdio for a subprocess. Caller sees the
+    // tempo_wallet_fund action and decides whether to spawn it themselves.
     return false;
   }
   const cli = await locateTempoCli();
   if (!cli.found || !cli.path) return false;
 
-  writeLine(`Handing off to Tempo CLI (${cli.path} wallet fund${network === 'testnet' ? ' --testnet' : ''})…`);
+  const args = tempoFundArgs(address, network);
+  writeLine(`Handing off to Tempo CLI: ${cli.path} ${args.join(' ')}`);
   writeLine('');
-  const args = ['wallet', 'fund'];
-  if (network === 'testnet') args.push('--testnet');
   try {
     const { exitCode } = await spawnTempo(cli.path, args);
     if (exitCode !== 0) {
       writeLine('');
-      writeLine(`Tempo CLI exited with code ${exitCode}. Run manually to debug: tempo wallet fund`);
+      writeLine(`Tempo CLI exited with code ${exitCode}. Run manually to debug: ${cli.path} ${args.join(' ')}`);
     }
   } catch (err) {
     writeLine('');
@@ -82,8 +91,8 @@ export async function fund(chain: Chain, amountUsd?: number, network: Network = 
             next_steps: {
               action: 'run_tempo_wallet_fund',
               suggestion: tempoCli?.found
-                ? `Run: ${tempoCli.path} wallet fund${network === 'testnet' ? ' --testnet' : ''}`
-                : `Install the Tempo CLI from ${TEMPO_INSTALL_URL}, then run: tempo wallet fund${network === 'testnet' ? ' --testnet' : ''}`,
+                ? `Run: ${tempoFundCommand(tempoCli.path!, ks.address, network)}`
+                : `Install the Tempo CLI from ${TEMPO_INSTALL_URL}, then run: tempo ${tempoFundArgs(ks.address, network).join(' ')}`,
             },
           }
         : {}),
@@ -100,9 +109,11 @@ export async function fund(chain: Chain, amountUsd?: number, network: Network = 
     } else if (chain === 'tempo') {
       writeLine('Tempo is not supported by Coinbase Onramp. Options:');
       if (tempoCli?.found) {
-        writeLine(`  • Hand off to Tempo CLI: ${tempoCli.path} wallet fund${network === 'testnet' ? ' --testnet' : ''}`);
+        writeLine(`  • Hand off to Tempo CLI: ${tempoFundCommand(tempoCli.path!, ks.address, network)}`);
       } else {
-        writeLine(`  • Install Tempo CLI (${TEMPO_INSTALL_URL}) then: tempo wallet fund${network === 'testnet' ? ' --testnet' : ''}`);
+        writeLine(
+          `  • Install Tempo CLI (${TEMPO_INSTALL_URL}) then: tempo ${tempoFundArgs(ks.address, network).join(' ')}`,
+        );
       }
       writeLine('  • Transfer USDC.e (chain 4217) from an existing Tempo wallet:');
     }
