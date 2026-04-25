@@ -102,13 +102,11 @@ jobs:
           git clone "https://x-access-token:${GH_TOKEN}@github.com/agentscore/homebrew-tap.git" tap
           cd tap
           mkdir -p Formula
-          # Use Python (no shell-escape worries with $ in template) to do the substitution
-          URL="$TARBALL_URL" SHA="$SHA256" python3 -c '
-import os
-template = open("../Formula/agentscore-pay.rb.template").read()
-out = template.replace("${URL}", os.environ["URL"]).replace("${SHA}", os.environ["SHA"])
-open("Formula/agentscore-pay.rb", "w").write(out)
-'
+          # template has literal ${URL} / ${SHA} tokens; sed substitutes them.
+          # Escape the literal $ in the search pattern via single-quoted shell + \$.
+          sed -e 's|\${URL}|'"$TARBALL_URL"'|g' \
+              -e 's|\${SHA}|'"$SHA256"'|g' \
+              ../Formula/agentscore-pay.rb.template > Formula/agentscore-pay.rb
           git config user.name 'agentscore-bot'
           git config user.email 'bot@agentscore.sh'
           git add Formula/agentscore-pay.rb
