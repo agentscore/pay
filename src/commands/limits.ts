@@ -1,3 +1,4 @@
+import { bold, dim, green } from '../colors';
 import { CliError } from '../errors';
 import { clearLimits, limitsPath, loadLimits, saveLimits, type Limits } from '../limits';
 import { isJson, writeJson, writeLine } from '../output';
@@ -14,14 +15,14 @@ export async function limitsShow(): Promise<void> {
     writeJson({ path: limitsPath(), limits });
     return;
   }
-  writeLine(`Limits file: ${limitsPath()}`);
+  writeLine(`${bold('Limits file')}: ${dim(limitsPath())}`);
   if (!limits.per_call_usd && !limits.daily_usd && !limits.per_merchant_usd) {
-    writeLine('No limits set.');
+    writeLine(dim('No limits set.'));
     return;
   }
-  if (limits.per_call_usd !== undefined) writeLine(`  per-call:     $${limits.per_call_usd}`);
-  if (limits.daily_usd !== undefined) writeLine(`  daily:        $${limits.daily_usd}`);
-  if (limits.per_merchant_usd !== undefined) writeLine(`  per-merchant: $${limits.per_merchant_usd}`);
+  if (limits.per_call_usd !== undefined) writeLine(`  per-call:     ${bold('$' + limits.per_call_usd)}`);
+  if (limits.daily_usd !== undefined) writeLine(`  daily:        ${bold('$' + limits.daily_usd)}`);
+  if (limits.per_merchant_usd !== undefined) writeLine(`  per-merchant: ${bold('$' + limits.per_merchant_usd)}`);
 }
 
 export async function limitsSet(opts: LimitsSetOptions): Promise<void> {
@@ -41,7 +42,7 @@ export async function limitsSet(opts: LimitsSetOptions): Promise<void> {
     writeJson({ path: limitsPath(), limits: next });
     return;
   }
-  writeLine('Limits saved:');
+  writeLine(`${green('✓')} Limits saved:`);
   await limitsShow();
 }
 
@@ -51,5 +52,5 @@ export async function limitsClear(): Promise<void> {
     writeJson({ cleared: true, path: limitsPath() });
     return;
   }
-  writeLine('Limits cleared.');
+  writeLine(`${green('✓')} Limits cleared.`);
 }

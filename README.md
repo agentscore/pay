@@ -16,15 +16,22 @@ npx @agent-score/pay --help
 # Or install globally
 npm i -g @agent-score/pay
 agentscore-pay --help
+
+# Or via the install script (auto-detects npm vs native binary)
+curl -fsSL https://raw.githubusercontent.com/agentscore/pay/main/install.sh | sh
+
+# Or via Homebrew (once the tap is published)
+brew tap agentscore/tap
+brew install agentscore-pay
 ```
 
-Requires Node 20+. Native single-file binaries (no Node required) are built via `bun run build:binary:all`.
+Requires Node 20+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release via `bun run build:binary:all`.
 
 ## Quick start
 
 ```bash
-# 1. Create an encrypted keystore for every chain at once
-agentscore-pay wallet create
+# 1. One-shot init — encrypted keystores on every chain, derived from a single BIP-39 mnemonic
+agentscore-pay init
 
 # 2. Fund one of them (prints Coinbase Onramp URL + QR + polls balance)
 agentscore-pay fund --chain base --amount 10
@@ -73,6 +80,95 @@ agentscore-pay pay POST https://merchant.example/api \
 
 When stdout is not a TTY (piped, redirected), `--plain` is automatically applied and structured output mirrors `--json`'s shape where applicable.
 
+### Use from an agent — complete recipe
+
+A typical autonomous agent flow: probe the endpoint, decide whether to pay, pay, branch on the structured outcome.
+
+**Bash (Claude Code / Cursor / shell-tool):**
+
+```bash
+#!/usr/bin/env bash
+set -eu
+URL="https://agents.martinestate.com/purchase"
+BODY='{"product_id":"cab-2021","quantity":1,"email":"agent@example.com","shipping":{...}}'
+MAX_SPEND=250
+
+# 1. Probe — what does this endpoint cost and which rails does it accept?
+PROBE=$(agentscore-pay check "$URL" -X POST -d "$BODY" --json)
+PRICE=$(printf '%s' "$PROBE" | jq -r '.accepts[0].max_amount_usd // empty')
+echo "Endpoint asks for \$${PRICE} USDC"
+
+# 2. Pay — capture stdout (success body) and exit code separately.
+RESPONSE=$(agentscore-pay pay POST "$URL" \
+  -H 'Content-Type: application/json' \
+  -d "$BODY" \
+  --max-spend "$MAX_SPEND" \
+  --timeout 120 \
+  --retries 2 \
+  --json) || EXIT=$?
+EXIT=${EXIT:-0}
+
+# 3. Branch on the standard exit codes.
+case "$EXIT" in
+  0) echo "Paid. tx=$(printf '%s' "$RESPONSE" | jq -r '.tx_hash // .body.tx_hash // "?"')" ;;
+  2) echo "Network/RPC error — retry later." >&2; exit 2 ;;
+  3) echo "Insufficient funds — top up:"; agentscore-pay fund-estimate "$URL" -X POST -d "$BODY"; exit 3 ;;
+  4) echo "Rejected (price exceeded --max-spend or local limit)." >&2; exit 4 ;;
+  5) echo "Multi-rail ambiguity — set --chain or config preferred_chains." >&2; exit 5 ;;
+  *) echo "User error: $RESPONSE" >&2; exit 1 ;;
+esac
+```
+
+**Python:**
+
+```python
+import json, subprocess, sys
+
+def pay(url: str, body: dict, max_spend_usd: float) -> dict:
+    proc = subprocess.run(
+        ["agentscore-pay", "pay", "POST", url,
+         "-H", "Content-Type: application/json",
+         "-d", json.dumps(body),
+         "--max-spend", str(max_spend_usd),
+         "--timeout", "120", "--retries", "2", "--json"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0:
+        return json.loads(proc.stdout)
+    err = json.loads(proc.stderr.splitlines()[-1])
+    raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['error']['code']} — {err['error']['message']}")
+
+result = pay("https://agents.martinestate.com/purchase",
+             {"product_id": "cab-2021", "quantity": 1, "email": "a@b.co", "shipping": {}}, 250)
+print(result["tx_hash"], result["body"])
+```
+
+**TypeScript / Node:**
+
+```ts
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const exec = promisify(execFile);
+
+async function pay(url: string, body: unknown, maxSpendUsd: number) {
+  try {
+    const { stdout } = await exec('agentscore-pay', [
+      'pay', 'POST', url,
+      '-H', 'Content-Type: application/json',
+      '-d', JSON.stringify(body),
+      '--max-spend', String(maxSpendUsd),
+      '--timeout', '120', '--retries', '2', '--json',
+    ]);
+    return JSON.parse(stdout);
+  } catch (err: any) {
+    const last = (err.stderr ?? '').split('\n').filter(Boolean).pop();
+    throw new Error(`pay exit ${err.code}: ${last}`);
+  }
+}
+```
+
+The CLI never touches stdout for human chrome when `--json` is passed — every byte on stdout is parseable JSON, every error on stderr is one JSON object per line.
+
 ## Rails
 
 | Chain | Protocol | Library | Network |
@@ -101,16 +197,26 @@ Config example (`~/.agentscore/config.json`):
 }
 ```
 
+Or via the CLI:
+
+```bash
+agentscore-pay config set preferred_chains tempo,base
+agentscore-pay config get
+agentscore-pay config unset preferred_chains
+```
+
 Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `wallet create [--chain c] [--mnemonic]` | Generate keystore(s). Omit `--chain` to create all three. Pass `--mnemonic` to derive from a BIP-39 seed. |
-| `wallet import [<key>] --chain c` / `wallet import --mnemonic "<phrase>"` | Import raw private key (hex/base64) OR a 12/24-word phrase |
-| `wallet address --chain c` | Print the address |
-| `wallet export --chain c --danger [--skip-confirm]` | Decrypt + print the private key |
+| `init [--no-mnemonic] [--fund-tempo-testnet] [--preferred-chains <list>]` | One-shot first-run: create all 3 wallets (mnemonic by default) + optional testnet fund + preferred-chain config |
+| `wallet create [--chain c] [--wallet name] [--mnemonic]` | Generate keystore(s). Omit `--chain` to create all three. Pass `--mnemonic` to derive from a BIP-39 seed. `--wallet` for named secondary wallets. |
+| `wallet import [<key>] --chain c [--wallet name]` / `wallet import --mnemonic "<phrase>"` | Import raw private key (hex/base64) OR a 12/24-word phrase |
+| `wallet list [--chain c]` | List named keystores per chain |
+| `wallet address --chain c [--wallet name]` | Print the address |
+| `wallet export --chain c [--wallet name] --danger [--skip-confirm]` | Decrypt + print the private key |
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
 | `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
@@ -118,10 +224,11 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
 | `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
-| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--dry-run] [-v]` | HTTP request + auto 402 handling |
+| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--timeout N] [--retries N] [--dry-run] [-v]` | HTTP request + auto 402 handling. `--timeout` defaults to 60s. `--retries` only retries pre-flight connection errors (per-scheme nonces prevent double-spend). |
 | `whoami [--network n]` | Wallet + balance summary + active config |
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
+| `config get [key] \| set <k> <v> \| unset <k> \| path` | Read/write `~/.agentscore/config.json` (e.g. `config set preferred_chains tempo,base`) |
 
 ## Mnemonic-based wallets
 
@@ -140,7 +247,24 @@ Derivation paths: EVM uses `m/44'/60'/0'/0/0` (standard), Solana uses `m/44'/501
 
 ## Multiple wallet profiles
 
-Set `AGENTSCORE_PAY_HOME` to point at a different state directory:
+Two layers of multi-wallet support:
+
+### Named wallets per chain (in-place)
+
+Each chain can hold multiple keystores. The default name is `default`; pass `--wallet <name>` to address others:
+
+```bash
+agentscore-pay wallet create --chain base --wallet trading
+agentscore-pay wallet list                          # enumerate per chain
+agentscore-pay balance --chain base --wallet trading
+agentscore-pay pay POST <url> --chain base --wallet trading -d '...' --max-spend 5
+```
+
+Names are limited to `[a-z0-9-]` (max 32 chars). Mnemonic-derived wallets are always stored under `default` — for additional named wallets use random keys (`wallet create`) or import (`wallet import`).
+
+### Separate state directories
+
+Set `AGENTSCORE_PAY_HOME` to isolate completely (different `history.jsonl`, `limits.json`, `config.json`):
 
 ```bash
 # One profile for production merchants

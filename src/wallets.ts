@@ -2,12 +2,14 @@ import * as base from './chains/base';
 import * as solana from './chains/solana';
 import * as tempo from './chains/tempo';
 import { decryptSecret, encryptSecret, keystoreExists, loadKeystore, saveKeystore } from './keystore';
+import { DEFAULT_WALLET_NAME } from './paths';
 import type { Chain, Network } from './constants';
 
 export interface Wallet {
   chain: Chain;
   address: string;
   secret: Buffer;
+  name?: string;
 }
 
 function generateKey(chain: Chain): Buffer {
@@ -22,23 +24,33 @@ async function deriveAddress(chain: Chain, secret: Buffer): Promise<string> {
   return tempo.keyToAddress(secret);
 }
 
-export async function createWallet(chain: Chain, passphrase: string, existing?: Buffer): Promise<Wallet> {
-  if (await keystoreExists(chain)) {
+export async function createWallet(
+  chain: Chain,
+  passphrase: string,
+  existing?: Buffer,
+  name: string = DEFAULT_WALLET_NAME,
+): Promise<Wallet> {
+  if (await keystoreExists(chain, name)) {
+    const suffix = name === DEFAULT_WALLET_NAME ? `${chain}.json` : `${chain}-${name}.json`;
     throw new Error(
-      `Keystore for ${chain} already exists. Delete ~/.agentscore/wallets/${chain}.json to regenerate.`,
+      `Keystore for ${chain} (${name}) already exists. Delete ~/.agentscore/wallets/${suffix} to regenerate.`,
     );
   }
   const secret = existing ?? generateKey(chain);
   const address = await deriveAddress(chain, secret);
   const encryption = await encryptSecret(secret, passphrase);
-  await saveKeystore({ version: 1, chain, address, encryption });
-  return { chain, address, secret };
+  await saveKeystore({ version: 1, chain, address, name, encryption });
+  return { chain, address, secret, name };
 }
 
-export async function loadWallet(chain: Chain, passphrase: string): Promise<Wallet> {
-  const file = await loadKeystore(chain);
+export async function loadWallet(
+  chain: Chain,
+  passphrase: string,
+  name: string = DEFAULT_WALLET_NAME,
+): Promise<Wallet> {
+  const file = await loadKeystore(chain, name);
   const secret = await decryptSecret(file.encryption, passphrase);
-  return { chain, address: file.address, secret };
+  return { chain, address: file.address, secret, name: file.name ?? name };
 }
 
 export async function getBalance(wallet: Wallet, network: Network = 'mainnet'): Promise<bigint> {

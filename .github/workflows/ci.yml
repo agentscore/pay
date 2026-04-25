@@ -30,3 +30,7 @@ jobs:
       - run: bunx tsc --noEmit
       - run: bun run test -- --coverage
       - run: bun run build
+      - name: Build native binary (linux-arm64)
+        run: bun run build:binary:linux-arm64
+      - name: Smoke test the native binary
+        run: ./dist/bin/agentscore-pay-linux-arm64 --version

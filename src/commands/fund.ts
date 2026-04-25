@@ -3,9 +3,11 @@ import qrcode from 'qrcode-terminal';
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
+import { bold, cyan, dim, green, yellow } from '../colors';
 import { onrampUrl, type Chain, type Network } from '../constants';
 import { loadKeystore } from '../keystore';
 import { emitProgress, isJson, writeJson, writeLine } from '../output';
+import { DEFAULT_WALLET_NAME } from '../paths';
 
 const POLL_INTERVAL_MS = 5_000;
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
@@ -46,10 +48,10 @@ async function fundTempoTestnet(address: string): Promise<void> {
   const initial = await tempoChain.balance(address, 'testnet');
   const txs = await tempoChain.fundTestnet(address);
   if (!isJson()) {
-    writeLine(`✓ Funded tempo testnet wallet ${address}`);
-    writeLine('  via tempo_fundAddress JSON-RPC — minted pathUSD + AlphaUSD + BetaUSD + ThetaUSD');
-    for (const hash of txs) writeLine(`  tx: ${hash}`);
-    writeLine('  Waiting for mint to confirm…');
+    writeLine(`${green('✓')} Funded tempo testnet wallet ${cyan(address)}`);
+    writeLine(dim('  via tempo_fundAddress JSON-RPC — minted pathUSD + AlphaUSD + BetaUSD + ThetaUSD'));
+    for (const hash of txs) writeLine(dim(`  tx: ${hash}`));
+    writeLine(dim('  Waiting for mint to confirm…'));
   }
   const balance = await pollTempoTestnetBalance(address, initial);
   const formatted = tempoChain.formatBalance(balance);
@@ -70,14 +72,14 @@ async function fundTempoTestnet(address: string): Promise<void> {
     return;
   }
   if (confirmed) {
-    writeLine(`✓ Confirmed. Current USDC.e balance: ${formatted} USDC`);
+    writeLine(`${green('✓')} Confirmed. Current USDC.e balance: ${bold(formatted)} USDC`);
   } else {
-    writeLine(`(mint pending — balance still ${formatted} USDC after ${TEMPO_TESTNET_MINT_TIMEOUT_MS / 1000}s; rerun \`balance --chain tempo --network testnet\` shortly)`);
+    writeLine(yellow(`(mint pending — balance still ${formatted} USDC after ${TEMPO_TESTNET_MINT_TIMEOUT_MS / 1000}s; rerun \`balance --chain tempo --network testnet\` shortly)`));
   }
 }
 
-export async function fund(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
-  const ks = await loadKeystore(chain);
+export async function fund(chain: Chain, amountUsd?: number, network: Network = 'mainnet', name: string = DEFAULT_WALLET_NAME): Promise<void> {
+  const ks = await loadKeystore(chain, name);
 
   if (chain === 'tempo' && network === 'testnet') {
     await fundTempoTestnet(ks.address);
@@ -128,7 +130,7 @@ export async function fund(chain: Chain, amountUsd?: number, network: Network = 
       if (isJson()) {
         writeJson({ event: 'deposit_detected', chain, address: ks.address, usdc: formatted });
       } else {
-        writeLine(`✓ Deposit detected. Current balance: ${formatted} USDC`);
+        writeLine(`${green('✓')} Deposit detected. Current balance: ${bold(formatted)} USDC`);
       }
       return;
     }
