@@ -28,10 +28,32 @@ function buildQrUri(chain: Chain, address: string, amountUsd?: number, network: 
   return tempoChain.qrUri(address, amountUsd, network);
 }
 
+const TEMPO_TESTNET_MINT_TIMEOUT_MS = 30_000;
+const TEMPO_TESTNET_POLL_MS = 2_000;
+
+async function pollTempoTestnetBalance(address: string, initial: bigint): Promise<bigint> {
+  const deadline = Date.now() + TEMPO_TESTNET_MINT_TIMEOUT_MS;
+  let current = initial;
+  while (Date.now() < deadline) {
+    await sleep(TEMPO_TESTNET_POLL_MS);
+    current = await tempoChain.balance(address, 'testnet');
+    if (current > initial) return current;
+  }
+  return current;
+}
+
 async function fundTempoTestnet(address: string): Promise<void> {
+  const initial = await tempoChain.balance(address, 'testnet');
   const txs = await tempoChain.fundTestnet(address);
-  const balance = await tempoChain.balance(address, 'testnet');
+  if (!isJson()) {
+    writeLine(`✓ Funded tempo testnet wallet ${address}`);
+    writeLine('  via tempo_fundAddress JSON-RPC — minted pathUSD + AlphaUSD + BetaUSD + ThetaUSD');
+    for (const hash of txs) writeLine(`  tx: ${hash}`);
+    writeLine('  Waiting for mint to confirm…');
+  }
+  const balance = await pollTempoTestnetBalance(address, initial);
   const formatted = tempoChain.formatBalance(balance);
+  const confirmed = balance > initial;
   if (isJson()) {
     writeJson({
       event: 'deposit_detected',
@@ -42,13 +64,16 @@ async function fundTempoTestnet(address: string): Promise<void> {
       tx_hashes: txs,
       stablecoins_minted: ['pathUSD', 'AlphaUSD', 'BetaUSD', 'ThetaUSD'],
       usdc: formatted,
+      confirmed,
+      ...(confirmed ? {} : { note: 'mint pending; balance read timed out, check again shortly' }),
     });
     return;
   }
-  writeLine(`✓ Funded tempo testnet wallet ${address}`);
-  writeLine('  via tempo_fundAddress JSON-RPC — minted pathUSD + AlphaUSD + BetaUSD + ThetaUSD');
-  for (const hash of txs) writeLine(`  tx: ${hash}`);
-  writeLine(`✓ Current USDC.e balance: ${formatted} USDC`);
+  if (confirmed) {
+    writeLine(`✓ Confirmed. Current USDC.e balance: ${formatted} USDC`);
+  } else {
+    writeLine(`(mint pending — balance still ${formatted} USDC after ${TEMPO_TESTNET_MINT_TIMEOUT_MS / 1000}s; rerun \`balance --chain tempo --network testnet\` shortly)`);
+  }
 }
 
 export async function fund(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
