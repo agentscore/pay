@@ -88,14 +88,25 @@ jobs:
           VERSION: ${{ github.ref_name }}
         if: env.GH_TOKEN != ''
         run: |
+          set -euo pipefail
           VERSION_NO_V="${VERSION#v}"
           TARBALL_URL="https://registry.npmjs.org/@agent-score/pay/-/pay-${VERSION_NO_V}.tgz"
-          # wait briefly for npm to publish then fetch sha256
-          for i in 1 2 3 4 5; do
-            if curl -fsSI "$TARBALL_URL" >/dev/null 2>&1; then break; fi
-            sleep 6
+          # npm CDN can take several minutes to propagate a new tarball; poll up to 5 min.
+          for i in $(seq 1 30); do
+            if curl -fsSI "$TARBALL_URL" >/dev/null 2>&1; then
+              echo "tarball reachable after ${i}0s"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "tarball never became reachable in 5 minutes — aborting" >&2
+              exit 1
+            fi
+            sleep 10
           done
-          SHA256=$(curl -fsSL "$TARBALL_URL" | shasum -a 256 | awk '{print $1}')
+          # Download once + checksum the file (separate steps so a partial download fails)
+          curl -fsSL "$TARBALL_URL" -o /tmp/pay.tgz
+          test -s /tmp/pay.tgz || { echo "downloaded tarball is empty" >&2; exit 1; }
+          SHA256=$(shasum -a 256 /tmp/pay.tgz | awk '{print $1}')
           echo "tarball: $TARBALL_URL"
           echo "sha256:  $SHA256"
 
