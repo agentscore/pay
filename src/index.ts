@@ -1,6 +1,6 @@
 import { run } from './cli';
 import { getMode, writeError } from './output';
-import { getNoticeIfNewer, refreshCacheInBackground } from './update-check';
+import { getNoticeIfNewer, refreshCacheAwaited, refreshCacheInBackground } from './update-check';
 
 declare const __VERSION__: string;
 
@@ -22,6 +22,6 @@ run(process.argv)
   .catch(async (err: unknown) => {
     const e = err instanceof Error ? err : new Error(String(err));
     const code = writeError(e);
-    refreshCacheInBackground();
+    await refreshCacheAwaited();
     process.exit(code);
   });

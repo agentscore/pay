@@ -28,6 +28,22 @@ describe('extractTxHash', () => {
     expect(extractTxHash(headers, null)).toBeUndefined();
   });
 
+  it('treats a base58 Solana-signature-shaped header value as the tx hash', () => {
+    const sig = '5J' + 'a'.repeat(86); // 88 chars, base58-safe
+    const headers = new Headers({ 'x-payment-response': sig });
+    expect(extractTxHash(headers, null)).toBe(sig);
+  });
+
+  it('does not classify shorter base58 strings as Solana signatures', () => {
+    const headers = new Headers({ 'x-payment-response': 'abcdef' });
+    expect(extractTxHash(headers, null)).toBeUndefined();
+  });
+
+  it('does not classify base58-shaped strings with disallowed chars (0OIl) as Solana sigs', () => {
+    const headers = new Headers({ 'x-payment-response': '0' + 'a'.repeat(87) });
+    expect(extractTxHash(headers, null)).toBeUndefined();
+  });
+
   it('reads tx_hash from response body when no header present', () => {
     const headers = new Headers();
     expect(extractTxHash(headers, { tx_hash: '0xfromBody' })).toBe('0xfromBody');

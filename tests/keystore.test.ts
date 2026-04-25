@@ -3,6 +3,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   decryptSecret,
+  deleteKeystore,
   encryptSecret,
   keystoreExists,
   listWallets,
@@ -118,12 +119,48 @@ describe('keystore', () => {
       expect(await listWallets('base')).toEqual([]);
     });
 
+    it('listWallets does not leak across chains (tempo-base.json is a tempo wallet, not a base one)', async () => {
+      const enc = await encryptSecret(Buffer.alloc(32, 9), 'pw');
+      await saveKeystore({ version: 1, chain: 'tempo', address: '0xt', name: 'base', encryption: enc });
+      expect(await listWallets('base')).toEqual([]);
+      expect(await listWallets('tempo')).toEqual(['base']);
+    });
+
     it('rejects invalid wallet names on save and load', async () => {
       const enc = await encryptSecret(Buffer.alloc(32, 1), 'pw');
       await expect(
         saveKeystore({ version: 1, chain: 'base', address: '0x', name: '../escape', encryption: enc }),
       ).rejects.toThrow();
       await expect(loadKeystore('base', '../escape')).rejects.toThrow();
+    });
+
+    describe('deleteKeystore', () => {
+      it('removes a named keystore and reports the removed paths', async () => {
+        const enc = await encryptSecret(Buffer.alloc(32, 1), 'pw');
+        await saveKeystore({ version: 1, chain: 'base', address: '0xa', name: 'trading', encryption: enc });
+        const removed = await deleteKeystore('base', 'trading');
+        expect(removed).toHaveLength(1);
+        expect(removed[0]).toMatch(/base-trading\.json$/);
+        expect(await keystoreExists('base', 'trading')).toBe(false);
+      });
+
+      it('removes both legacy and new default paths when deleting "default"', async () => {
+        await makeKeystore('base.json', 'base');
+        const enc = await encryptSecret(Buffer.alloc(32, 2), 'pw');
+        await saveKeystore({ version: 1, chain: 'base', address: '0xb', name: 'default', encryption: enc });
+        const removed = await deleteKeystore('base');
+        expect(removed.some((p) => p.endsWith('base-default.json'))).toBe(true);
+        expect(removed.some((p) => p.endsWith('base.json'))).toBe(true);
+      });
+
+      it('is a no-op when the keystore does not exist', async () => {
+        const removed = await deleteKeystore('base', 'never-existed');
+        expect(removed).toEqual([]);
+      });
+
+      it('rejects invalid wallet names', async () => {
+        await expect(deleteKeystore('base', '../escape')).rejects.toThrow();
+      });
     });
   });
 });

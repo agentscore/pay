@@ -1,9 +1,9 @@
-import { bold, dim, green } from '../colors';
+import { bold, dim, green, yellow } from '../colors';
 import { saveConfig } from '../config';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
 import { keystoreExists } from '../keystore';
-import { mnemonicExists } from '../mnemonic-store';
+import { mnemonicExists, mnemonicPath } from '../mnemonic-store';
 import { isJson, writeHumanNote, writeJson } from '../output';
 import { fund } from './fund';
 import { walletCreate } from './wallet';
@@ -36,13 +36,27 @@ export async function init(opts: InitOptions = {}): Promise<void> {
     return;
   }
 
-  if (useMnemonic && (await mnemonicExists())) {
+  const hasMnemonic = await mnemonicExists();
+  if (useMnemonic && hasMnemonic) {
     throw new CliError('wallet_exists', 'A mnemonic is already stored. Re-run with --no-mnemonic to create raw keys for missing chains, or remove the existing mnemonic first.', {
       nextSteps: {
         action: 'inspect_or_remove_mnemonic',
         suggestion: 'Use `wallet show-mnemonic --danger` to view, or delete the mnemonic file to start fresh.',
       },
     });
+  }
+  if (!useMnemonic && hasMnemonic && existingWallets.length < SUPPORTED_CHAINS.length) {
+    throw new CliError(
+      'wallet_exists',
+      'A mnemonic is stored but some chains are missing keystores. Adding random keys would leave the mnemonic out of sync with the on-disk wallets.',
+      {
+        nextSteps: {
+          action: 'recover_from_mnemonic_or_clear',
+          suggestion: `Either re-derive the missing chains with \`wallet import --mnemonic "<phrase>"\` (after \`wallet show-mnemonic --danger\`), or remove ${mnemonicPath()} to forfeit the global mnemonic.`,
+        },
+        extra: { mnemonic_path: mnemonicPath(), existing_wallets: existingWallets },
+      },
+    );
   }
 
   if (!isJson()) writeHumanNote('Creating wallets for base, solana, tempo' + (useMnemonic ? ' from a single BIP-39 mnemonic' : ' (random keys per chain)') + '...');
@@ -57,7 +71,16 @@ export async function init(opts: InitOptions = {}): Promise<void> {
 
   if (opts.fundTempoTestnet) {
     if (!isJson()) writeHumanNote('\nFunding Tempo testnet wallet via tempo_fundAddress...');
-    await fund('tempo', undefined, 'testnet');
+    try {
+      await fund('tempo', undefined, 'testnet');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isJson()) {
+        writeJson({ event: 'fund_tempo_testnet_failed', error: msg });
+      } else {
+        writeHumanNote(yellow(`(tempo testnet fund failed: ${msg} — wallets are still created; rerun \`fund --chain tempo --network testnet\` later)`));
+      }
+    }
   }
 
   if (!isJson()) {

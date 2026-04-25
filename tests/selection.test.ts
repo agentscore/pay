@@ -136,4 +136,72 @@ describe('selectRail', () => {
     const { selectRail } = await import('../src/selection');
     await expect(selectRail({ minBalanceRaw: 100n })).rejects.toMatchObject({ code: 'no_funded_rail' });
   });
+
+  describe('named wallets (--wallet)', () => {
+    async function writeNamedKeystore(chain: 'base' | 'solana' | 'tempo', name: string, address: string) {
+      const file = join(ROOT, '.agentscore', 'wallets', `${chain}-${name}.json`);
+      const dummy = {
+        version: 1,
+        chain,
+        address,
+        name,
+        encryption: {
+          kdf: 'scrypt',
+          kdfParams: { N: 16384, r: 8, p: 1, saltHex: '00'.repeat(16) },
+          cipher: 'aes-256-gcm',
+          cipherIv: '00'.repeat(12),
+          cipherAuthTag: '00'.repeat(16),
+          ciphertext: '00'.repeat(32),
+        },
+      };
+      await writeFile(file, JSON.stringify(dummy));
+    }
+
+    it('selects a named wallet when --wallet is passed', async () => {
+      await writeNamedKeystore('base', 'trading', '0xtradingbase');
+      await mockBalances({ base: 100n });
+      const { selectRail } = await import('../src/selection');
+      const picked = await selectRail({ chainOverride: 'base', walletName: 'trading', minBalanceRaw: 50n });
+      expect(picked.chain).toBe('base');
+      expect(picked.name).toBe('trading');
+      expect(picked.address).toBe('0xtradingbase');
+    });
+
+    it('errors no_wallet when --wallet name has no keystore', async () => {
+      await writeKeystore('base', '0xbase');
+      await mockBalances({ base: 100n });
+      const { selectRail } = await import('../src/selection');
+      await expect(
+        selectRail({ chainOverride: 'base', walletName: 'trading' }),
+      ).rejects.toMatchObject({ code: 'no_wallet' });
+    });
+
+    it('default name falls back to legacy <chain>.json', async () => {
+      await writeKeystore('base', '0xlegacy');
+      await mockBalances({ base: 50n });
+      const { selectRail } = await import('../src/selection');
+      const picked = await selectRail({ chainOverride: 'base', walletName: 'default' });
+      expect(picked.address).toBe('0xlegacy');
+      expect(picked.name).toBe('default');
+    });
+
+    it('legacy <chain>.json is invisible to non-default wallet names', async () => {
+      await writeKeystore('base', '0xlegacy');
+      await mockBalances({ base: 50n });
+      const { selectRail } = await import('../src/selection');
+      await expect(
+        selectRail({ chainOverride: 'base', walletName: 'trading' }),
+      ).rejects.toMatchObject({ code: 'no_wallet' });
+    });
+
+    it('walletName surfaces in CliError extra payload', async () => {
+      const { selectRail } = await import('../src/selection');
+      try {
+        await selectRail({ walletName: 'agent-1' });
+        throw new Error('should have rejected');
+      } catch (err) {
+        expect((err as { extra: Record<string, unknown> }).extra.wallet_name).toBe('agent-1');
+      }
+    });
+  });
 });

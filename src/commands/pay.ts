@@ -42,7 +42,8 @@ interface PaymentSettled {
 
 export async function pay(opts: PayOptions): Promise<void> {
   const network: Network = opts.network ?? 'mainnet';
-  const candidate = await selectRail({ chainOverride: opts.chain, network });
+  const walletName = opts.walletName ?? DEFAULT_WALLET_NAME;
+  const candidate = await selectRail({ chainOverride: opts.chain, walletName, network });
   if (opts.verbose) {
     emitProgress('rail_selected', {
       chain: candidate.chain,
@@ -79,7 +80,7 @@ export async function pay(opts: PayOptions): Promise<void> {
   }
 
   const passphrase = await promptPassphrase();
-  const wallet = await loadWallet(candidate.chain, passphrase, opts.walletName ?? DEFAULT_WALLET_NAME);
+  const wallet = await loadWallet(candidate.chain, passphrase, walletName);
 
   const timeoutSeconds = opts.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
   const controller = new AbortController();

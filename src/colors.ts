@@ -32,6 +32,16 @@ export function bold(s: string): string {
 export const SUCCESS_MARK = '✓';
 export const FAILURE_MARK = '✗';
 
+export function padEndVisible(value: string, visibleWidth: number, rawWidth: number = visibleWidth): string {
+  if (value.length >= rawWidth) return value;
+  return value + ' '.repeat(rawWidth - value.length);
+}
+
+export function padColored(coloredText: string, rawText: string, width: number): string {
+  if (rawText.length >= width) return coloredText;
+  return coloredText + ' '.repeat(width - rawText.length);
+}
+
 export function ok(text: string): string {
   return `${green(SUCCESS_MARK)} ${text}`;
 }

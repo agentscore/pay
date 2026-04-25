@@ -127,3 +127,47 @@ describe('fetchLatestVersion', () => {
     expect(await fetchLatestVersion()).toBeNull();
   });
 });
+
+describe('refreshCacheAwaited', () => {
+  let originalHome: string | undefined;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(async () => {
+    originalHome = process.env.HOME;
+    process.env.HOME = ROOT;
+    originalFetch = globalThis.fetch;
+    await rm(ROOT, { recursive: true, force: true });
+    await mkdir(join(ROOT, '.agentscore'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    process.env.HOME = originalHome;
+    globalThis.fetch = originalFetch;
+    await rm(ROOT, { recursive: true, force: true });
+  });
+
+  it('writes the cache when fetch resolves before the timeout', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ version: '9.9.9' }),
+    } as Response);
+    const { refreshCacheAwaited, readCache } = await import('../src/update-check');
+    await refreshCacheAwaited();
+    const cache = await readCache();
+    expect(cache?.latest).toBe('9.9.9');
+  });
+
+  it('returns even when fetch never resolves (timeout race)', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => undefined));
+    const { refreshCacheAwaited } = await import('../src/update-check');
+    const start = Date.now();
+    await refreshCacheAwaited();
+    expect(Date.now() - start).toBeLessThan(3000);
+  });
+
+  it('swallows fetch errors silently', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('boom'));
+    const { refreshCacheAwaited } = await import('../src/update-check');
+    await expect(refreshCacheAwaited()).resolves.toBeUndefined();
+  });
+});

@@ -1,4 +1,7 @@
 #
+# DO NOT INSTALL DIRECTLY — this file is a TEMPLATE.
+# The `sha256` field is a placeholder and `brew install` will fail.
+#
 # Homebrew formula template for @agent-score/pay.
 #
 # To publish:

@@ -17,10 +17,12 @@ import {
   walletImport,
   walletImportMnemonic,
   walletList,
+  walletRemove,
   walletShowMnemonic,
 } from './commands/wallet';
 import { whoami } from './commands/whoami';
 import { SUPPORTED_CHAINS, SUPPORTED_NETWORKS, type Chain, type Network } from './constants';
+import { CliError } from './errors';
 import { resolveMode, setMode } from './output';
 import type { ModeFlags } from './output';
 
@@ -135,6 +137,18 @@ export function buildCli(): Command {
     .action(async (key: string | undefined, opts: { chain?: Chain; mnemonic?: string; wallet: string }) => {
       applyMode(program);
       if (opts.mnemonic) {
+        if (opts.wallet !== 'default') {
+          throw new CliError(
+            'invalid_input',
+            '--mnemonic stores keys under the "default" wallet name; --wallet is not supported in this mode.',
+            {
+              nextSteps: {
+                action: 'drop_wallet_flag_or_use_raw_key',
+                suggestion: `Drop --wallet, or run \`wallet import <hex-key> --chain <c> --wallet ${opts.wallet}\` instead.`,
+              },
+            },
+          );
+        }
         await walletImportMnemonic(opts.mnemonic, opts.chain);
         return;
       }
@@ -186,6 +200,18 @@ export function buildCli(): Command {
     .action(async (opts: { chain: Chain; wallet: string; danger?: boolean; skipConfirm?: boolean }) => {
       applyMode(program);
       await walletExport({ chain: opts.chain, name: opts.wallet, danger: opts.danger, skipConfirm: opts.skipConfirm });
+    });
+
+  wallet
+    .command('remove')
+    .description('Delete a keystore. DANGER — irrecoverable unless you have the BIP-39 mnemonic backup.')
+    .addOption(chainOption(true))
+    .addOption(walletNameOption())
+    .option('--danger', 'explicitly acknowledge the risk of irrecoverable deletion')
+    .option('--skip-confirm', 'skip the "type EXPORT" prompt (for scripting)')
+    .action(async (opts: { chain: Chain; wallet: string; danger?: boolean; skipConfirm?: boolean }) => {
+      applyMode(program);
+      await walletRemove({ chain: opts.chain, name: opts.wallet, danger: opts.danger, skipConfirm: opts.skipConfirm });
     });
 
   program
@@ -358,7 +384,7 @@ export function buildCli(): Command {
     .option('-d, --data <body>', 'request body')
     .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
     .option('--max-spend <usd>', 'reject payments above this USD amount', (v) => Number(v))
-    .option('--timeout <seconds>', 'abort if the merchant fetch + 402 round-trip takes longer (default 60)', (v) => Number(v))
+    .option('--timeout <seconds>', 'abort the merchant request if it takes longer (default 60). Note: only the request to the merchant honors this signal — facilitator settlement may exceed it.', (v) => Number(v))
     .option('--retries <n>', 'retry transient network errors up to N times (default 0). Per-scheme nonces prevent double-spend.', (v) => Number(v))
     .option('--dry-run', 'print the payment plan without signing or sending')
     .option('-v, --verbose', 'log rail selection + balances to stderr')

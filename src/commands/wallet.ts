@@ -2,7 +2,7 @@ import qrcode from 'qrcode-terminal';
 import { bold, cyan, dim, green, yellow } from '../colors';
 import { onrampUrl, SUPPORTED_CHAINS, type Chain } from '../constants';
 import { CliError } from '../errors';
-import { decryptSecret, keystoreExists, listWallets, loadKeystore } from '../keystore';
+import { decryptSecret, deleteKeystore, keystoreExists, listWallets, loadKeystore } from '../keystore';
 import { deriveKey, generatePhrase, validatePhrase } from '../mnemonic';
 import { loadMnemonic, mnemonicExists, mnemonicPath, saveMnemonic } from '../mnemonic-store';
 import { isHuman, isJson, writeHumanNote, writeJson, writeLine } from '../output';
@@ -266,13 +266,49 @@ export async function walletList(chain?: Chain): Promise<void> {
   }
   for (const row of rows) {
     if (row.names.length === 0) {
-      writeLine(`${row.chain.padEnd(8)} ${dim('(none)')}`);
+      if (!chain) writeLine(`${row.chain.padEnd(8)} ${dim('(none)')}`);
       continue;
     }
     for (const n of row.names) {
       writeLine(`${row.chain.padEnd(8)} ${n}`);
     }
   }
+}
+
+export interface WalletRemoveOptions {
+  chain: Chain;
+  name?: string;
+  danger?: boolean;
+  skipConfirm?: boolean;
+}
+
+export async function walletRemove(opts: WalletRemoveOptions): Promise<void> {
+  if (!opts.danger) {
+    throw new CliError('invalid_input', 'wallet remove requires --danger flag (the keystore will be irrecoverably deleted).', {
+      nextSteps: {
+        action: 'pass_danger_flag',
+        suggestion: 'Re-run with --danger and expect a type-to-confirm prompt (or --skip-confirm for scripting).',
+      },
+    });
+  }
+  const name = opts.name ?? DEFAULT_WALLET_NAME;
+  validateWalletName(name);
+  if (!(await keystoreExists(opts.chain, name))) {
+    throw new CliError('no_wallet', `No keystore for ${opts.chain} (${name}).`, {
+      extra: { chain: opts.chain, name },
+    });
+  }
+  const file = await loadKeystore(opts.chain, name);
+  if (!opts.skipConfirm) {
+    await typeToConfirm(`Type EXPORT to confirm deleting ${opts.chain}/${name} (${file.address})`);
+  }
+  const removed = await deleteKeystore(opts.chain, name);
+  if (isJson()) {
+    writeJson({ ok: true, chain: opts.chain, name, address: file.address, removed_files: removed });
+    return;
+  }
+  writeLine(`${green('✓')} Removed ${opts.chain}/${name} (${file.address})`);
+  for (const path of removed) writeLine(dim(`  - ${path}`));
 }
 
 export interface WalletExportOptions {
