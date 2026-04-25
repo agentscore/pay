@@ -40,11 +40,6 @@ export function fail(text: string): string {
   return `${red(FAILURE_MARK)} ${text}`;
 }
 
-export function padEndVisible(value: string, visibleWidth: number, rawWidth: number = visibleWidth): string {
-  if (value.length >= rawWidth) return value;
-  return value + ' '.repeat(rawWidth - value.length);
-}
-
 export function padColored(coloredText: string, rawText: string, width: number): string {
   if (rawText.length >= width) return coloredText;
   return coloredText + ' '.repeat(width - rawText.length);
