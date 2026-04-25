@@ -16,7 +16,6 @@ export default defineConfig({
         'src/prompts.ts',
         'src/wallets.ts',
         'src/mnemonic-store.ts',
-        'src/tempo-cli.ts',
         'vitest.config.ts',
         'vitest.integration.config.ts',
         'tsup.config.ts',
