@@ -1,6 +1,0 @@
-# Default reviewers for all paths
-* @vvillait88 @seanthorne10
-
-# Workflows + release plumbing — admin-touched only
-/.github/ @vvillait88 @seanthorne10
-/Formula/ @vvillait88 @seanthorne10

@@ -319,14 +319,15 @@ export function buildCli(): Command {
 
   program
     .command('discover')
-    .description('List x402-enabled services from the Coinbase Bazaar registry (api.cdp.coinbase.com)')
-    .option('--search <query>', 'filter by description / URL / domain (case-insensitive substring)')
+    .description('List paid services from the x402 Bazaar (Coinbase) and MPP services directory (Tempo). Both queried in parallel by default.')
+    .option('--search <query>', 'filter by description / URL / domain / category (case-insensitive substring)')
     .addOption(chainOption())
     .option('--max-price <usd>', 'only services priced at or below this USD amount', (v) => Number(v))
     .option('--limit <n>', 'max services to print (default: all)', (v) => Number(v))
-    .action(async (opts: { search?: string; chain?: Chain; maxPrice?: number; limit?: number }) => {
+    .addOption(new Option('--protocol <p>', 'restrict source to one registry (default: both)').choices(['x402', 'mpp', 'both']).default('both'))
+    .action(async (opts: { search?: string; chain?: Chain; maxPrice?: number; limit?: number; protocol: 'x402' | 'mpp' | 'both' }) => {
       applyMode(program);
-      await discover({ search: opts.search, chain: opts.chain, maxPriceUsd: opts.maxPrice, limit: opts.limit });
+      await discover({ search: opts.search, chain: opts.chain, maxPriceUsd: opts.maxPrice, limit: opts.limit, protocol: opts.protocol });
     });
 
   const config = program.command('config').description('Read/write persistent CLI preferences (~/.agentscore/config.json)');
