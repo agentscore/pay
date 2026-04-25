@@ -74,10 +74,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ github.ref_name }}
+        if: env.GH_TOKEN != ''
         run: |
           VERSION_NO_V="${VERSION#v}"
           TARBALL_URL="https://registry.npmjs.org/@agent-score/pay/-/pay-${VERSION_NO_V}.tgz"
