@@ -70,4 +70,6 @@ jobs:
 
       - name: Faucet hint summary
         if: matrix.chain != 'tempo'
-        run: echo "Manual fund step (CI cannot complete a real pay without a testnet merchant): ${{ matrix.faucet_hint }}"
+        run: |
+          echo "Manual fund step (CI cannot complete a real pay without a testnet merchant)."
+          echo "Hint - ${{ matrix.faucet_hint }}"
