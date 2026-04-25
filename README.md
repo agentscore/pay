@@ -165,7 +165,7 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 
 - `agentscore-pay faucet --chain base` prints the Circle USDC faucet URL + the Base Sepolia address (copied to clipboard). Paste into the faucet form and wait.
 - Same flow for `--chain solana` (Solana Devnet).
-- Tempo testnet faucet is not public; contact the Tempo team.
+- **`agentscore-pay fund --chain tempo --network testnet`** is one-shot: it calls Moderato's `tempo_fundAddress` JSON-RPC and mints 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) directly to the wallet. No browser, no captcha, no install.
 
 ### Scripted / deployed agents
 

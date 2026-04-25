@@ -28,8 +28,37 @@ function buildQrUri(chain: Chain, address: string, amountUsd?: number, network: 
   return tempoChain.qrUri(address, amountUsd, network);
 }
 
+async function fundTempoTestnet(address: string): Promise<void> {
+  const txs = await tempoChain.fundTestnet(address);
+  const balance = await tempoChain.balance(address, 'testnet');
+  const formatted = tempoChain.formatBalance(balance);
+  if (isJson()) {
+    writeJson({
+      event: 'deposit_detected',
+      chain: 'tempo',
+      network: 'testnet',
+      address,
+      method: 'tempo_fundAddress',
+      tx_hashes: txs,
+      stablecoins_minted: ['pathUSD', 'AlphaUSD', 'BetaUSD', 'ThetaUSD'],
+      usdc: formatted,
+    });
+    return;
+  }
+  writeLine(`✓ Funded tempo testnet wallet ${address}`);
+  writeLine('  via tempo_fundAddress JSON-RPC — minted pathUSD + AlphaUSD + BetaUSD + ThetaUSD');
+  for (const hash of txs) writeLine(`  tx: ${hash}`);
+  writeLine(`✓ Current USDC.e balance: ${formatted} USDC`);
+}
+
 export async function fund(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
   const ks = await loadKeystore(chain);
+
+  if (chain === 'tempo' && network === 'testnet') {
+    await fundTempoTestnet(ks.address);
+    return;
+  }
+
   const onramp = network === 'mainnet' ? onrampUrl(chain, ks.address, amountUsd) : null;
   const uri = buildQrUri(chain, ks.address, amountUsd, network);
 
