@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt, type ScryptOptions } from 'crypto';
-import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import {
   DEFAULT_WALLET_NAME,
@@ -148,6 +148,28 @@ export async function listWallets(chain: Chain): Promise<string[]> {
     }
   }
   return [...names].sort();
+}
+
+export async function deleteKeystore(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<string[]> {
+  if (!isValidWalletName(name)) throw new Error(`Invalid wallet name: ${name}`);
+  const removed: string[] = [];
+  const newPath = _keystorePath(chain, name);
+  try {
+    await rm(newPath);
+    removed.push(newPath);
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+  }
+  if (name === DEFAULT_WALLET_NAME) {
+    const legacy = legacyKeystorePath(chain);
+    try {
+      await rm(legacy);
+      removed.push(legacy);
+    } catch (err) {
+      if (!isNotFound(err)) throw err;
+    }
+  }
+  return removed;
 }
 
 function isNotFound(err: unknown): boolean {

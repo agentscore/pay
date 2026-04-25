@@ -19,6 +19,8 @@ export function isTransientNetworkError(err: unknown): boolean {
 }
 
 export async function withRetries<T>(fn: () => Promise<T>, opts: RetryOptions): Promise<T> {
+  // jitter defaults to Math.random() in production to spread retries (avoid thundering herd);
+  // tests pass `() => 0` for deterministic delays.
   const { retries, baseDelayMs = 200, maxDelayMs = 10_000, jitter = () => Math.random() } = opts;
   if (retries < 0) throw new Error('retries must be >= 0');
   let lastErr: unknown;

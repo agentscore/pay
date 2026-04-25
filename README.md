@@ -217,6 +217,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `wallet list [--chain c]` | List named keystores per chain |
 | `wallet address --chain c [--wallet name]` | Print the address |
 | `wallet export --chain c [--wallet name] --danger [--skip-confirm]` | Decrypt + print the private key |
+| `wallet remove --chain c [--wallet name] --danger [--skip-confirm]` | Irrecoverably delete a keystore |
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
 | `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
@@ -224,7 +225,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
 | `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
-| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--timeout N] [--retries N] [--dry-run] [-v]` | HTTP request + auto 402 handling. `--timeout` defaults to 60s. `--retries` only retries pre-flight connection errors (per-scheme nonces prevent double-spend). |
+| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--timeout N] [--retries N] [--dry-run] [-v]` | HTTP request + auto 402 handling. `--timeout` defaults to 60s and applies to the merchant request only — facilitator settlement may exceed it. `--retries` only retries pre-flight connection errors (per-scheme nonces prevent double-spend). |
 | `whoami [--network n]` | Wallet + balance summary + active config |
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |

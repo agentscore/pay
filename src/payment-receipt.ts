@@ -1,3 +1,7 @@
+const BASE58_ALPHABET = /^[1-9A-HJ-NP-Za-km-z]+$/;
+const SOLANA_SIG_MIN = 86;
+const SOLANA_SIG_MAX = 90;
+
 export function extractTxHash(headers: Headers, body: unknown): string | undefined {
   const header = headers.get('x-payment-response');
   if (header) {
@@ -7,6 +11,13 @@ export function extractTxHash(headers: Headers, body: unknown): string | undefin
       if (typeof tx === 'string' && tx.length > 0) return tx;
     } catch {
       if (header.startsWith('0x')) return header;
+      if (
+        header.length >= SOLANA_SIG_MIN &&
+        header.length <= SOLANA_SIG_MAX &&
+        BASE58_ALPHABET.test(header)
+      ) {
+        return header;
+      }
     }
   }
   if (body && typeof body === 'object') {

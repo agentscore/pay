@@ -1,40 +1,61 @@
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
+import { bold, cyan, dim } from '../colors';
 import { loadConfig } from '../config';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
-import { keystoreExists, keystorePath, loadKeystore } from '../keystore';
+import { keystoreExists, keystorePath, listWallets, loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
+
+interface WalletSummary {
+  chain: Chain;
+  name: string;
+  address: string;
+  balance_usdc: string;
+  balance_raw: string;
+  keystore: string;
+}
 
 interface ChainSummary {
   chain: Chain;
   has_wallet: boolean;
-  address?: string;
-  balance_usdc?: string;
-  keystore?: string;
+  wallets: WalletSummary[];
+}
+
+async function readBalance(chain: Chain, address: string, network: Network): Promise<bigint> {
+  if (chain === 'base') return baseChain.balance(address, network);
+  if (chain === 'solana') return solanaChain.balance(address, network);
+  return tempoChain.balance(address, network);
+}
+
+function formatBalance(chain: Chain, raw: bigint): string {
+  if (chain === 'base') return baseChain.formatBalance(raw);
+  if (chain === 'solana') return solanaChain.formatBalance(raw);
+  return tempoChain.formatBalance(raw);
 }
 
 async function summarize(chain: Chain, network: Network): Promise<ChainSummary> {
-  if (!(await keystoreExists(chain))) return { chain, has_wallet: false };
-  const ks = await loadKeystore(chain);
-  const raw =
-    chain === 'base'
-      ? await baseChain.balance(ks.address, network)
-      : chain === 'solana'
-        ? await solanaChain.balance(ks.address, network)
-        : await tempoChain.balance(ks.address, network);
-  const formatted =
-    chain === 'base'
-      ? baseChain.formatBalance(raw)
-      : chain === 'solana'
-        ? solanaChain.formatBalance(raw)
-        : tempoChain.formatBalance(raw);
+  const names = await listWallets(chain);
+  if (names.length === 0) return { chain, has_wallet: false, wallets: [] };
+  const wallets = await Promise.all(
+    names.map(async (name) => {
+      if (!(await keystoreExists(chain, name))) return null;
+      const ks = await loadKeystore(chain, name);
+      const raw = await readBalance(chain, ks.address, network);
+      return {
+        chain,
+        name,
+        address: ks.address,
+        balance_usdc: formatBalance(chain, raw),
+        balance_raw: raw.toString(),
+        keystore: keystorePath(chain, name),
+      } satisfies WalletSummary;
+    }),
+  );
   return {
     chain,
     has_wallet: true,
-    address: ks.address,
-    balance_usdc: formatted,
-    keystore: keystorePath(chain),
+    wallets: wallets.filter((w): w is WalletSummary => w !== null),
   };
 }
 
@@ -54,18 +75,21 @@ export async function whoami(network: Network = 'mainnet'): Promise<void> {
     return;
   }
 
-  writeLine('Wallets:');
+  writeLine(bold('Wallets:'));
   for (const row of rows) {
     if (!row.has_wallet) {
-      writeLine(`  ${row.chain.padEnd(8)} (no wallet)`);
+      writeLine(`  ${row.chain.padEnd(8)} ${dim('(no wallet)')}`);
       continue;
     }
-    writeLine(`  ${row.chain.padEnd(8)} ${row.balance_usdc?.padStart(14)} USDC  ${row.address}`);
+    for (const w of row.wallets) {
+      const tag = w.name === 'default' ? '' : `  [${w.name}]`;
+      writeLine(`  ${row.chain.padEnd(8)} ${w.balance_usdc.padStart(14)} USDC  ${cyan(w.address)}${dim(tag)}`);
+    }
   }
   writeLine('');
   if (config.preferred_chains) {
-    writeLine(`Preferred chains: ${config.preferred_chains.join(' > ')}`);
+    writeLine(`Preferred chains: ${bold(config.preferred_chains.join(' > '))}`);
   } else {
-    writeLine('No config preference set. (agent picks via --chain or single-candidate auto-use)');
+    writeLine(dim('No config preference set. (agent picks via --chain or single-candidate auto-use)'));
   }
 }

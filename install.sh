@@ -16,10 +16,25 @@ REPO="agentscore/pay"
 BIN_NAME="agentscore-pay"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
-note() { printf '\033[36m→\033[0m %s\n' "$1"; }
-warn() { printf '\033[33m!\033[0m %s\n' "$1" >&2; }
-ok()   { printf '\033[32m✓\033[0m %s\n' "$1"; }
-die()  { printf '\033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  ESC="$(printf '\033')"
+  CYAN="${ESC}[36m"
+  YELLOW="${ESC}[33m"
+  GREEN="${ESC}[32m"
+  RED="${ESC}[31m"
+  RESET="${ESC}[0m"
+else
+  CYAN=""
+  YELLOW=""
+  GREEN=""
+  RED=""
+  RESET=""
+fi
+
+note() { printf '%s\n' "${CYAN}→${RESET} $1"; }
+warn() { printf '%s\n' "${YELLOW}!${RESET} $1" >&2; }
+ok()   { printf '%s\n' "${GREEN}✓${RESET} $1"; }
+die()  { printf '%s\n' "${RED}✗${RESET} $1" >&2; exit 1; }
 
 detect_target() {
   os=$(uname -s | tr '[:upper:]' '[:lower:]')

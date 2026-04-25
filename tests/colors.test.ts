@@ -1,5 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { bold, cyan, dim, fail, FAILURE_MARK, green, ok, red, SUCCESS_MARK, yellow } from '../src/colors';
+import {
+  bold,
+  cyan,
+  dim,
+  fail,
+  FAILURE_MARK,
+  green,
+  ok,
+  padColored,
+  red,
+  SUCCESS_MARK,
+  yellow,
+} from '../src/colors';
 import { setMode } from '../src/output';
 
 describe('colors', () => {
@@ -58,6 +70,27 @@ describe('colors', () => {
       expect(green('hi')).toContain('hi');
       expect(red('hi')).toContain('hi');
       expect(bold('hi')).toContain('hi');
+    });
+  });
+
+  describe('padColored', () => {
+    beforeEach(() => setMode('human'));
+
+    it('pads to the visible width using the raw text length, not the colored length', () => {
+      const colored = green('200 ✓');
+      const padded = padColored(colored, '200 ✓', 7);
+      expect(padded.endsWith('  ')).toBe(true);
+      expect(padded.startsWith(colored)).toBe(true);
+    });
+
+    it('returns input unchanged when raw is already at or beyond width', () => {
+      const colored = red('overflow');
+      expect(padColored(colored, 'overflow', 5)).toBe(colored);
+    });
+
+    it('works in plain mode (no color, raw length matches)', () => {
+      setMode('plain');
+      expect(padColored('200 ✓', '200 ✓', 7)).toBe('200 ✓  ');
     });
   });
 });

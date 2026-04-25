@@ -77,3 +77,18 @@ export function refreshCacheInBackground(): void {
       /* best-effort */
     });
 }
+
+const REFRESH_AWAIT_TIMEOUT_MS = 1500;
+
+export async function refreshCacheAwaited(): Promise<void> {
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, REFRESH_AWAIT_TIMEOUT_MS).unref?.());
+  const refresh = (async () => {
+    try {
+      const latest = await fetchLatestVersion();
+      if (latest) await writeCache(latest);
+    } catch {
+      /* best-effort */
+    }
+  })();
+  await Promise.race([refresh, timeout]);
+}
