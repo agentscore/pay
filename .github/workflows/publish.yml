@@ -33,7 +33,16 @@ jobs:
       - run: bun run build
 
       - name: Publish to npm (with provenance)
-        run: npm publish --access public --provenance
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="${VERSION#*-}"
+            DIST_TAG="${DIST_TAG%%.*}"
+            echo "prerelease detected — publishing under dist-tag: $DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Build native binaries
         run: bun run build:binary:all
