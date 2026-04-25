@@ -23,6 +23,26 @@ describe('isTransientNetworkError', () => {
   it('does not retry generic 4xx-style messages', () => {
     expect(isTransientNetworkError(new Error('Bad Request'))).toBe(false);
   });
+
+  it('walks Error.cause chain (Node 20+ fetch wraps ECONNRESET in TypeError)', () => {
+    const inner = new Error('ECONNRESET');
+    const outer = new TypeError('fetch failed') as Error & { cause: unknown };
+    outer.cause = inner;
+    expect(isTransientNetworkError(outer)).toBe(true);
+  });
+
+  it('returns false when cause is non-transient', () => {
+    const inner = new Error('Permission denied');
+    const outer = new Error('outer') as Error & { cause: unknown };
+    outer.cause = inner;
+    expect(isTransientNetworkError(outer)).toBe(false);
+  });
+
+  it('does not infinitely loop when cause is self-reference', () => {
+    const e = new Error('whatever') as Error & { cause: unknown };
+    e.cause = e;
+    expect(isTransientNetworkError(e)).toBe(false);
+  });
 });
 
 describe('withRetries', () => {

@@ -15,7 +15,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
@@ -32,19 +32,73 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
 
-      - name: Publish to npm
+      - name: Publish to npm (with provenance)
         run: npm publish --access public --provenance
 
       - name: Build native binaries
         run: bun run build:binary:all
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign native binaries with cosign (keyless, OIDC)
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          for f in dist/bin/agentscore-pay-*; do
+            cosign sign-blob --yes \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.pem" \
+              "$f"
+          done
+
       - name: Create GitHub Release
         run: |
           gh release create "$GITHUB_REF_NAME" --generate-notes \
             dist/bin/agentscore-pay-darwin-arm64 \
+            dist/bin/agentscore-pay-darwin-arm64.sig \
+            dist/bin/agentscore-pay-darwin-arm64.pem \
             dist/bin/agentscore-pay-darwin-x64 \
+            dist/bin/agentscore-pay-darwin-x64.sig \
+            dist/bin/agentscore-pay-darwin-x64.pem \
             dist/bin/agentscore-pay-linux-arm64 \
+            dist/bin/agentscore-pay-linux-arm64.sig \
+            dist/bin/agentscore-pay-linux-arm64.pem \
             dist/bin/agentscore-pay-linux-x64 \
-            dist/bin/agentscore-pay-windows-x64.exe
+            dist/bin/agentscore-pay-linux-x64.sig \
+            dist/bin/agentscore-pay-linux-x64.pem \
+            dist/bin/agentscore-pay-windows-x64.exe \
+            dist/bin/agentscore-pay-windows-x64.exe.sig \
+            dist/bin/agentscore-pay-windows-x64.exe.pem
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Update Homebrew tap
+        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION_NO_V="${VERSION#v}"
+          TARBALL_URL="https://registry.npmjs.org/@agent-score/pay/-/pay-${VERSION_NO_V}.tgz"
+          # wait briefly for npm to publish then fetch sha256
+          for i in 1 2 3 4 5; do
+            if curl -fsSI "$TARBALL_URL" >/dev/null 2>&1; then break; fi
+            sleep 6
+          done
+          SHA256=$(curl -fsSL "$TARBALL_URL" | shasum -a 256 | awk '{print $1}')
+          echo "tarball: $TARBALL_URL"
+          echo "sha256:  $SHA256"
+
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/agentscore/homebrew-tap.git" tap
+          cd tap
+          mkdir -p Formula
+          sed -e "s|REPLACE_WITH_TARBALL_URL|$TARBALL_URL|g" \
+              -e "s|REPLACE_WITH_TARBALL_SHA256|$SHA256|g" \
+              -e "s|VERSION_PLACEHOLDER|$VERSION_NO_V|g" \
+              ../Formula/agentscore-pay.rb.template > Formula/agentscore-pay.rb
+          git config user.name 'agentscore-bot'
+          git config user.email 'bot@agentscore.sh'
+          git add Formula/agentscore-pay.rb
+          git commit -m "agentscore-pay $VERSION" || echo "no changes"
+          git push origin HEAD

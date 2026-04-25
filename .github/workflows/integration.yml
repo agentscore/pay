@@ -1,0 +1,73 @@
+name: Integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Testnet smoke (${{ matrix.chain }} / ${{ matrix.network }})
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - chain: base
+            network: testnet
+            faucet_hint: 'https://faucet.circle.com (Base Sepolia USDC)'
+          - chain: solana
+            network: testnet
+            faucet_hint: 'https://faucet.circle.com (Solana Devnet USDC)'
+          - chain: tempo
+            network: testnet
+            faucet_hint: 'tempo_fundAddress JSON-RPC (programmatic)'
+    env:
+      AGENTSCORE_PAY_HOME: /tmp/agentscore-int-${{ matrix.chain }}
+      AGENTSCORE_PAY_PASSPHRASE: integration-test-passphrase-${{ github.run_id }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+
+      - name: Create ${{ matrix.chain }} wallet
+        run: |
+          mkdir -p "$AGENTSCORE_PAY_HOME"
+          ./dist/index.js wallet create --chain ${{ matrix.chain }} --json
+
+      - name: Read initial balance (${{ matrix.network }})
+        run: ./dist/index.js balance --chain ${{ matrix.chain }} --network ${{ matrix.network }} --json
+
+      - name: Programmatic faucet (Tempo testnet only)
+        if: matrix.chain == 'tempo'
+        run: ./dist/index.js fund --chain tempo --network testnet --json
+
+      - name: Read balance again
+        run: ./dist/index.js balance --chain ${{ matrix.chain }} --network ${{ matrix.network }} --json
+
+      - name: Probe an x402-gated testnet endpoint (smoke)
+        if: matrix.chain == 'base'
+        run: |
+          ./dist/index.js check https://example.com --json || true
+        continue-on-error: true
+
+      - name: Faucet hint summary
+        if: matrix.chain != 'tempo'
+        run: echo "Manual fund step (CI cannot complete a real pay without a testnet merchant): ${{ matrix.faucet_hint }}"

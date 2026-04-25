@@ -38,13 +38,22 @@ interface RailSummary {
   pay_to?: string;
 }
 
+function safeBigInt(raw: string): bigint | null {
+  try {
+    return BigInt(raw);
+  } catch {
+    return null;
+  }
+}
+
 function normalizeX402(body: unknown): RailSummary[] {
   const record = body as { accepts?: X402Accept[] };
   const accepts = Array.isArray(record.accepts) ? record.accepts : [];
   return accepts.map((a) => {
     const decimals = a.extra?.decimals ?? 6;
     const raw = a.maxAmountRequired ?? '0';
-    const priceUsd = (Number(BigInt(raw)) / 10 ** decimals).toFixed(decimals);
+    const parsed = safeBigInt(raw);
+    const priceUsd = parsed === null ? undefined : (Number(parsed) / 10 ** decimals).toFixed(decimals);
     return {
       protocol: 'x402',
       rail: `${a.scheme ?? 'exact'}/${a.network ?? 'unknown'}`,

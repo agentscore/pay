@@ -1,6 +1,7 @@
 import * as base from './chains/base';
 import * as solana from './chains/solana';
 import * as tempo from './chains/tempo';
+import { CliError } from './errors';
 import { decryptSecret, encryptSecret, keystoreExists, loadKeystore, saveKeystore } from './keystore';
 import { DEFAULT_WALLET_NAME } from './paths';
 import type { Chain, Network } from './constants';
@@ -49,7 +50,15 @@ export async function loadWallet(
   name: string = DEFAULT_WALLET_NAME,
 ): Promise<Wallet> {
   const file = await loadKeystore(chain, name);
-  const secret = await decryptSecret(file.encryption, passphrase);
+  let secret: Buffer;
+  try {
+    secret = await decryptSecret(file.encryption, passphrase);
+  } catch {
+    throw new CliError('wrong_passphrase', `Failed to decrypt ${chain} (${name}) keystore with the provided passphrase.`, {
+      nextSteps: { action: 'retry_passphrase' },
+      extra: { chain, name },
+    });
+  }
   return { chain, address: file.address, secret, name: file.name ?? name };
 }
 

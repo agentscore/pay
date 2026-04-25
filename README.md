@@ -230,6 +230,9 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
 | `config get [key] \| set <k> <v> \| unset <k> \| path` | Read/write `~/.agentscore/config.json` (e.g. `config set preferred_chains tempo,base`) |
+| `discover [--search q] [--chain c] [--max-price N] [--limit N]` | List x402 services from the Coinbase Bazaar registry (api.cdp.coinbase.com) |
+| `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL — skip per-call prompts during a session |
+| `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
 ## Mnemonic-based wallets
 

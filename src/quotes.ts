@@ -1,5 +1,13 @@
 import type { Chain } from './constants';
 
+function safeBigInt(raw: string): bigint | null {
+  try {
+    return BigInt(raw);
+  } catch {
+    return null;
+  }
+}
+
 export interface RailQuote {
   chain: Chain;
   price_usd?: number;
@@ -47,7 +55,8 @@ export function parseBody(body: unknown): RailQuote[] {
       if (!chain) continue;
       const decimals = a.extra?.decimals ?? 6;
       const priceRaw = a.maxAmountRequired ?? '0';
-      const priceUsd = Number(BigInt(priceRaw)) / 10 ** decimals;
+      const parsed = safeBigInt(priceRaw);
+      const priceUsd = parsed === null ? undefined : Number(parsed) / 10 ** decimals;
       quotes.push({
         chain,
         price_usd: priceUsd,

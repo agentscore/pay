@@ -1,6 +1,6 @@
 import { mkdir, rm } from 'fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { appendEntry, readEntries } from '../src/ledger';
+import { appendEntry, readEntries, readEntriesWithMeta } from '../src/ledger';
 
 const ROOT = '/tmp/pay-ledger-test';
 
@@ -71,7 +71,7 @@ describe('ledger', () => {
     expect(entries).toHaveLength(2);
   });
 
-  it('skips malformed lines silently', async () => {
+  it('skips malformed lines silently in readEntries', async () => {
     await appendEntry({
       timestamp: '2026-04-24T10:00:00Z',
       chain: 'base',
@@ -88,5 +88,29 @@ describe('ledger', () => {
     await fs.appendFile(ledgerPath(), 'not-json\n');
     const entries = await readEntries();
     expect(entries).toHaveLength(1);
+  });
+
+  it('readEntriesWithMeta surfaces a malformed-line count', async () => {
+    await appendEntry({
+      timestamp: '2026-04-24T10:00:00Z',
+      chain: 'base',
+      signer: '0xa',
+      method: 'POST',
+      url: 'https://x',
+      host: 'x',
+      status: 200,
+      protocol: 'x402',
+      ok: true,
+    });
+    const fs = await import('fs/promises');
+    const { ledgerPath } = await import('../src/ledger');
+    await fs.appendFile(ledgerPath(), 'not-json\n{also bad\n');
+    const { entries, malformed_lines } = await readEntriesWithMeta();
+    expect(entries).toHaveLength(1);
+    expect(malformed_lines).toBe(2);
+  });
+
+  it('readEntriesWithMeta returns 0 malformed for missing file', async () => {
+    expect(await readEntriesWithMeta()).toEqual({ entries: [], malformed_lines: 0 });
   });
 });

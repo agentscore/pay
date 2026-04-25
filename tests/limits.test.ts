@@ -120,4 +120,28 @@ describe('limits', () => {
     const result = await enforce({ daily_usd: 100 }, { priceUsd: 30, host: 'a.example', now });
     expect(result.allowed).toBe(true);
   });
+
+  it('enforce surfaces malformed_entries count for non-finite/negative price_usd or bad timestamp', async () => {
+    const now = new Date('2026-04-24T12:00:00Z');
+    const ts = '2026-04-24T11:00:00Z';
+    await appendEntry({
+      timestamp: ts, chain: 'base', signer: '0x', method: 'POST', url: 'https://a/',
+      host: 'a', status: 200, protocol: 'x402', price_usd: 'NaN', ok: true,
+    });
+    await appendEntry({
+      timestamp: ts, chain: 'base', signer: '0x', method: 'POST', url: 'https://a/',
+      host: 'a', status: 200, protocol: 'x402', price_usd: '-5', ok: true,
+    });
+    await appendEntry({
+      timestamp: 'not-a-date', chain: 'base', signer: '0x', method: 'POST', url: 'https://a/',
+      host: 'a', status: 200, protocol: 'x402', price_usd: '5', ok: true,
+    });
+    await appendEntry({
+      timestamp: ts, chain: 'base', signer: '0x', method: 'POST', url: 'https://a/',
+      host: 'a', status: 200, protocol: 'x402', price_usd: '10', ok: true,
+    });
+    const result = await enforce({ daily_usd: 100 }, { priceUsd: 1, host: 'a', now });
+    expect(result.allowed).toBe(true);
+    expect(result.malformed_entries).toBe(3);
+  });
 });

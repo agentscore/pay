@@ -1,20 +1,26 @@
-import { bold, dim, green, padColored, red } from '../colors';
-import { readEntries } from '../ledger';
-import { isJson, writeJson, writeLine } from '../output';
+import { bold, dim, green, padColored, red, yellow } from '../colors';
+import { readEntriesWithMeta } from '../ledger';
+import { isHuman, isJson, writeHumanNote, writeJson, writeLine } from '../output';
 
 export interface HistoryOptions {
   limit?: number;
 }
 
 export async function history(opts: HistoryOptions = {}): Promise<void> {
-  const entries = await readEntries(opts.limit);
+  const { entries, malformed_lines } = await readEntriesWithMeta(opts.limit);
   if (isJson()) {
-    writeJson(entries);
+    writeJson({ entries, ...(malformed_lines > 0 ? { malformed_lines } : {}) });
     return;
   }
   if (entries.length === 0) {
     writeLine('No payment history.');
+    if (malformed_lines > 0 && isHuman()) {
+      writeHumanNote(yellow(`(${malformed_lines} malformed line${malformed_lines === 1 ? '' : 's'} skipped — possible mid-write crash)`));
+    }
     return;
+  }
+  if (malformed_lines > 0 && isHuman()) {
+    writeHumanNote(yellow(`(${malformed_lines} malformed line${malformed_lines === 1 ? '' : 's'} skipped)`));
   }
   writeLine(bold('Time                 Chain      Price      Status   Host                          Action            Tx'));
   for (const e of entries) {

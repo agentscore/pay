@@ -1,5 +1,6 @@
 import { cancel, isCancel, password as clackPassword } from '@clack/prompts';
 import { CliError } from './errors';
+import { readCachedPassphrase } from './unlock-cache';
 
 const ENV_PASSPHRASE = 'AGENTSCORE_PAY_PASSPHRASE';
 
@@ -10,11 +11,13 @@ function isInteractive(): boolean {
 export async function promptPassphrase(message = 'Enter wallet passphrase'): Promise<string> {
   const envPass = process.env[ENV_PASSPHRASE];
   if (envPass) return envPass;
+  const cached = await readCachedPassphrase();
+  if (cached) return cached;
   if (!isInteractive()) {
     throw new CliError('user_cancelled', 'Passphrase required but no TTY and AGENTSCORE_PAY_PASSPHRASE not set.', {
       nextSteps: {
         action: 'set_env_passphrase',
-        suggestion: 'Set AGENTSCORE_PAY_PASSPHRASE=... in the environment before running.',
+        suggestion: 'Set AGENTSCORE_PAY_PASSPHRASE=... in the environment, or run `unlock --for 15m` from a TTY first.',
       },
     });
   }

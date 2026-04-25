@@ -15,7 +15,12 @@ export function isTransientNetworkError(err: unknown): boolean {
   if (err instanceof CliError) return false;
   if (!(err instanceof Error)) return false;
   if (err.name === 'AbortError') return false;
-  return TRANSIENT_NETWORK_ERR_PATTERN.test(err.message);
+  if (TRANSIENT_NETWORK_ERR_PATTERN.test(err.message)) return true;
+  // Node 20+ wraps the underlying ECONNRESET / ETIMEDOUT in `cause` of a
+  // generic TypeError("fetch failed"). Walk the chain.
+  const cause = (err as Error & { cause?: unknown }).cause;
+  if (cause instanceof Error && cause !== err) return isTransientNetworkError(cause);
+  return false;
 }
 
 export async function withRetries<T>(fn: () => Promise<T>, opts: RetryOptions): Promise<T> {

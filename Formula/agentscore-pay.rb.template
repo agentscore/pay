@@ -1,0 +1,29 @@
+#
+# DO NOT INSTALL DIRECTLY — this is the SOURCE TEMPLATE.
+# The publish workflow substitutes URL + sha256 + version, then commits the
+# rendered file into agentscore/homebrew-tap on each release.
+#
+# Placeholders:
+#   REPLACE_WITH_TARBALL_URL    — npm tarball URL
+#   REPLACE_WITH_TARBALL_SHA256 — sha256 of the tarball
+#   VERSION_PLACEHOLDER         — bare version string (without leading v)
+#
+class AgentscorePay < Formula
+  desc "CLI wallet for one-shell-command agent payments (x402 + MPP)"
+  homepage "https://agentscore.sh"
+  url "REPLACE_WITH_TARBALL_URL"
+  sha256 "REPLACE_WITH_TARBALL_SHA256"
+  version "VERSION_PLACEHOLDER"
+  license "MIT"
+
+  depends_on "node"
+
+  def install
+    system "npm", "install", *Language::Node.std_npm_install_args(libexec)
+    bin.install_symlink Dir["#{libexec}/bin/*"]
+  end
+
+  test do
+    assert_match(/\d+\.\d+\.\d+/, shell_output("#{bin}/agentscore-pay --version"))
+  end
+end

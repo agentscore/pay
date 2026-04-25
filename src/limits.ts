@@ -62,6 +62,7 @@ export interface EnforceResult {
   violated?: 'per_call_usd' | 'daily_usd' | 'per_merchant_usd';
   limit?: number;
   would_be?: number;
+  malformed_entries?: number;
 }
 
 export async function enforce(limits: Limits, input: EnforceInput): Promise<EnforceResult> {
@@ -80,20 +81,31 @@ export async function enforce(limits: Limits, input: EnforceInput): Promise<Enfo
   const entries = await readEntries();
   let dailySum = 0;
   let merchantSum = 0;
+  let malformedEntries = 0;
   for (const entry of entries) {
-    if (!entry.ok || !entry.price_usd) continue;
+    if (!entry.ok) continue;
+    if (!entry.price_usd) continue;
     const amount = Number(entry.price_usd);
-    if (!Number.isFinite(amount)) continue;
+    if (!Number.isFinite(amount) || amount < 0) {
+      malformedEntries += 1;
+      continue;
+    }
     const ts = Date.parse(entry.timestamp);
-    if (Number.isFinite(ts) && ts >= cutoff) dailySum += amount;
+    if (!Number.isFinite(ts)) {
+      malformedEntries += 1;
+      continue;
+    }
+    if (ts >= cutoff) dailySum += amount;
     if (entry.host === host) merchantSum += amount;
   }
 
   if (limits.daily_usd !== undefined && dailySum + priceUsd > limits.daily_usd) {
-    return { allowed: false, violated: 'daily_usd', limit: limits.daily_usd, would_be: dailySum + priceUsd };
+    return { allowed: false, violated: 'daily_usd', limit: limits.daily_usd, would_be: dailySum + priceUsd, malformed_entries: malformedEntries };
   }
   if (limits.per_merchant_usd !== undefined && merchantSum + priceUsd > limits.per_merchant_usd) {
-    return { allowed: false, violated: 'per_merchant_usd', limit: limits.per_merchant_usd, would_be: merchantSum + priceUsd };
+    return { allowed: false, violated: 'per_merchant_usd', limit: limits.per_merchant_usd, would_be: merchantSum + priceUsd, malformed_entries: malformedEntries };
   }
-  return { allowed: true };
+  const result: EnforceResult = { allowed: true };
+  if (malformedEntries > 0) result.malformed_entries = malformedEntries;
+  return result;
 }

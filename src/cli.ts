@@ -2,6 +2,7 @@ import { Command, Option } from 'commander';
 import { balance } from './commands/balance';
 import { check } from './commands/check';
 import { configGet, configPathCmd, configSet, configUnset } from './commands/config';
+import { discover } from './commands/discover';
 import { faucet } from './commands/faucet';
 import { fund } from './commands/fund';
 import { fundEstimate } from './commands/fund-estimate';
@@ -10,6 +11,8 @@ import { init } from './commands/init';
 import { limitsClear, limitsSet, limitsShow } from './commands/limits';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
+import { revoke } from './commands/revoke';
+import { unlock } from './commands/unlock';
 import {
   walletAddress,
   walletCreate,
@@ -284,6 +287,47 @@ export function buildCli(): Command {
         });
       },
     );
+
+  program
+    .command('revoke')
+    .description('Revoke an ERC-20 allowance: approve(spender, 0). EVM only (base, tempo). Requires native gas in the signer wallet.')
+    .addOption(chainOption(true))
+    .addOption(networkOption())
+    .addOption(walletNameOption())
+    .requiredOption('--token <address>', 'ERC-20 token contract (0x...)')
+    .requiredOption('--spender <address>', 'spender to revoke (0x...)')
+    .action(async (opts: { chain: Chain; network: Network; wallet: string; token: string; spender: string }) => {
+      applyMode(program);
+      await revoke({
+        chain: opts.chain,
+        network: opts.network,
+        token: opts.token,
+        spender: opts.spender,
+        walletName: opts.wallet,
+      });
+    });
+
+  program
+    .command('unlock')
+    .description('Cache the wallet passphrase to ~/.agentscore/.unlock for a bounded duration (skip per-command prompts)')
+    .option('--for <duration>', 'TTL — e.g. 15m, 2h, 30s, 1d (max 8h)', '15m')
+    .option('--clear', 'remove the cached passphrase')
+    .action(async (opts: { for?: string; clear?: boolean }) => {
+      applyMode(program);
+      await unlock({ forDuration: opts.for, clear: opts.clear });
+    });
+
+  program
+    .command('discover')
+    .description('List x402-enabled services from the Coinbase Bazaar registry (api.cdp.coinbase.com)')
+    .option('--search <query>', 'filter by description / URL / domain (case-insensitive substring)')
+    .addOption(chainOption())
+    .option('--max-price <usd>', 'only services priced at or below this USD amount', (v) => Number(v))
+    .option('--limit <n>', 'max services to print (default: all)', (v) => Number(v))
+    .action(async (opts: { search?: string; chain?: Chain; maxPrice?: number; limit?: number }) => {
+      applyMode(program);
+      await discover({ search: opts.search, chain: opts.chain, maxPriceUsd: opts.maxPrice, limit: opts.limit });
+    });
 
   const config = program.command('config').description('Read/write persistent CLI preferences (~/.agentscore/config.json)');
   config

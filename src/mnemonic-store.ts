@@ -1,5 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname } from 'path';
+import { CliError } from './errors';
 import { decryptSecret, encryptSecret } from './keystore';
 import { mnemonicPath } from './paths';
 
@@ -35,7 +36,14 @@ export async function saveMnemonic(phrase: string, passphrase: string, chains: s
 export async function loadMnemonic(passphrase: string): Promise<string> {
   const raw = await readFile(mnemonicPath(), 'utf-8');
   const file = JSON.parse(raw) as MnemonicFile;
-  const secret = await decryptSecret(file.encryption, passphrase);
+  let secret: Buffer;
+  try {
+    secret = await decryptSecret(file.encryption, passphrase);
+  } catch {
+    throw new CliError('wrong_passphrase', 'Failed to decrypt the stored mnemonic with the provided passphrase.', {
+      nextSteps: { action: 'retry_passphrase' },
+    });
+  }
   return secret.toString('utf-8');
 }
 

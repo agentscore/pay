@@ -28,9 +28,9 @@ describe('config', () => {
     await rm(ROOT, { recursive: true, force: true });
   });
 
-  it('returns empty when no config file exists', async () => {
+  it('returns just the version when no config file exists', async () => {
     const cfg = await loadConfig();
-    expect(cfg).toEqual({});
+    expect(cfg).toEqual({ version: 1 });
   });
 
   it('parses preferred_chains', async () => {
@@ -76,10 +76,17 @@ describe('config', () => {
       expect(cfg.preferred_chains).toEqual(['solana', 'tempo']);
     });
 
-    it('omits empty preferred_chains', async () => {
+    it('omits empty preferred_chains but always writes version', async () => {
       await saveConfig({ preferred_chains: [] });
       const raw = await readFile(join(ROOT, '.agentscore', 'config.json'), 'utf-8');
-      expect(JSON.parse(raw)).toEqual({});
+      expect(JSON.parse(raw)).toEqual({ version: 1 });
+    });
+
+    it('reads back configs missing version (defaults to current)', async () => {
+      await writeFile(join(ROOT, '.agentscore', 'config.json'), JSON.stringify({ preferred_chains: ['base'] }));
+      const cfg = await loadConfig();
+      expect(cfg.version).toBe(1);
+      expect(cfg.preferred_chains).toEqual(['base']);
     });
   });
 
@@ -121,7 +128,7 @@ describe('config', () => {
     it('is a no-op for an already-unset key', async () => {
       await unsetConfigValue('preferred_chains');
       const cfg = await loadConfig();
-      expect(cfg).toEqual({});
+      expect(cfg).toEqual({ version: 1 });
     });
 
     it('rejects unknown keys', async () => {

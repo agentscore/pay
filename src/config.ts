@@ -6,7 +6,10 @@ import { baseDir, configPath } from './paths';
 
 export { configPath } from './paths';
 
+export const CONFIG_VERSION = 1;
+
 export interface Config {
+  version?: number;
   preferred_chains?: Chain[];
 }
 
@@ -17,11 +20,13 @@ export async function loadConfig(): Promise<Config> {
   try {
     const raw = await readFile(configPath(), 'utf-8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const version = typeof parsed.version === 'number' ? parsed.version : CONFIG_VERSION;
     return {
+      version,
       preferred_chains: parsePreferredChains(parsed.preferred_chains),
     };
   } catch (err) {
-    if (isNotFound(err)) return {};
+    if (isNotFound(err)) return { version: CONFIG_VERSION };
     throw err;
   }
 }
@@ -30,7 +35,7 @@ export async function saveConfig(cfg: Config): Promise<void> {
   const path = configPath();
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await mkdir(baseDir(), { recursive: true, mode: 0o700 });
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = { version: cfg.version ?? CONFIG_VERSION };
   if (cfg.preferred_chains && cfg.preferred_chains.length > 0) {
     out.preferred_chains = cfg.preferred_chains;
   }
