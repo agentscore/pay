@@ -24,7 +24,10 @@ describe('config command (CLI surface)', () => {
   });
 
   function out() {
-    return stdout.mock.calls.map((c) => String(c[0])).join('');
+    const raw = stdout.mock.calls.map((c) => String(c[0])).join('');
+    // strip ANSI escape sequences so content assertions don't depend on TTY/CI color rendering
+    // eslint-disable-next-line no-control-regex
+    return raw.replace(/\x1b\[[0-9;]*m/g, '');
   }
   function jsonOut() {
     return JSON.parse(out().trim().split('\n').pop()!);
