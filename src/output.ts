@@ -1,43 +1,23 @@
-import pc from 'picocolors';
+import { dim, red, yellow } from './colors';
 import { CliError, exitCodeForError } from './errors';
+import { getMode, isJson as _isJson } from './mode';
 
-export type OutputMode = 'human' | 'json' | 'plain';
-
-let currentMode: OutputMode = 'human';
-
-export interface ModeFlags {
-  json?: boolean;
-  plain?: boolean;
-}
-
-export function resolveMode(flags: ModeFlags = {}): OutputMode {
-  if (flags.json) return 'json';
-  if (flags.plain) return 'plain';
-  return process.stdout.isTTY ? 'human' : 'plain';
-}
-
-export function setMode(mode: OutputMode): void {
-  currentMode = mode;
-}
-
-export function getMode(): OutputMode {
-  return currentMode;
-}
-
-export function isHuman(): boolean {
-  return currentMode === 'human';
-}
-
-export function isJson(): boolean {
-  return currentMode === 'json';
-}
+export {
+  getMode,
+  isHuman,
+  isJson,
+  resolveMode,
+  setMode,
+  type ModeFlags,
+  type OutputMode,
+} from './mode';
 
 export function writeJson(data: unknown): void {
   process.stdout.write(JSON.stringify(data) + '\n');
 }
 
 export function writeLine(text: string): void {
-  if (currentMode === 'json') return;
+  if (_isJson()) return;
   process.stdout.write(text + '\n');
 }
 
@@ -46,12 +26,12 @@ export function writeText(text: string): void {
 }
 
 export function writeHumanNote(text: string): void {
-  if (currentMode === 'json') return;
+  if (_isJson()) return;
   process.stderr.write(text + '\n');
 }
 
 export function emitProgress(event: string, data?: Record<string, unknown>): void {
-  if (currentMode === 'json') {
+  if (_isJson()) {
     process.stderr.write(JSON.stringify({ event, ...data }) + '\n');
     return;
   }
@@ -64,14 +44,14 @@ export function emitProgress(event: string, data?: Record<string, unknown>): voi
 
 export function writeError(err: CliError | Error): number {
   const structured = toStructured(err);
-  if (currentMode === 'human') {
+  if (getMode() === 'human') {
     const { error } = structured;
-    process.stderr.write(`${pc.red('agentscore-pay:')} ${error.message}\n`);
+    process.stderr.write(`${red('agentscore-pay:')} ${error.message}\n`);
     if (structured.next_steps && typeof structured.next_steps === 'object') {
       const ns = structured.next_steps as NextStepsSerialized;
-      if (ns.suggestion) process.stderr.write(`  ${pc.yellow('→')} ${ns.suggestion}\n`);
+      if (ns.suggestion) process.stderr.write(`  ${yellow('→')} ${ns.suggestion}\n`);
     }
-    process.stderr.write(pc.dim(`\nMachine-readable:\n${JSON.stringify(structured)}\n`));
+    process.stderr.write(dim(`\nMachine-readable:\n${JSON.stringify(structured)}\n`));
   } else {
     process.stderr.write(JSON.stringify(structured) + '\n');
   }
