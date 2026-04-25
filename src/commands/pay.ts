@@ -8,7 +8,10 @@ import { CliError } from '../errors';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
 import { emitProgress, isJson, writeJson, writeLine, writeText } from '../output';
+import { DEFAULT_WALLET_NAME } from '../paths';
+import { extractNextStepsAction, extractTxHash } from '../payment-receipt';
 import { promptPassphrase } from '../prompts';
+import { withRetries } from '../retry';
 import { selectRail } from '../selection';
 import { createMppAccount, createX402Signer, loadWallet, type Wallet } from '../wallets';
 import type { ClientEvmSigner } from '@x402/evm';
@@ -24,6 +27,17 @@ export interface PayOptions {
   maxSpendUsd?: number;
   verbose?: boolean;
   dryRun?: boolean;
+  timeoutSeconds?: number;
+  retries?: number;
+  walletName?: string;
+}
+
+export const DEFAULT_TIMEOUT_SECONDS = 60;
+export const DEFAULT_RETRIES = 0;
+
+interface PaymentSettled {
+  price_usd?: string;
+  tx_hash?: string;
 }
 
 export async function pay(opts: PayOptions): Promise<void> {
@@ -65,9 +79,13 @@ export async function pay(opts: PayOptions): Promise<void> {
   }
 
   const passphrase = await promptPassphrase();
-  const wallet = await loadWallet(candidate.chain, passphrase);
+  const wallet = await loadWallet(candidate.chain, passphrase, opts.walletName ?? DEFAULT_WALLET_NAME);
 
-  const init: RequestInit = { method: opts.method };
+  const timeoutSeconds = opts.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+
+  const init: RequestInit = { method: opts.method, signal: controller.signal };
   if (opts.body !== undefined) init.body = opts.body;
   init.headers = {
     'Content-Type': 'application/json',
@@ -82,22 +100,56 @@ export async function pay(opts: PayOptions): Promise<void> {
       chain: wallet.chain,
       signer: wallet.address,
       has_body: opts.body !== undefined,
+      timeout_seconds: timeoutSeconds,
     });
   }
 
+  const settled: PaymentSettled = {};
+  const retries = opts.retries ?? DEFAULT_RETRIES;
   let res: Response;
   try {
-    res = wallet.chain === 'tempo'
-      ? await payViaMpp(wallet, opts, init)
-      : await payViaX402(wallet, opts, init, network);
+    res = await withRetries(
+      () =>
+        wallet.chain === 'tempo'
+          ? payViaMpp(wallet, opts, init, settled)
+          : payViaX402(wallet, opts, init, network, settled),
+      {
+        retries,
+        baseDelayMs: 200,
+        onRetry: (attempt, err, delayMs) => {
+          if (opts.verbose) {
+            emitProgress('retry', {
+              attempt,
+              of: retries,
+              delay_ms: delayMs,
+              reason: err instanceof Error ? err.message : String(err),
+            });
+          }
+        },
+      },
+    );
   } catch (err) {
+    if (controller.signal.aborted) {
+      throw new CliError('session_timeout', `Payment timed out after ${timeoutSeconds}s`, {
+        nextSteps: {
+          action: 'retry_with_higher_timeout',
+          suggestion: `Re-run with --timeout ${timeoutSeconds * 2} or check if the merchant is reachable.`,
+        },
+        extra: { timeout_seconds: timeoutSeconds, url: opts.url },
+      });
+    }
     throw mapNetworkError(err);
+  } finally {
+    clearTimeout(timer);
   }
 
   if (opts.verbose) emitProgress('response', { status: res.status, status_text: res.statusText });
 
   const text = await res.text();
   const parsed = tryParseJson(text);
+
+  if (!settled.tx_hash) settled.tx_hash = extractTxHash(res.headers, parsed);
+  const nextStepsAction = extractNextStepsAction(parsed);
 
   const host = safeHost(opts.url);
   const entry = {
@@ -109,6 +161,9 @@ export async function pay(opts: PayOptions): Promise<void> {
     host,
     status: res.status,
     protocol: (wallet.chain === 'tempo' ? 'mpp' : 'x402') as 'mpp' | 'x402',
+    ...(settled.price_usd ? { price_usd: settled.price_usd } : {}),
+    ...(settled.tx_hash ? { tx_hash: settled.tx_hash } : {}),
+    ...(nextStepsAction ? { next_steps_action: nextStepsAction } : {}),
     ok: res.ok,
   };
   await appendEntry(entry);
@@ -120,6 +175,9 @@ export async function pay(opts: PayOptions): Promise<void> {
       status_text: res.statusText,
       chain: wallet.chain,
       signer: wallet.address,
+      ...(settled.price_usd ? { price_usd: settled.price_usd } : {}),
+      ...(settled.tx_hash ? { tx_hash: settled.tx_hash } : {}),
+      ...(nextStepsAction ? { next_steps_action: nextStepsAction } : {}),
       body: parsed ?? text,
     });
   } else {
@@ -132,6 +190,7 @@ export async function pay(opts: PayOptions): Promise<void> {
     });
   }
 }
+
 
 function tryParseJson(text: string): unknown {
   if (!text) return null;
@@ -150,7 +209,13 @@ function safeHost(url: string): string {
   }
 }
 
-async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit, network: Network): Promise<Response> {
+async function payViaX402(
+  wallet: Wallet,
+  opts: PayOptions,
+  init: RequestInit,
+  network: Network,
+  settled: PaymentSettled,
+): Promise<Response> {
   const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
   if (wallet.chain === 'base') {
@@ -170,6 +235,7 @@ async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit, n
     const decimals = Number(req.decimals ?? 6);
     const priceRaw = BigInt(req.maxAmountRequired ?? '0');
     const priceUsd = Number(priceRaw) / 10 ** decimals;
+    settled.price_usd = priceUsd.toFixed(decimals);
     if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
       return { abort: true, reason: `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}` };
     }
@@ -183,7 +249,12 @@ async function payViaX402(wallet: Wallet, opts: PayOptions, init: RequestInit, n
   return fetchWithPay(opts.url, init);
 }
 
-async function payViaMpp(wallet: Wallet, opts: PayOptions, init: RequestInit): Promise<Response> {
+async function payViaMpp(
+  wallet: Wallet,
+  opts: PayOptions,
+  init: RequestInit,
+  settled: PaymentSettled,
+): Promise<Response> {
   const account = createMppAccount(wallet);
   const host = safeHost(opts.url);
   const limits = await loadLimits();
@@ -197,6 +268,7 @@ async function payViaMpp(wallet: Wallet, opts: PayOptions, init: RequestInit): P
         const decimals = Number(r.decimals ?? 6);
         const priceRaw = BigInt(r.amount ?? '0');
         const priceUsd = Number(priceRaw) / 10 ** decimals;
+        settled.price_usd = priceUsd.toFixed(decimals);
         if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
           throw new CliError(
             'max_spend_exceeded',

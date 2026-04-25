@@ -15,6 +15,8 @@ export interface LedgerEntry {
   status: number;
   protocol: 'x402' | 'mpp';
   price_usd?: string;
+  tx_hash?: string;
+  next_steps_action?: string;
   ok: boolean;
 }
 

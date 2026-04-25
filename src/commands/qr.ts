@@ -4,10 +4,11 @@ import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
+import { DEFAULT_WALLET_NAME } from '../paths';
 import type { Chain, Network } from '../constants';
 
-export async function qr(chain: Chain, amountUsd?: number, network: Network = 'mainnet'): Promise<void> {
-  const ks = await loadKeystore(chain);
+export async function qr(chain: Chain, amountUsd?: number, network: Network = 'mainnet', name: string = DEFAULT_WALLET_NAME): Promise<void> {
+  const ks = await loadKeystore(chain, name);
   const uri =
     chain === 'base'
       ? baseChain.qrUri(ks.address, amountUsd, network)

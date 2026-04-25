@@ -37,6 +37,7 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
     case 'network_error':
     case 'rpc_error':
     case 'merchant_error':
+    case 'session_timeout':
       return EXIT_CODES.NETWORK_ERROR;
     case 'insufficient_balance':
     case 'no_funded_rail':

@@ -1,3 +1,4 @@
+import pc from 'picocolors';
 import { CliError, exitCodeForError } from './errors';
 
 export type OutputMode = 'human' | 'json' | 'plain';
@@ -65,12 +66,12 @@ export function writeError(err: CliError | Error): number {
   const structured = toStructured(err);
   if (currentMode === 'human') {
     const { error } = structured;
-    process.stderr.write(`agentscore-pay: ${error.message}\n`);
+    process.stderr.write(`${pc.red('agentscore-pay:')} ${error.message}\n`);
     if (structured.next_steps && typeof structured.next_steps === 'object') {
       const ns = structured.next_steps as NextStepsSerialized;
-      if (ns.suggestion) process.stderr.write(`  → ${ns.suggestion}\n`);
+      if (ns.suggestion) process.stderr.write(`  ${pc.yellow('→')} ${ns.suggestion}\n`);
     }
-    process.stderr.write(`\nMachine-readable:\n${JSON.stringify(structured)}\n`);
+    process.stderr.write(pc.dim(`\nMachine-readable:\n${JSON.stringify(structured)}\n`));
   } else {
     process.stderr.write(JSON.stringify(structured) + '\n');
   }
