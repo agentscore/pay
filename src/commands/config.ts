@@ -27,15 +27,15 @@ export async function configGet(key?: string): Promise<void> {
     return;
   }
   writeLine(`${bold('config')}: ${dim(configPath())}`);
-  if (Object.keys(cfg).length === 0) {
+  const setKeys = CONFIG_KEYS.filter((k) => (cfg as Record<string, unknown>)[k] !== undefined);
+  if (setKeys.length === 0) {
     writeLine(dim('(empty — no preferences set)'));
     writeLine('');
     writeLine(dim(`Valid keys: ${CONFIG_KEYS.join(', ')}`));
     return;
   }
-  for (const k of CONFIG_KEYS) {
+  for (const k of setKeys) {
     const v = (cfg as Record<string, unknown>)[k];
-    if (v === undefined) continue;
     writeLine(`  ${k} = ${bold(formatValue(v))}`);
   }
 }

@@ -230,7 +230,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
 | `config get [key] \| set <k> <v> \| unset <k> \| path` | Read/write `~/.agentscore/config.json` (e.g. `config set preferred_chains tempo,base`) |
-| `discover [--search q] [--chain c] [--max-price N] [--limit N]` | List x402 services from the Coinbase Bazaar registry (api.cdp.coinbase.com) |
+| `discover [--search q] [--chain c] [--max-price N] [--limit N] [--protocol x402\|mpp\|both]` | List paid services from the x402 Bazaar (Coinbase) and MPP services directory (Tempo). Both queried in parallel by default. |
 | `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL — skip per-call prompts during a session |
 | `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
@@ -249,6 +249,15 @@ agentscore-pay wallet show-mnemonic --danger
 
 Derivation paths: EVM uses `m/44'/60'/0'/0/0` (standard), Solana uses `m/44'/501'/0'/0'` (SLIP-10 Ed25519). The same phrase regenerates identical keys on every machine.
 
+#### Why two derivation algorithms?
+
+EVM and Solana use **different curves**: EVM uses secp256k1 (BIP-32 hardened+non-hardened paths), Solana uses Ed25519 (which only supports hardened derivation). The standards differ accordingly:
+
+- **EVM (BIP-44, secp256k1)** — `m/44'/60'/0'/0/0`. The trailing `/0/0` is non-hardened. MetaMask, Rabby, and Coinbase Wallet all use this path; importing a phrase into any of them yields the same address you see in `wallet address --chain base`.
+- **Solana (SLIP-10, Ed25519)** — `m/44'/501'/0'/0'`. All four levels are hardened (note the trailing `'`). Phantom and Solflare use this path for "Account 0"; importing the same phrase yields the address you see in `wallet address --chain solana`.
+
+If you import the phrase into Phantom and see a different address, check that Phantom is set to "Standard derivation path" (not the legacy `m/44'/501'/0'`).
+
 ## Multiple wallet profiles
 
 Two layers of multi-wallet support:
@@ -265,6 +274,35 @@ agentscore-pay pay POST <url> --chain base --wallet trading -d '...' --max-spend
 ```
 
 Names are limited to `[a-z0-9-]` (max 32 chars). Mnemonic-derived wallets are always stored under `default` — for additional named wallets use random keys (`wallet create`) or import (`wallet import`).
+
+#### End-to-end: separate trading + default wallets
+
+```bash
+# Default wallet for general spending
+agentscore-pay init                                 # creates base/solana/tempo "default"
+agentscore-pay fund --chain base --amount 10        # tops up default
+
+# Separate "trading" wallet for a high-budget bot
+agentscore-pay wallet create --chain base --wallet trading
+agentscore-pay wallet address --chain base --wallet trading
+# → 0xTRADINGADDRESS — fund this address externally (CEX withdrawal, transfer, etc.)
+agentscore-pay balance --chain base --wallet trading
+
+# Inspect everything
+agentscore-pay wallet list
+# base     default
+# base     trading
+
+# Pay from each
+agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base                    # uses default
+agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base --wallet trading   # uses trading
+
+# Remove a wallet (irrecoverable — back up the mnemonic or export the key first)
+agentscore-pay wallet export --chain base --wallet trading --danger --skip-confirm > trading.key
+agentscore-pay wallet remove --chain base --wallet trading --danger --skip-confirm
+```
+
+Per-wallet limits aren't supported today (limits are global). Use separate `AGENTSCORE_PAY_HOME` profiles if you need per-wallet daily caps.
 
 ### Separate state directories
 
@@ -291,9 +329,13 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 
 ### Testnet
 
-- `agentscore-pay faucet --chain base` prints the Circle USDC faucet URL + the Base Sepolia address (copied to clipboard). Paste into the faucet form and wait.
-- Same flow for `--chain solana` (Solana Devnet).
-- **`agentscore-pay fund --chain tempo --network testnet`** is one-shot: it calls Moderato's `tempo_fundAddress` JSON-RPC and mints 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) directly to the wallet. No browser, no captcha, no install.
+| Chain | UX | Time-to-funded |
+|---|---|---|
+| Base Sepolia | `faucet --chain base` — prints Circle URL + copies your address to clipboard. Paste into the form and wait. | ~30s + manual paste |
+| Solana Devnet | `faucet --chain solana` — same Circle flow. | ~30s + manual paste |
+| **Tempo testnet** | **`fund --chain tempo --network testnet` is the only programmatic faucet** — calls Moderato's `tempo_fundAddress` JSON-RPC, mints 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) directly. No browser, no captcha. | ~5s, fully scripted |
+
+Use `fund --chain tempo --network testnet` in CI/agent setup scripts — it's the only one that works without human interaction. Base Sepolia and Solana Devnet still require pasting your address into Circle's web form.
 
 ### Scripted / deployed agents
 
@@ -320,6 +362,40 @@ agentscore-pay fund-estimate https://agents.martinestate.com/purchase \
 - Local spending limits (`limits set --daily N --per-call N --per-merchant N`) enforce at signing time via the x402 and MPP hooks.
 - `~/.agentscore/history.jsonl` records successful payments (url, host, chain, protocol, status, timestamp). No secrets logged.
 - No telemetry. No auto-update. No plaintext keys on disk.
+
+### Passphrase strength
+
+For **interactive humans**: any 8+ char passphrase you'll remember is fine — the scrypt-256-GCM combination is robust against offline brute force at typical human-passphrase entropy levels.
+
+For **autonomous agents**: the passphrase usually lives in `AGENTSCORE_PAY_PASSPHRASE` (env var) or `~/.agentscore/.unlock` (file). Both are filesystem/process-readable to anyone with shell access as that user, so the passphrase isn't really a separate trust boundary — it's primarily protecting the keystore against *theft of the on-disk file alone*. A long, random passphrase makes the file useless if exfiltrated:
+
+```sh
+# generate a 32-byte (256-bit) random passphrase
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# 4d2a...
+
+# stash it where your agent can read it (env / secret manager / .env / etc.)
+export AGENTSCORE_PAY_PASSPHRASE=4d2a...
+```
+
+If the wallet keystore *and* the passphrase store are both compromised, the wallet is compromised — there's no extra protection from a complex passphrase. Defend the directory.
+
+### Verifying release binaries (sigstore / cosign)
+
+Native binaries attached to each [GitHub Release](https://github.com/agentscore/pay/releases) are signed with [sigstore/cosign](https://docs.sigstore.dev/cosign/overview/) keyless OIDC. To verify a downloaded binary:
+
+```sh
+cosign verify-blob \
+  --signature agentscore-pay-darwin-arm64.sig \
+  --certificate agentscore-pay-darwin-arm64.pem \
+  --certificate-identity-regexp 'https://github.com/agentscore/.+' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  agentscore-pay-darwin-arm64
+```
+
+A successful verification (`Verified OK`) confirms the binary was built by a workflow in the `agentscore` GitHub org against the published source — not tampered post-build. The `.sig` and `.pem` files are uploaded next to each binary in the release.
+
+The npm package itself is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (also sigstore-backed) — `npm install @agent-score/pay` inherits the same trust chain automatically.
 
 ## Environment
 
