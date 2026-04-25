@@ -62,7 +62,15 @@ export async function pay(opts: PayOptions): Promise<void> {
       method: opts.method,
       url: opts.url,
       protocol: candidate.chain === 'tempo' ? 'mpp' : 'x402',
-      headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}), 'X-Wallet-Address': candidate.address },
+      headers: (() => {
+        const userKeys = Object.keys(opts.headers ?? {}).map((k) => k.toLowerCase());
+        const hasIdentity = userKeys.includes('x-operator-token') || userKeys.includes('x-wallet-address');
+        return {
+          'Content-Type': 'application/json',
+          ...(opts.headers ?? {}),
+          ...(hasIdentity ? {} : { 'X-Wallet-Address': candidate.address }),
+        };
+      })(),
       body: opts.body ?? null,
       max_spend_usd: opts.maxSpendUsd ?? null,
     };
@@ -88,10 +96,18 @@ export async function pay(opts: PayOptions): Promise<void> {
 
   const init: RequestInit = { method: opts.method, signal: controller.signal };
   if (opts.body !== undefined) init.body = opts.body;
+  // Auto-inject X-Wallet-Address ONLY when the caller hasn't already chosen an identity
+  // header. If the agent passed X-Operator-Token, layering X-Wallet-Address on top makes
+  // the merchant's gate evaluate BOTH identities — and unlinked wallets without their
+  // own KYC will fail compliance even though the operator_token is fully verified.
+  // Header lookup is case-insensitive per RFC 7230.
+  const userHeaderKeys = Object.keys(opts.headers ?? {}).map((k) => k.toLowerCase());
+  const userSpecifiedIdentity =
+    userHeaderKeys.includes('x-operator-token') || userHeaderKeys.includes('x-wallet-address');
   init.headers = {
     'Content-Type': 'application/json',
     ...(opts.headers ?? {}),
-    'X-Wallet-Address': wallet.address,
+    ...(userSpecifiedIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
   };
 
   if (opts.verbose) {
@@ -219,12 +235,21 @@ async function payViaX402(
 ): Promise<Response> {
   const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
+  // Register schemes on BOTH x402 versions. Coinbase x402-fetch and the @x402/core HTTP
+  // parser hardcode `x402Version === 1` for the body shape, while the client's
+  // `register()` defaults to v2. A merchant that emits `x402Version: 1` in the response
+  // (forced by the parser bug) would otherwise fail with "No client registered for x402
+  // version: 1" even though the scheme handler is identical between v1/v2.
   if (wallet.chain === 'base') {
     const cfg = evmConfig('base', network);
-    client.register(cfg.network as `${string}:${string}`, new ExactEvmScheme(signer as ClientEvmSigner));
+    const evmClient = new ExactEvmScheme(signer as ClientEvmSigner);
+    client.register(cfg.network as `${string}:${string}`, evmClient);
+    client.registerV1(cfg.network as `${string}:${string}`, evmClient);
   } else if (wallet.chain === 'solana') {
     const cfg = svmConfig(network);
-    client.register(cfg.network as `${string}:${string}`, new ExactSvmScheme(signer as ClientSvmSigner));
+    const svmClient = new ExactSvmScheme(signer as ClientSvmSigner);
+    client.register(cfg.network as `${string}:${string}`, svmClient);
+    client.registerV1(cfg.network as `${string}:${string}`, svmClient);
   } else {
     throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — use MPP for Tempo.`);
   }
