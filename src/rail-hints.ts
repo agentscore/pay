@@ -30,19 +30,11 @@ const HINTS: Record<string, RailHint> = {
     description: 'x402 on Optimism — not natively supported by agentscore-pay.',
     docs_url: 'https://x402.org',
   },
+  // Single canonical entry for Stripe SPT — the lookup function below maps any rail name
+  // starting with `stripe` (`stripe`, `stripe-spt`, `stripe/charge`, future Stripe-flavored
+  // schemes) to this hint, so we don't need duplicate entries per spelling variant.
   stripe: {
     name: 'Stripe (Shared Payment Token)',
-    description:
-      "User-approved card payment from a Link wallet. Each spend requires the user's explicit approval via push notification.",
-    docs_url: 'https://docs.stripe.com',
-    recommended_client: {
-      name: '@stripe/link-cli',
-      install: 'npm i -g @stripe/link-cli',
-      docs_url: 'https://github.com/stripe/link-cli',
-    },
-  },
-  'stripe-spt': {
-    name: 'Stripe Shared Payment Token',
     description:
       "User-approved card payment from a Link wallet. Each spend requires the user's explicit approval via push notification.",
     docs_url: 'https://docs.stripe.com',

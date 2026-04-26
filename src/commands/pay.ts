@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { x402Client } from '@x402/core/client';
 import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
@@ -104,10 +105,19 @@ export async function pay(opts: PayOptions): Promise<void> {
   const userHeaderKeys = Object.keys(opts.headers ?? {}).map((k) => k.toLowerCase());
   const userSpecifiedIdentity =
     userHeaderKeys.includes('x-operator-token') || userHeaderKeys.includes('x-wallet-address');
+  // X-Idempotency-Key — stable across retries within this pay invocation. Merchants that
+  // honor the convention (Stripe-pattern dedup) can use it to avoid double-charging when
+  // a settled payment + lost network connection causes withRetries to re-fire. Hash-based
+  // so the same logical payment (same url + body + method + signer) always produces the
+  // same key; different invocations get different keys (timestamp salt).
+  const userSpecifiedIdempotency = userHeaderKeys.includes('x-idempotency-key');
   init.headers = {
     'Content-Type': 'application/json',
     ...(opts.headers ?? {}),
     ...(userSpecifiedIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
+    ...(userSpecifiedIdempotency
+      ? {}
+      : { 'X-Idempotency-Key': computeIdempotencyKey({ url: opts.url, method: opts.method, body: opts.body, signer: wallet.address }) }),
   };
 
   if (opts.verbose) {
@@ -257,7 +267,16 @@ async function payViaX402(
   const host = safeHost(opts.url);
   const limits = await loadLimits();
   client.onBeforePaymentCreation(async ({ selectedRequirements }) => {
-    const req = selectedRequirements as { decimals?: number; maxAmountRequired?: string };
+    const req = selectedRequirements as { decimals?: number; maxAmountRequired?: string; asset?: string };
+    // Defensive fallback to 6 (USDC) when merchant omits decimals. Spec REQUIRES decimals
+    // so the fallback is unreachable for compliant merchants — surface a warning if it
+    // ever fires so non-USDC merchants emitting partial 402s don't silently mis-bill.
+    if (req.decimals === undefined) {
+      emitProgress('decimals_fallback', {
+        message: "merchant 402 omitted 'decimals' — assuming 6 (USDC). If asset is non-USDC the price will be off by orders of magnitude.",
+        asset: req.asset ?? null,
+      });
+    }
     const decimals = Number(req.decimals ?? 6);
     const priceRaw = BigInt(req.maxAmountRequired ?? '0');
     const priceUsd = Number(priceRaw) / 10 ** decimals;
@@ -291,6 +310,11 @@ async function payViaMpp(
       const requests =
         (challenge as { paymentRequests?: Array<{ amount?: string; decimals?: number }> }).paymentRequests ?? [];
       for (const r of requests) {
+        if (r.decimals === undefined) {
+          emitProgress('decimals_fallback', {
+            message: "merchant MPP challenge omitted 'decimals' — assuming 6 (USDC). If asset is non-USDC the price will be off by orders of magnitude.",
+          });
+        }
         const decimals = Number(r.decimals ?? 6);
         const priceRaw = BigInt(r.amount ?? '0');
         const priceUsd = Number(priceRaw) / 10 ** decimals;
@@ -313,6 +337,34 @@ async function payViaMpp(
     },
   });
   return client.fetch(opts.url, init);
+}
+
+/**
+ * Stable per-invocation idempotency key. Hashes the request shape (url + method + body +
+ * signer) so all retries within `withRetries` reuse the same key — merchants that honor
+ * X-Idempotency-Key (Stripe-pattern dedup) won't double-charge if a payment settled but
+ * the network response was lost.
+ *
+ * Note: this is per-pay-invocation, not per-logical-purchase across pay restarts. Two
+ * separate pay runs to the same URL will produce different keys (the timestamp salt
+ * shifts the hash). For cross-process idempotency, callers should pass an explicit
+ * X-Idempotency-Key header in `opts.headers`.
+ */
+function computeIdempotencyKey(input: {
+  url: string;
+  method: string;
+  body?: string;
+  signer: string;
+}): string {
+  const h = createHash('sha256');
+  h.update(input.method);
+  h.update('\0');
+  h.update(input.url);
+  h.update('\0');
+  h.update(input.body ?? '');
+  h.update('\0');
+  h.update(input.signer);
+  return `pay-${h.digest('hex').slice(0, 32)}`;
 }
 
 function mapNetworkError(err: unknown): CliError {

@@ -8,6 +8,7 @@ import { loadMnemonic, mnemonicExists, mnemonicPath, saveMnemonic } from '../mne
 import { isHuman, isJson, writeHumanNote, writeJson, writeLine } from '../output';
 import { DEFAULT_WALLET_NAME, isValidWalletName, keystorePath } from '../paths';
 import { promptNewPassphrase, promptPassphrase } from '../prompts';
+import { clearCache as clearUnlockCache } from '../unlock-cache';
 import { createWallet, getQrUri } from '../wallets';
 import type { Wallet } from '../wallets';
 
@@ -303,12 +304,24 @@ export async function walletRemove(opts: WalletRemoveOptions): Promise<void> {
     await typeToConfirm(`Type EXPORT to confirm deleting ${opts.chain}/${name} (${file.address})`);
   }
   const removed = await deleteKeystore(opts.chain, name);
+  // Clear the cached passphrase too — keeping it after a wallet delete is residual
+  // credential exposure (the passphrase often unlocks other wallets the same user
+  // created with the same password). Best-effort: ignore failure if cache doesn't exist.
+  const unlockCacheCleared = await clearUnlockCache().catch(() => false);
   if (isJson()) {
-    writeJson({ ok: true, chain: opts.chain, name, address: file.address, removed_files: removed });
+    writeJson({
+      ok: true,
+      chain: opts.chain,
+      name,
+      address: file.address,
+      removed_files: removed,
+      unlock_cache_cleared: unlockCacheCleared,
+    });
     return;
   }
   writeLine(`${green('✓')} Removed ${opts.chain}/${name} (${file.address})`);
   for (const path of removed) writeLine(dim(`  - ${path}`));
+  if (unlockCacheCleared) writeLine(dim('  - cleared cached passphrase (was set via `unlock`)'));
 }
 
 export interface WalletExportOptions {
