@@ -415,11 +415,11 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 `@agent-score/pay` is the universal agent-payment CLI; it works with any 402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
 
 - [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
-- [`@agent-score/gate`](https://www.npmjs.com/package/@agent-score/gate) — merchant-side trust-gating middleware
+- [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce) — merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers
 - [`@agent-score/mcp`](https://www.npmjs.com/package/@agent-score/mcp) — MCP server for AgentScore tools
 - **`@agent-score/pay`** (this package) — agent-side CLI wallet across x402 and MPP rails
 
-When a merchant uses `@agent-score/gate`, wallet-to-operator linking happens merchant-side via `captureWallet` — pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
+When a merchant uses `@agent-score/commerce`, wallet-to-operator linking happens merchant-side via `captureWallet` — pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## License
 
