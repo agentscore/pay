@@ -4,7 +4,7 @@ import * as tempoChain from '../chains/tempo';
 import { CliError } from '../errors';
 import { keystoreExists, loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
-import { parseBody, type RailQuote } from '../quotes';
+import { parseBody, type RailQuote, type UnsupportedRail } from '../quotes';
 import type { Chain, Network } from '../constants';
 
 export interface FundEstimateOptions {
@@ -57,11 +57,20 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
     return;
   }
 
-  const quotes: RailQuote[] = parseBody(body);
+  const { supported: quotes, unsupported }: { supported: RailQuote[]; unsupported: UnsupportedRail[] } = parseBody(body);
   if (quotes.length === 0) {
-    throw new CliError('merchant_error', 'Could not parse any rails from 402 body.', {
-      extra: { raw_body: text.slice(0, 2000) },
-    });
+    throw new CliError(
+      'merchant_error',
+      unsupported.length > 0
+        ? `Merchant only accepts rails not natively supported by agentscore-pay: ${unsupported.map(formatUnsupportedLabel).join(', ')}.`
+        : 'Could not parse any rails from 402 body.',
+      {
+        extra: {
+          raw_body: text.slice(0, 2000),
+          ...(unsupported.length > 0 ? { unsupported_rails: unsupported } : {}),
+        },
+      },
+    );
   }
 
   const rows = await Promise.all(
@@ -97,6 +106,7 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
       method: opts.method,
       payment_required: true,
       quotes: rows,
+      ...(unsupported.length > 0 ? { unsupported_rails: unsupported } : {}),
     });
     return;
   }
@@ -115,4 +125,17 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
       `${r.chain.padEnd(9)} ${r.protocol.padEnd(9)} ${price.padStart(10)}  ${balance.padStart(12)}  ${calls.padStart(6)}  ${suggest}`,
     );
   }
+  if (unsupported.length > 0) {
+    writeLine('');
+    writeLine('Other rails accepted (not natively supported by agentscore-pay):');
+    for (const u of unsupported) {
+      writeLine(`  ${formatUnsupportedLabel(u).padEnd(40)} ${u.hint?.recommended_client?.name ? `→ try ${u.hint.recommended_client.name}` : ''}`);
+    }
+  }
+}
+
+function formatUnsupportedLabel(u: UnsupportedRail): string {
+  if (u.hint?.name) return u.hint.name;
+  if (u.protocol === 'x402') return `${u.scheme ?? 'exact'}/${u.network ?? 'unknown'}`;
+  return u.method ?? u.network ?? 'unknown';
 }

@@ -1,5 +1,8 @@
 import { CliError } from '../errors';
 import { isJson, writeJson, writeLine } from '../output';
+import { chainFromNetworkId } from '../quotes';
+import { lookupRailHint, type RailHint } from '../rail-hints';
+import { challengeToRail, parsePaymentChallenges } from '../www-authenticate';
 
 export interface CheckOptions {
   method: string;
@@ -36,6 +39,8 @@ interface RailSummary {
   price_raw?: string;
   asset?: string;
   pay_to?: string;
+  natively_supported: boolean;
+  hint?: RailHint;
 }
 
 function safeBigInt(raw: string): bigint | null {
@@ -54,6 +59,7 @@ function normalizeX402(body: unknown): RailSummary[] {
     const raw = a.maxAmountRequired ?? '0';
     const parsed = safeBigInt(raw);
     const priceUsd = parsed === null ? undefined : (Number(parsed) / 10 ** decimals).toFixed(decimals);
+    const natively_supported = chainFromNetworkId(a.network) !== null;
     return {
       protocol: 'x402',
       rail: `${a.scheme ?? 'exact'}/${a.network ?? 'unknown'}`,
@@ -62,22 +68,44 @@ function normalizeX402(body: unknown): RailSummary[] {
       price_raw: raw,
       asset: a.asset,
       pay_to: a.payTo,
+      natively_supported,
+      hint: natively_supported ? undefined : lookupRailHint({ network: a.network, scheme: a.scheme }),
     } satisfies RailSummary;
   });
+}
+
+function challengeRailToSummary(c: ReturnType<typeof challengeToRail>): RailSummary {
+  return {
+    protocol: 'mpp',
+    rail: c.rail,
+    network: c.network,
+    price_usd: c.price_usd,
+    price_raw: c.price_raw,
+    asset: c.asset,
+    pay_to: c.pay_to,
+    natively_supported: c.natively_supported,
+    hint: c.hint,
+  };
 }
 
 function normalizeMpp(body: unknown): RailSummary[] {
   const record = body as { accepted_methods?: MppAccept[] };
   const accepts = Array.isArray(record.accepted_methods) ? record.accepted_methods : [];
   const amountUsd = (body as { amount_usd?: string }).amount_usd;
-  return accepts.map((a) => ({
-    protocol: 'mpp',
-    rail: a.method ?? 'unknown',
-    network: a.network ?? (a.chain_id ? `eip155:${a.chain_id}` : undefined),
-    price_usd: amountUsd,
-    asset: a.token,
-    pay_to: a.pay_to,
-  } satisfies RailSummary));
+  return accepts.map((a) => {
+    const network = a.network ?? (a.chain_id ? `eip155:${a.chain_id}` : undefined);
+    const natively_supported = a.method?.startsWith('tempo/') === true || chainFromNetworkId(network) !== null;
+    return {
+      protocol: 'mpp',
+      rail: a.method ?? 'unknown',
+      network,
+      price_usd: amountUsd,
+      asset: a.token,
+      pay_to: a.pay_to,
+      natively_supported,
+      hint: natively_supported ? undefined : lookupRailHint({ method: a.method, network }),
+    } satisfies RailSummary;
+  });
 }
 
 export async function check(opts: CheckOptions): Promise<void> {
@@ -121,6 +149,7 @@ export async function check(opts: CheckOptions): Promise<void> {
   const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const isX402 = Array.isArray(record.accepts);
   const isMpp = Array.isArray(record.accepted_methods);
+  const challenges = parsePaymentChallenges(res.headers);
 
   let rails: RailSummary[] = [];
   let protocol: 'x402' | 'mpp' | 'both' | 'unknown' = 'unknown';
@@ -133,6 +162,11 @@ export async function check(opts: CheckOptions): Promise<void> {
   } else if (isMpp) {
     rails = normalizeMpp(body);
     protocol = 'mpp';
+  }
+  if (challenges.length > 0) {
+    rails = [...rails, ...challenges.map(challengeToRail).map(challengeRailToSummary)];
+    if (protocol === 'unknown') protocol = 'mpp';
+    else if (protocol === 'x402') protocol = 'both';
   }
 
   const payload = {
@@ -155,9 +189,27 @@ export async function check(opts: CheckOptions): Promise<void> {
     return;
   }
   writeLine('');
-  writeLine('Accepted rails:');
-  for (const r of rails) {
-    const price = r.price_usd ? `$${r.price_usd}` : '?';
-    writeLine(`  ${r.protocol.padEnd(5)} ${r.rail.padEnd(28)} ${price.padStart(10)}  pay_to=${r.pay_to ?? 'n/a'}`);
+  const native = rails.filter((r) => r.natively_supported);
+  const other = rails.filter((r) => !r.natively_supported);
+  if (native.length > 0) {
+    writeLine('Accepted rails (natively supported by agentscore-pay):');
+    for (const r of native) {
+      const price = r.price_usd ? `$${r.price_usd}` : '?';
+      writeLine(`  ${r.protocol.padEnd(5)} ${r.rail.padEnd(28)} ${price.padStart(10)}  pay_to=${r.pay_to ?? 'n/a'}`);
+    }
+  }
+  if (other.length > 0) {
+    if (native.length > 0) writeLine('');
+    writeLine('Other rails accepted (use a compatible client):');
+    for (const r of other) {
+      const label = r.hint?.name ?? r.rail;
+      const price = r.price_usd ? `$${r.price_usd}` : '?';
+      writeLine(`  ${r.protocol.padEnd(5)} ${label.padEnd(28)} ${price.padStart(10)}`);
+      if (r.hint?.recommended_client) {
+        writeLine(`         → ${r.hint.recommended_client.name}${r.hint.recommended_client.install ? ` (${r.hint.recommended_client.install})` : ''}`);
+      } else if (r.hint?.docs_url) {
+        writeLine(`         → ${r.hint.docs_url}`);
+      }
+    }
   }
 }

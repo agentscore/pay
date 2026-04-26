@@ -28,10 +28,10 @@ describe('chainFromNetworkId', () => {
 });
 
 describe('parseBody', () => {
-  it('returns empty for non-objects', () => {
-    expect(parseBody(null)).toEqual([]);
-    expect(parseBody('string')).toEqual([]);
-    expect(parseBody(undefined)).toEqual([]);
+  it('returns empty supported + unsupported for non-objects', () => {
+    expect(parseBody(null)).toEqual({ supported: [], unsupported: [] });
+    expect(parseBody('string')).toEqual({ supported: [], unsupported: [] });
+    expect(parseBody(undefined)).toEqual({ supported: [], unsupported: [] });
   });
 
   it('parses x402 accepts array', () => {
@@ -47,9 +47,10 @@ describe('parseBody', () => {
         },
       ],
     };
-    const quotes = parseBody(body);
-    expect(quotes).toHaveLength(1);
-    expect(quotes[0]).toMatchObject({
+    const { supported, unsupported } = parseBody(body);
+    expect(supported).toHaveLength(1);
+    expect(unsupported).toHaveLength(0);
+    expect(supported[0]).toMatchObject({
       chain: 'base',
       price_usd: 5,
       decimals: 6,
@@ -66,9 +67,9 @@ describe('parseBody', () => {
         { method: 'tempo/charge', network: 'eip155:4217', chain_id: 4217, token: '0x20C0', decimals: 6, pay_to: '0xABC2' },
       ],
     };
-    const quotes = parseBody(body);
-    expect(quotes).toHaveLength(1);
-    expect(quotes[0]).toMatchObject({ chain: 'tempo', price_usd: 12.5, protocol: 'mpp', pay_to: '0xABC2' });
+    const { supported } = parseBody(body);
+    expect(supported).toHaveLength(1);
+    expect(supported[0]).toMatchObject({ chain: 'tempo', price_usd: 12.5, protocol: 'mpp', pay_to: '0xABC2' });
   });
 
   it('handles a merchant that advertises both x402 + MPP (like martin-estate)', () => {
@@ -79,16 +80,44 @@ describe('parseBody', () => {
       ],
       accepted_methods: [{ method: 'tempo/charge', chain_id: 4217, token: '0x20C0', decimals: 6, pay_to: '0x2' }],
     };
-    const quotes = parseBody(body);
-    expect(quotes).toHaveLength(2);
-    expect(quotes.map((q) => q.chain).sort()).toEqual(['base', 'tempo']);
-    expect(quotes.map((q) => q.protocol).sort()).toEqual(['mpp', 'x402']);
+    const { supported } = parseBody(body);
+    expect(supported).toHaveLength(2);
+    expect(supported.map((q) => q.chain).sort()).toEqual(['base', 'tempo']);
+    expect(supported.map((q) => q.protocol).sort()).toEqual(['mpp', 'x402']);
   });
 
-  it('skips rails on unknown networks', () => {
+  it('surfaces unsupported x402 rails with hints when known', () => {
     const body = {
-      accepts: [{ scheme: 'exact', network: 'eip155:1', maxAmountRequired: '100' }],
+      accepts: [{ scheme: 'exact', network: 'eip155:137', maxAmountRequired: '100' }],
     };
-    expect(parseBody(body)).toEqual([]);
+    const { supported, unsupported } = parseBody(body);
+    expect(supported).toEqual([]);
+    expect(unsupported).toHaveLength(1);
+    expect(unsupported[0]).toMatchObject({ protocol: 'x402', network: 'eip155:137' });
+    expect(unsupported[0].hint?.name).toContain('Polygon');
+  });
+
+  it('surfaces unsupported MPP methods with hints (stripe → link-cli)', () => {
+    const body = {
+      accepted_methods: [{ method: 'stripe', token: 'usd', pay_to: 'pi_x' }],
+    };
+    const { supported, unsupported } = parseBody(body);
+    expect(supported).toEqual([]);
+    expect(unsupported).toHaveLength(1);
+    expect(unsupported[0].hint?.recommended_client?.name).toBe('@stripe/link-cli');
+  });
+
+  it('mixes supported + unsupported in the same response', () => {
+    const body = {
+      accepts: [
+        { scheme: 'exact', network: 'eip155:8453', maxAmountRequired: '1000', extra: { decimals: 6 } },
+        { scheme: 'exact', network: 'eip155:1', maxAmountRequired: '1000', extra: { decimals: 6 } },
+      ],
+    };
+    const { supported, unsupported } = parseBody(body);
+    expect(supported).toHaveLength(1);
+    expect(unsupported).toHaveLength(1);
+    expect(supported[0].chain).toBe('base');
+    expect(unsupported[0].network).toBe('eip155:1');
   });
 });

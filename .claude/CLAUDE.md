@@ -4,7 +4,7 @@ CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and M
 
 ## Purpose
 
-Closes the UX gap for shell-tool LLM agents that want to pay protocol-gated endpoints. Mirrors `tempo request` ergonomics but covers every rail an AgentScore-gated merchant might accept: one shell command, body preserved, agent never sees a private key on the wire.
+Closes the UX gap for shell-tool LLM agents that want to pay protocol-gated endpoints. Mirrors `tempo request` ergonomics but covers every rail any 402/MPP merchant might accept: one shell command, body preserved, agent never sees a private key on the wire. Built by AgentScore; works with any 402-gated merchant — AgentScore-gated or not. Brand-as-maker stays prominent (binary name `agentscore-pay`, package `@agent-score/pay`); brand-as-scope explicitly does not — pay is the universal agent-payment CLI for the ecosystem.
 
 ## Architecture
 

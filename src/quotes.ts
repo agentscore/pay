@@ -1,3 +1,4 @@
+import { lookupRailHint, type RailHint } from './rail-hints';
 import type { Chain } from './constants';
 
 function safeBigInt(raw: string): bigint | null {
@@ -16,6 +17,22 @@ export interface RailQuote {
   asset?: string;
   pay_to?: string;
   protocol: 'x402' | 'mpp';
+}
+
+export interface UnsupportedRail {
+  protocol: 'x402' | 'mpp';
+  scheme?: string;
+  method?: string;
+  network?: string;
+  asset?: string;
+  pay_to?: string;
+  price_raw?: string;
+  hint?: RailHint;
+}
+
+export interface ParsedRails {
+  supported: RailQuote[];
+  unsupported: UnsupportedRail[];
 }
 
 interface X402Accept {
@@ -44,20 +61,32 @@ export function chainFromNetworkId(net?: string): Chain | null {
   return null;
 }
 
-export function parseBody(body: unknown): RailQuote[] {
-  if (!body || typeof body !== 'object') return [];
+export function parseBody(body: unknown): ParsedRails {
+  if (!body || typeof body !== 'object') return { supported: [], unsupported: [] };
   const record = body as Record<string, unknown>;
-  const quotes: RailQuote[] = [];
+  const supported: RailQuote[] = [];
+  const unsupported: UnsupportedRail[] = [];
 
   if (Array.isArray(record.accepts)) {
     for (const a of record.accepts as X402Accept[]) {
       const chain = chainFromNetworkId(a.network);
-      if (!chain) continue;
+      if (!chain) {
+        unsupported.push({
+          protocol: 'x402',
+          scheme: a.scheme,
+          network: a.network,
+          asset: a.asset,
+          pay_to: a.payTo,
+          price_raw: a.maxAmountRequired,
+          hint: lookupRailHint({ network: a.network, scheme: a.scheme }),
+        });
+        continue;
+      }
       const decimals = a.extra?.decimals ?? 6;
       const priceRaw = a.maxAmountRequired ?? '0';
       const parsed = safeBigInt(priceRaw);
       const priceUsd = parsed === null ? undefined : Number(parsed) / 10 ** decimals;
-      quotes.push({
+      supported.push({
         chain,
         price_usd: priceUsd,
         decimals,
@@ -75,8 +104,18 @@ export function parseBody(body: unknown): RailQuote[] {
       let chain: Chain | null = null;
       if (m.method?.startsWith('tempo/')) chain = 'tempo';
       else chain = chainFromNetworkId(m.network);
-      if (!chain) continue;
-      quotes.push({
+      if (!chain) {
+        unsupported.push({
+          protocol: 'mpp',
+          method: m.method,
+          network: m.network,
+          asset: m.token,
+          pay_to: m.pay_to,
+          hint: lookupRailHint({ method: m.method, network: m.network }),
+        });
+        continue;
+      }
+      supported.push({
         chain,
         price_usd: Number.isFinite(amountUsd) && amountUsd > 0 ? amountUsd : undefined,
         decimals: m.decimals ?? 6,
@@ -87,5 +126,5 @@ export function parseBody(body: unknown): RailQuote[] {
     }
   }
 
-  return quotes;
+  return { supported, unsupported };
 }

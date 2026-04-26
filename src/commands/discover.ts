@@ -2,6 +2,7 @@ import { bold, cyan, dim, yellow } from '../colors';
 import { CliError } from '../errors';
 import { isJson, writeJson, writeLine } from '../output';
 import { chainFromNetworkId } from '../quotes';
+import { lookupRailHint, type RailHint } from '../rail-hints';
 import type { Chain } from '../constants';
 
 const X402_BAZAAR_URL = 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources';
@@ -78,6 +79,8 @@ interface NormalizedRail {
   price_usd?: number;
   pay_to?: string;
   asset?: string;
+  natively_supported: boolean;
+  hint?: RailHint;
 }
 
 interface NormalizedService {
@@ -135,11 +138,16 @@ export async function discover(opts: DiscoverOptions = {}): Promise<void> {
     const tag = svc.source === 'x402' ? dim('[x402]') : dim('[mpp]');
     writeLine(`  ${bold(price.padStart(8))}  ${tag}  ${cyan(svc.url ?? svc.domain ?? '(unknown)')}`);
     if (svc.description) writeLine(`                    ${dim(svc.description.slice(0, 76))}`);
-    const railSummary = svc.rails
-      .filter((r) => r.chain)
-      .map((r) => `${r.chain}/${r.scheme ?? svc.source}`)
-      .join(', ');
-    if (railSummary) writeLine(`                    ${dim(`rails: ${railSummary}`)}`);
+    const native = svc.rails.filter((r) => r.natively_supported);
+    const other = svc.rails.filter((r) => !r.natively_supported);
+    if (native.length > 0) {
+      const summary = native.map((r) => `${r.chain}/${r.scheme ?? svc.source}`).join(', ');
+      writeLine(`                    ${dim(`rails: ${summary}`)}`);
+    }
+    if (other.length > 0) {
+      const summary = other.map((r) => r.hint?.name ?? `${r.scheme ?? svc.source}/${r.network ?? 'unknown'}`).join(', ');
+      writeLine(`                    ${dim(`other: ${summary}`)}`);
+    }
   }
   if (errors.length > 0) {
     writeLine('');
@@ -192,13 +200,16 @@ function normalizeX402(item: BazaarItem): NormalizedService {
         price_usd = undefined;
       }
     }
+    const chain = chainFromNetworkId(a.network);
     return {
-      chain: chainFromNetworkId(a.network),
+      chain,
       network: a.network,
       scheme: a.scheme,
       price_usd,
       pay_to: a.payTo,
       asset: a.asset,
+      natively_supported: chain !== null,
+      hint: chain === null ? lookupRailHint({ network: a.network, scheme: a.scheme }) : undefined,
     };
   });
   const prices = rails.map((r) => r.price_usd).filter((p): p is number => typeof p === 'number');
@@ -231,6 +242,8 @@ function normalizeMpp(svc: MppService): NormalizedService {
       scheme: ep.payment.method,
       price_usd,
       asset: ep.payment.currency,
+      natively_supported: chain !== null,
+      hint: chain === null ? lookupRailHint({ method: ep.payment.method }) : undefined,
     });
   }
   const prices = rails.map((r) => r.price_usd).filter((p): p is number => typeof p === 'number');

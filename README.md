@@ -3,9 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-CLI wallet for one-shell-command agent payments across **x402** (Base, Solana) and **MPP** (Tempo).
+**One CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command — natively across **x402** (Base, Solana) and **MPP** (Tempo), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
-Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire — but works across every rail an AgentScore-gated merchant might accept.
+Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## Install
 
@@ -412,12 +412,14 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 
 ## Relationship to other AgentScore packages
 
+`@agent-score/pay` is the universal agent-payment CLI; it works with any 402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
+
 - [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
 - [`@agent-score/gate`](https://www.npmjs.com/package/@agent-score/gate) — merchant-side trust-gating middleware
 - [`@agent-score/mcp`](https://www.npmjs.com/package/@agent-score/mcp) — MCP server for AgentScore tools
 - **`@agent-score/pay`** (this package) — agent-side CLI wallet across x402 and MPP rails
 
-Wallet-to-operator linking happens merchant-side via `captureWallet` in `@agent-score/gate` — this CLI does not duplicate the `POST /v1/credentials/wallets` call.
+When a merchant uses `@agent-score/gate`, wallet-to-operator linking happens merchant-side via `captureWallet` — pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## License
 
