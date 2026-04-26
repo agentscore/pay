@@ -80,6 +80,18 @@ agentscore-pay pay POST https://merchant.example/api \
 
 When stdout is not a TTY (piped, redirected), `--plain` is automatically applied and structured output mirrors `--json`'s shape where applicable.
 
+### Idempotency on retry
+
+Every `pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-256 hash of `(url + method + body + signer)` — so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `pay` invocations).
+
+### Test-mode addresses
+
+AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. Pay exports `isAgentScoreTestAddress(addr)` from `@agent-score/pay/test-mode` and `AGENTSCORE_TEST_ADDRESSES` for completion / fixtures.
+
+### Decimals fallback
+
+Spec-compliant 402 responses carry `decimals` in the rail requirements. If a merchant omits it, pay falls back to USDC's 6 decimals and emits a `decimals_fallback` progress event in `--verbose` mode — non-USDC tokens that omit `decimals` would otherwise silently mis-bill. Surfacing the warning lets agents catch malformed merchant 402s before money moves.
+
 ### Use from an agent — complete recipe
 
 A typical autonomous agent flow: probe the endpoint, decide whether to pay, pay, branch on the structured outcome.
