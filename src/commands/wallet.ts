@@ -442,7 +442,7 @@ function emitCreateResults(results: CreateResult[]): void {
       writeHumanNote('  Fund via Coinbase Onramp:');
       writeHumanNote(`    ${r.onramp_url}`);
     } else if (r.chain === 'tempo') {
-      writeHumanNote(yellow('  Fund via Tempo: `tempo wallet fund` or transfer USDC.e (chain 4217)'));
+      writeHumanNote(yellow('  Fund: `agentscore-pay fund --chain tempo --network testnet` (programmatic mint), or transfer USDC.e on chain 4217 mainnet.'));
     }
     if (r.qr_uri) qrcode.generate(r.qr_uri, { small: true });
   }

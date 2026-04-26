@@ -109,9 +109,7 @@ export async function fund(chain: Chain, amountUsd?: number, network: Network = 
       writeLine('');
       writeLine('Option B — scan QR with a mobile wallet (Coinbase Wallet / Rabby / MetaMask):');
     } else if (chain === 'tempo') {
-      writeLine('Coinbase Onramp does not support Tempo. Options:');
-      writeLine('  • `tempo wallet fund` via the Tempo CLI');
-      writeLine('  • Transfer USDC.e (chain 4217) from an existing Tempo wallet');
+      writeLine('Coinbase Onramp does not support Tempo mainnet. Transfer USDC.e (chain 4217) to the address below from an existing Tempo wallet, or scan the QR.');
       writeLine('');
     }
     qrcode.generate(uri, { small: true });

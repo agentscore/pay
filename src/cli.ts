@@ -242,7 +242,7 @@ export function buildCli(): Command {
 
   program
     .command('fund')
-    .description('Print Coinbase Onramp URL + QR, poll balance until deposit lands (Tempo: hints tempo wallet fund)')
+    .description('Fund the wallet. Base/Solana mainnet: Coinbase Onramp URL + receive QR + balance polling. Tempo testnet: programmatic mint via tempo_fundAddress JSON-RPC (free, no signup). Tempo mainnet: receive QR + balance polling (no onramp).')
     .addOption(chainOption(true))
     .addOption(networkOption())
     .addOption(walletNameOption())

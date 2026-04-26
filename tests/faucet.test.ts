@@ -24,7 +24,9 @@ describe('faucetUrls', () => {
     expect(faucetUrls('tempo', 'testnet')).toEqual([]);
   });
 
-  it('tempoFaucetNote mentions the Tempo CLI', () => {
-    expect(tempoFaucetNote()).toContain('tempo wallet fund');
+  it('tempoFaucetNote points at the built-in programmatic mint', () => {
+    const note = tempoFaucetNote();
+    expect(note).toContain('agentscore-pay fund --chain tempo --network testnet');
+    expect(note).toContain('tempo_fundAddress');
   });
 });
