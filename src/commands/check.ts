@@ -1,3 +1,4 @@
+import { isKnownUSDC } from '../constants';
 import { CliError } from '../errors';
 import { mergeHeaders } from '../headers';
 import { isJson, writeJson, writeLine } from '../output';
@@ -15,6 +16,7 @@ export interface CheckOptions {
 interface X402Accept {
   scheme?: string;
   network?: string;
+  amount?: string;
   maxAmountRequired?: string;
   asset?: string;
   payTo?: string;
@@ -56,11 +58,17 @@ function normalizeX402(body: unknown): RailSummary[] {
   const record = body as { accepts?: X402Accept[] };
   const accepts = Array.isArray(record.accepts) ? record.accepts : [];
   return accepts.map((a) => {
-    const decimals = a.extra?.decimals ?? 6;
-    const raw = a.maxAmountRequired ?? '0';
+    const chain = chainFromNetworkId(a.network);
+    // x402 v1 uses `maxAmountRequired`; v2 uses `amount`. Decimals is never carried
+    // at the top level — extra.decimals is best-effort, otherwise canonical USDC = 6,
+    // unknown asset = leave price_usd undefined rather than displaying a wrong value.
+    const declaredDecimals = a.extra?.decimals;
+    const decimals = declaredDecimals ?? (chain && isKnownUSDC(a.asset, chain) ? 6 : null);
+    const raw = a.amount ?? a.maxAmountRequired ?? '0';
     const parsed = safeBigInt(raw);
-    const priceUsd = parsed === null ? undefined : (Number(parsed) / 10 ** decimals).toFixed(decimals);
-    const natively_supported = chainFromNetworkId(a.network) !== null;
+    const priceUsd =
+      decimals !== null && parsed !== null ? (Number(parsed) / 10 ** decimals).toFixed(decimals) : undefined;
+    const natively_supported = chain !== null;
     return {
       protocol: 'x402',
       rail: `${a.scheme ?? 'exact'}/${a.network ?? 'unknown'}`,

@@ -90,9 +90,12 @@ Every `pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-2
 
 AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. Pay exports `isAgentScoreTestAddress(addr)` from `@agent-score/pay/test-mode` and `AGENTSCORE_TEST_ADDRESSES` for completion / fixtures.
 
-### Decimals fallback
+### Decimals handling
 
-Spec-compliant 402 responses carry `decimals` in the rail requirements. If a merchant omits it, pay falls back to USDC's 6 decimals and emits a `decimals_fallback` progress event in `--verbose` mode — non-USDC tokens that omit `decimals` would otherwise silently mis-bill. Surfacing the warning lets agents catch malformed merchant 402s before money moves.
+Spec-compliant 402 responses carry `decimals` in the rail requirements. When a merchant omits it, pay applies a strict policy to avoid silent mis-billing:
+
+- **Asset is canonical USDC** (matched against the per-chain Circle USDC registry pinned in pay) — silently use 6 decimals.
+- **Asset is anything else** — abort with `merchant_spec_violation`. Guessing decimals risks orders-of-magnitude mis-billing on tokens with non-6-decimal precision, so pay refuses to pay rather than continuing on partial info.
 
 ### Use from an agent — complete recipe
 

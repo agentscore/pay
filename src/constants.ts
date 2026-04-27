@@ -120,3 +120,19 @@ export function svmConfig(network: Network = 'mainnet'): SvmConfig {
   }
   return { ...USDC.solana.devnet, rpcUrl: rpcUrl('SOLANA_DEVNET_RPC_URL', DEFAULT_RPC.solana_devnet) };
 }
+
+const KNOWN_USDC_BY_CHAIN: Record<Chain, ReadonlyArray<string>> = {
+  base: [USDC.base.mainnet.address, USDC.base.sepolia.address],
+  solana: [USDC.solana.mainnet.mint, USDC.solana.devnet.mint],
+  tempo: [USDC.tempo.mainnet.address, USDC.tempo.testnet.address],
+};
+
+export function isKnownUSDC(asset: string | null | undefined, chain: Chain): boolean {
+  if (!asset) return false;
+  const candidates = KNOWN_USDC_BY_CHAIN[chain];
+  if (chain === 'solana') {
+    return candidates.includes(asset);
+  }
+  const lc = asset.toLowerCase();
+  return candidates.some((c) => c.toLowerCase() === lc);
+}

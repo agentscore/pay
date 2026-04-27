@@ -4,7 +4,7 @@ import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { Mppx, tempo } from 'mppx/client';
-import { evmConfig, svmConfig, type Chain, type Network } from '../constants';
+import { evmConfig, isKnownUSDC, svmConfig, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
 import { mergeHeaders } from '../headers';
 import { appendEntry } from '../ledger';
@@ -40,6 +40,13 @@ export const DEFAULT_RETRIES = 0;
 interface PaymentSettled {
   price_usd?: string;
   tx_hash?: string;
+  /**
+   * Structured abort surfaced by the x402 onBeforePaymentCreation hook. x402-fetch wraps
+   * any error thrown from the hook in a generic Error("Failed to create payment payload: ..."),
+   * stripping CliError fields. Stashing it here lets the outer catch re-raise the original
+   * with the right code + nextSteps.
+   */
+  cliError?: CliError;
 }
 
 export async function pay(opts: PayOptions): Promise<void> {
@@ -161,6 +168,10 @@ export async function pay(opts: PayOptions): Promise<void> {
       },
     );
   } catch (err) {
+    // x402 hooks throw inside @x402/fetch's wrapped try/catch which strips CliError fields
+    // by re-wrapping into a generic Error. The hook stashes the structured CliError on
+    // `settled` so we can re-raise it here with the right code + nextSteps.
+    if (settled.cliError) throw settled.cliError;
     if (controller.signal.aborted) {
       throw new CliError('session_timeout', `Payment timed out after ${timeoutSeconds}s`, {
         nextSteps: {
@@ -241,6 +252,22 @@ function safeHost(url: string): string {
   }
 }
 
+function resolveDecimals(declared: number | undefined, asset: string | undefined, chain: Chain): number {
+  if (declared !== undefined) return Number(declared);
+  if (isKnownUSDC(asset, chain)) return 6;
+  throw new CliError(
+    'merchant_spec_violation',
+    `Merchant 402 omitted 'decimals' for unrecognized asset ${asset ?? '(none)'} on ${chain}. Refusing to pay — guessing decimals risks orders-of-magnitude mis-billing.`,
+    {
+      nextSteps: {
+        action: 'contact_merchant',
+        suggestion: 'Ask the merchant to include the required `decimals` field in their 402 challenge per the paymentauth.org / x402 spec.',
+      },
+      extra: { chain, asset: asset ?? null },
+    },
+  );
+}
+
 async function payViaX402(
   wallet: Wallet,
   opts: PayOptions,
@@ -272,26 +299,44 @@ async function payViaX402(
   const host = safeHost(opts.url);
   const limits = await loadLimits();
   client.onBeforePaymentCreation(async ({ selectedRequirements }) => {
-    const req = selectedRequirements as { decimals?: number; maxAmountRequired?: string; asset?: string };
-    // Defensive fallback to 6 (USDC) when merchant omits decimals. Spec REQUIRES decimals
-    // so the fallback is unreachable for compliant merchants — surface a warning if it
-    // ever fires so non-USDC merchants emitting partial 402s don't silently mis-bill.
-    if (req.decimals === undefined) {
-      emitProgress('decimals_fallback', {
-        message: "merchant 402 omitted 'decimals' — assuming 6 (USDC). If asset is non-USDC the price will be off by orders of magnitude.",
-        asset: req.asset ?? null,
-      });
-    }
-    const decimals = Number(req.decimals ?? 6);
-    const priceRaw = BigInt(req.maxAmountRequired ?? '0');
-    const priceUsd = Number(priceRaw) / 10 ** decimals;
-    settled.price_usd = priceUsd.toFixed(decimals);
-    if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
-      return { abort: true, reason: `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}` };
-    }
-    const verdict = await enforce(limits, { priceUsd, host });
-    if (!verdict.allowed) {
-      return { abort: true, reason: `Local limit violated (${verdict.violated}=${verdict.limit}, would be ${verdict.would_be}).` };
+    // x402 v2 uses `amount`; v1 uses `maxAmountRequired`. Decimals is never carried
+    // at the top level by x402 — it's implicit (USDC=6). resolveDecimals enforces
+    // that we only proceed when the asset is canonical USDC, otherwise abort.
+    const req = selectedRequirements as {
+      amount?: string;
+      maxAmountRequired?: string;
+      asset?: string;
+      extra?: { decimals?: number };
+    };
+    try {
+      const declaredDecimals = typeof req.extra?.decimals === 'number' ? req.extra.decimals : undefined;
+      const decimals = resolveDecimals(declaredDecimals, req.asset, wallet.chain);
+      const priceRaw = BigInt(req.amount ?? req.maxAmountRequired ?? '0');
+      const priceUsd = Number(priceRaw) / 10 ** decimals;
+      settled.price_usd = priceUsd.toFixed(decimals);
+      if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
+        settled.cliError = new CliError(
+          'max_spend_exceeded',
+          `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}`,
+          { extra: { price_usd: priceUsd, max_spend_usd: opts.maxSpendUsd } },
+        );
+        return { abort: true, reason: settled.cliError.message };
+      }
+      const verdict = await enforce(limits, { priceUsd, host });
+      if (!verdict.allowed) {
+        settled.cliError = new CliError(
+          'limit_exceeded',
+          `Local limit violated: ${verdict.violated}=${verdict.limit}`,
+          { extra: { violated: verdict.violated, limit: verdict.limit, would_be: verdict.would_be } },
+        );
+        return { abort: true, reason: settled.cliError.message };
+      }
+    } catch (err) {
+      if (err instanceof CliError) {
+        settled.cliError = err;
+        return { abort: true, reason: err.message };
+      }
+      throw err;
     }
   });
 
@@ -312,31 +357,23 @@ async function payViaMpp(
     methods: [tempo({ account })],
     fetch,
     onChallenge: async (challenge) => {
-      const requests =
-        (challenge as { paymentRequests?: Array<{ amount?: string; decimals?: number }> }).paymentRequests ?? [];
-      for (const r of requests) {
-        if (r.decimals === undefined) {
-          emitProgress('decimals_fallback', {
-            message: "merchant MPP challenge omitted 'decimals' — assuming 6 (USDC). If asset is non-USDC the price will be off by orders of magnitude.",
-          });
-        }
-        const decimals = Number(r.decimals ?? 6);
-        const priceRaw = BigInt(r.amount ?? '0');
-        const priceUsd = Number(priceRaw) / 10 ** decimals;
-        settled.price_usd = priceUsd.toFixed(decimals);
-        if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
-          throw new CliError(
-            'max_spend_exceeded',
-            `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}`,
-            { extra: { price_usd: priceUsd, max_spend_usd: opts.maxSpendUsd } },
-          );
-        }
-        const verdict = await enforce(limits, { priceUsd, host });
-        if (!verdict.allowed) {
-          throw new CliError('limit_exceeded', `Local limit violated: ${verdict.violated}=${verdict.limit}`, {
-            extra: { violated: verdict.violated, limit: verdict.limit, would_be: verdict.would_be },
-          });
-        }
+      const req = (challenge as { request?: { amount?: string; currency?: string; decimals?: number } }).request ?? {};
+      const decimals = resolveDecimals(req.decimals, req.currency, wallet.chain);
+      const priceRaw = BigInt(req.amount ?? '0');
+      const priceUsd = Number(priceRaw) / 10 ** decimals;
+      settled.price_usd = priceUsd.toFixed(decimals);
+      if (opts.maxSpendUsd !== undefined && priceUsd > opts.maxSpendUsd) {
+        throw new CliError(
+          'max_spend_exceeded',
+          `Payment ${priceUsd} USDC exceeds --max-spend ${opts.maxSpendUsd}`,
+          { extra: { price_usd: priceUsd, max_spend_usd: opts.maxSpendUsd } },
+        );
+      }
+      const verdict = await enforce(limits, { priceUsd, host });
+      if (!verdict.allowed) {
+        throw new CliError('limit_exceeded', `Local limit violated: ${verdict.violated}=${verdict.limit}`, {
+          extra: { violated: verdict.violated, limit: verdict.limit, would_be: verdict.would_be },
+        });
       }
       return undefined;
     },

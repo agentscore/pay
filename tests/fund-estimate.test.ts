@@ -34,7 +34,7 @@ describe('parseBody', () => {
     expect(parseBody(undefined)).toEqual({ supported: [], unsupported: [] });
   });
 
-  it('parses x402 accepts array', () => {
+  it('parses x402 v1 accepts array (maxAmountRequired field)', () => {
     const body = {
       accepts: [
         {
@@ -58,6 +58,49 @@ describe('parseBody', () => {
       protocol: 'x402',
       pay_to: '0xAbC1',
     });
+  });
+
+  it('parses x402 v2 accepts array (amount field) — the shape modern merchants emit', () => {
+    const body = {
+      accepts: [
+        {
+          scheme: 'exact',
+          network: 'eip155:84532',
+          amount: '110000',
+          asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+          payTo: '0xAbC1',
+          extra: { name: 'USDC', version: '2' },
+        },
+      ],
+    };
+    const { supported } = parseBody(body);
+    expect(supported).toHaveLength(1);
+    expect(supported[0]).toMatchObject({
+      chain: 'base',
+      price_usd: 0.11,
+      decimals: 6,
+      price_raw: '110000',
+      protocol: 'x402',
+    });
+  });
+
+  it('leaves price_usd undefined when decimals is omitted and asset is unknown (refuses to guess)', () => {
+    const body = {
+      accepts: [
+        {
+          scheme: 'exact',
+          network: 'eip155:8453',
+          amount: '1000000000000000000',
+          asset: '0x0000000000000000000000000000000000000bAd',
+          payTo: '0xAbC1',
+        },
+      ],
+    };
+    const { supported } = parseBody(body);
+    expect(supported).toHaveLength(1);
+    expect(supported[0].price_usd).toBeUndefined();
+    expect(supported[0].decimals).toBeUndefined();
+    expect(supported[0].price_raw).toBe('1000000000000000000');
   });
 
   it('parses MPP accepted_methods array with amount_usd', () => {

@@ -1,6 +1,6 @@
+import { isKnownUSDC, type Chain } from './constants';
 import { lookupRailHint, type RailHint } from './rail-hints';
 import { challengeToRail, parsePaymentChallenges } from './www-authenticate';
-import type { Chain } from './constants';
 
 function safeBigInt(raw: string): bigint | null {
   try {
@@ -39,6 +39,7 @@ export interface ParsedRails {
 interface X402Accept {
   scheme?: string;
   network?: string;
+  amount?: string;
   maxAmountRequired?: string;
   asset?: string;
   payTo?: string;
@@ -70,6 +71,10 @@ export function parseBody(body: unknown, headers?: Headers): ParsedRails {
   if (Array.isArray(record.accepts)) {
     for (const a of record.accepts as X402Accept[]) {
       const chain = chainFromNetworkId(a.network);
+      // x402 v1 → maxAmountRequired; v2 → amount. Decimals not at top level; use
+      // extra.decimals if present, else canonical USDC = 6, else leave undefined
+      // rather than display a wrong value.
+      const priceRaw = a.amount ?? a.maxAmountRequired ?? '0';
       if (!chain) {
         unsupported.push({
           protocol: 'x402',
@@ -77,15 +82,15 @@ export function parseBody(body: unknown, headers?: Headers): ParsedRails {
           network: a.network,
           asset: a.asset,
           pay_to: a.payTo,
-          price_raw: a.maxAmountRequired,
+          price_raw: priceRaw,
           hint: lookupRailHint({ network: a.network, scheme: a.scheme }),
         });
         continue;
       }
-      const decimals = a.extra?.decimals ?? 6;
-      const priceRaw = a.maxAmountRequired ?? '0';
+      const declaredDecimals = a.extra?.decimals;
+      const decimals = declaredDecimals ?? (isKnownUSDC(a.asset, chain) ? 6 : undefined);
       const parsed = safeBigInt(priceRaw);
-      const priceUsd = parsed === null ? undefined : Number(parsed) / 10 ** decimals;
+      const priceUsd = decimals !== undefined && parsed !== null ? Number(parsed) / 10 ** decimals : undefined;
       supported.push({
         chain,
         price_usd: priceUsd,
