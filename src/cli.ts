@@ -1,4 +1,5 @@
 import { Command, Option } from 'commander';
+import { agentGuide } from './commands/agent-guide';
 import { balance } from './commands/balance';
 import { check } from './commands/check';
 import { configGet, configPathCmd, configSet, configUnset } from './commands/config';
@@ -62,6 +63,11 @@ function applyMode(program: Command): ModeFlags {
 }
 
 const HELP_FOOTER = `
+For LLM tool-loop agents:
+  Run \`agentscore-pay agent-guide\` for the structured how-to (golden path,
+  pitfalls, exit-code branching). Use \`--json\` on every command for
+  machine-parseable output.
+
 Exit codes:
   0  success
   1  user error (bad args, missing wallet, wrong passphrase)
@@ -410,6 +416,14 @@ export function buildCli(): Command {
     .option('-X, --method <method>', 'HTTP method', 'GET')
     .option('-d, --data <body>', 'request body')
     .option('-H, --header <header...>', "additional header (repeatable, 'Name: value')", collectHeader, {} as Record<string, string>)
+    .addHelpText(
+      'after',
+      '\nAgent notes:\n' +
+        '  • Most paid endpoints require POST + JSON body — bare GET returns 404/405. Match the method/body you intend to pay with.\n' +
+        '  • When -d is set, pay sends Content-Type: application/json automatically. Skip -H \'content-type: ...\' (redundant; deduped case-insensitively).\n' +
+        '  • Use --json for parseable output (status, payment_required, accepted_rails, hint).\n' +
+        '  • Run `agentscore-pay agent-guide` for the full agent how-to.\n',
+    )
     .action(
       async (
         url: string,
@@ -435,7 +449,7 @@ export function buildCli(): Command {
     .option('-v, --verbose', 'log rail selection + balances to stderr')
     .addHelpText(
       'after',
-      '\nExamples:\n  agentscore-pay pay POST https://merchant.example/x -d \'{}\' --max-spend 5\n  agentscore-pay pay POST https://merchant.example/x --chain tempo -d \'{}\' --max-spend 5\n  agentscore-pay pay GET https://merchant.example/y --json   # scripted\n\nRail selection:\n  1. --chain X                                → use X (error if not accepted or insufficient)\n  2. ~/.agentscore/config.json preferred_chains → use first matching candidate\n  3. exactly one funded candidate             → use it\n  4. zero candidates                          → error (fund something)\n  5. multiple candidates                      → error, require --chain\n',
+      '\nExamples:\n  agentscore-pay pay POST https://merchant.example/x -d \'{}\' --max-spend 5\n  agentscore-pay pay POST https://merchant.example/x --chain tempo -d \'{}\' --max-spend 5\n  agentscore-pay pay GET https://merchant.example/y --json   # scripted\n\nRail selection:\n  1. --chain X                                → use X (error if not accepted or insufficient)\n  2. ~/.agentscore/config.json preferred_chains → use first matching candidate\n  3. exactly one funded candidate             → use it\n  4. zero candidates                          → error (fund something)\n  5. multiple candidates                      → error, require --chain\n\nAgent notes:\n  • ALWAYS run --dry-run first to confirm rail + cost.\n  • ALWAYS pass --max-spend with a USD ceiling — pay rejects payments above it (exit 4).\n  • When -d is set, pay sends Content-Type: application/json automatically. Skip -H \'content-type: ...\'.\n  • Use --json for parseable output. `agentscore-pay agent-guide` prints the full agent how-to.\n',
     )
     .action(
       async (
@@ -471,6 +485,14 @@ export function buildCli(): Command {
         });
       },
     );
+
+  program
+    .command('agent-guide')
+    .description('Print structured how-to-use guidance for LLM tool-loop agents (use --json for parseable output)')
+    .action(async () => {
+      applyMode(program);
+      await agentGuide();
+    });
 
   return program;
 }

@@ -2,6 +2,7 @@ import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { CliError } from '../errors';
+import { mergeHeaders } from '../headers';
 import { keystoreExists, loadKeystore } from '../keystore';
 import { isJson, writeJson, writeLine } from '../output';
 import { parseBody, type RailQuote, type UnsupportedRail } from '../quotes';
@@ -30,7 +31,7 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
   const network: Network = opts.network ?? 'mainnet';
   const init: RequestInit = { method: opts.method };
   if (opts.body !== undefined) init.body = opts.body;
-  init.headers = { 'Content-Type': 'application/json', ...(opts.headers ?? {}) };
+  init.headers = mergeHeaders({ 'Content-Type': 'application/json' }, opts.headers);
 
   let res: Response;
   try {
@@ -57,7 +58,7 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
     return;
   }
 
-  const { supported: quotes, unsupported }: { supported: RailQuote[]; unsupported: UnsupportedRail[] } = parseBody(body);
+  const { supported: quotes, unsupported }: { supported: RailQuote[]; unsupported: UnsupportedRail[] } = parseBody(body, res.headers);
   if (quotes.length === 0) {
     throw new CliError(
       'merchant_error',

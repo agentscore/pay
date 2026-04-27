@@ -1,4 +1,5 @@
 import { lookupRailHint, type RailHint } from './rail-hints';
+import { challengeToRail, parsePaymentChallenges } from './www-authenticate';
 import type { Chain } from './constants';
 
 function safeBigInt(raw: string): bigint | null {
@@ -61,11 +62,10 @@ export function chainFromNetworkId(net?: string): Chain | null {
   return null;
 }
 
-export function parseBody(body: unknown): ParsedRails {
-  if (!body || typeof body !== 'object') return { supported: [], unsupported: [] };
-  const record = body as Record<string, unknown>;
+export function parseBody(body: unknown, headers?: Headers): ParsedRails {
   const supported: RailQuote[] = [];
   const unsupported: UnsupportedRail[] = [];
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
 
   if (Array.isArray(record.accepts)) {
     for (const a of record.accepts as X402Accept[]) {
@@ -126,5 +126,39 @@ export function parseBody(body: unknown): ParsedRails {
     }
   }
 
+  if (headers) {
+    for (const c of parsePaymentChallenges(headers)) {
+      const r = challengeToRail(c);
+      const chain = chainFromMethodOrNetwork(r.scheme, r.network);
+      if (!chain) {
+        unsupported.push({
+          protocol: 'mpp',
+          method: r.scheme,
+          network: r.network,
+          asset: r.asset,
+          pay_to: r.pay_to,
+          price_raw: r.price_raw,
+          hint: r.hint,
+        });
+        continue;
+      }
+      const priceUsdNum = r.price_usd !== undefined ? Number(r.price_usd) : undefined;
+      supported.push({
+        chain,
+        price_usd: priceUsdNum !== undefined && Number.isFinite(priceUsdNum) ? priceUsdNum : undefined,
+        decimals: 6,
+        price_raw: r.price_raw,
+        asset: r.asset,
+        pay_to: r.pay_to,
+        protocol: 'mpp',
+      });
+    }
+  }
+
   return { supported, unsupported };
+}
+
+function chainFromMethodOrNetwork(method?: string, network?: string): Chain | null {
+  if (method && /^tempo(\/|$)/i.test(method)) return 'tempo';
+  return chainFromNetworkId(network);
 }

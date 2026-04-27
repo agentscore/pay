@@ -120,4 +120,56 @@ describe('parseBody', () => {
     expect(supported[0].chain).toBe('base');
     expect(unsupported[0].network).toBe('eip155:1');
   });
+
+  describe('with WWW-Authenticate headers (paymentauth.org spec)', () => {
+    // Locus apollo/org-enrichment style 402: bare problem+json body, the rail
+    // metadata lives in WWW-Authenticate. Without the headers arg, parseBody
+    // returns no rails; with headers it surfaces the tempo rail.
+    const LOCUS_HEADER =
+      'Payment id="abc", realm="apollo.mpp.paywithlocus.com", method="tempo", intent="charge", request="eyJhbW91bnQiOiI4MDAwIiwiY3VycmVuY3kiOiIweDIwQzAwMDAwMDAwMDAwMDAwMDAwMDAwMGI5NTM3ZDExYzYwRThiNTAiLCJtZXRob2REZXRhaWxzIjp7ImNoYWluSWQiOjQyMTd9LCJyZWNpcGllbnQiOiIweDA2MGIwZkIwQmU5ZDkwNTU3NTc3QjNBRUU0ODA3MTEwNjcxNDlGZjAifQ"';
+
+    it('extracts MPP rail from WWW-Authenticate when body has no accepts/accepted_methods', () => {
+      const body = { type: 'https://paymentauth.org/problems/payment-required', status: 402 };
+      const headers = new Headers({ 'www-authenticate': LOCUS_HEADER });
+      const { supported, unsupported } = parseBody(body, headers);
+      expect(unsupported).toHaveLength(0);
+      expect(supported).toHaveLength(1);
+      expect(supported[0]).toMatchObject({
+        chain: 'tempo',
+        protocol: 'mpp',
+        price_usd: 0.008,
+        price_raw: '8000',
+        pay_to: '0x060b0fB0Be9d90557577B3AEE480711067149Ff0',
+      });
+    });
+
+    it('returns no rails when headers are not passed (the bug we fixed)', () => {
+      const body = { type: 'https://paymentauth.org/problems/payment-required', status: 402 };
+      const { supported, unsupported } = parseBody(body);
+      expect(supported).toEqual([]);
+      expect(unsupported).toEqual([]);
+    });
+
+    it('flags unsupported challenge schemes as unsupported (e.g. stripe)', () => {
+      const headers = new Headers({
+        'www-authenticate': 'Payment id="x", realm="m.com", method="stripe", request="e30="',
+      });
+      const { supported, unsupported } = parseBody({}, headers);
+      expect(supported).toEqual([]);
+      expect(unsupported).toHaveLength(1);
+      expect(unsupported[0].method).toBe('stripe');
+    });
+
+    it('merges body-derived rails with header-derived rails', () => {
+      const body = {
+        accepts: [
+          { scheme: 'exact', network: 'eip155:8453', maxAmountRequired: '1000', extra: { decimals: 6 } },
+        ],
+      };
+      const headers = new Headers({ 'www-authenticate': LOCUS_HEADER });
+      const { supported } = parseBody(body, headers);
+      expect(supported).toHaveLength(2);
+      expect(supported.map((q) => q.chain).sort()).toEqual(['base', 'tempo']);
+    });
+  });
 });

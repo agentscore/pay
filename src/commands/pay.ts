@@ -6,6 +6,7 @@ import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { Mppx, tempo } from 'mppx/client';
 import { evmConfig, svmConfig, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
+import { mergeHeaders } from '../headers';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
 import { emitProgress, isJson, writeJson, writeLine, writeText } from '../output';
@@ -66,11 +67,13 @@ export async function pay(opts: PayOptions): Promise<void> {
       headers: (() => {
         const userKeys = Object.keys(opts.headers ?? {}).map((k) => k.toLowerCase());
         const hasIdentity = userKeys.includes('x-operator-token') || userKeys.includes('x-wallet-address');
-        return {
-          'Content-Type': 'application/json',
-          ...(opts.headers ?? {}),
-          ...(hasIdentity ? {} : { 'X-Wallet-Address': candidate.address }),
-        };
+        return mergeHeaders(
+          {
+            'Content-Type': 'application/json',
+            ...(hasIdentity ? {} : { 'X-Wallet-Address': candidate.address }),
+          },
+          opts.headers,
+        );
       })(),
       body: opts.body ?? null,
       max_spend_usd: opts.maxSpendUsd ?? null,
@@ -111,14 +114,16 @@ export async function pay(opts: PayOptions): Promise<void> {
   // so the same logical payment (same url + body + method + signer) always produces the
   // same key; different invocations get different keys (timestamp salt).
   const userSpecifiedIdempotency = userHeaderKeys.includes('x-idempotency-key');
-  init.headers = {
-    'Content-Type': 'application/json',
-    ...(opts.headers ?? {}),
-    ...(userSpecifiedIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
-    ...(userSpecifiedIdempotency
-      ? {}
-      : { 'X-Idempotency-Key': computeIdempotencyKey({ url: opts.url, method: opts.method, body: opts.body, signer: wallet.address }) }),
-  };
+  init.headers = mergeHeaders(
+    {
+      'Content-Type': 'application/json',
+      ...(userSpecifiedIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
+      ...(userSpecifiedIdempotency
+        ? {}
+        : { 'X-Idempotency-Key': computeIdempotencyKey({ url: opts.url, method: opts.method, body: opts.body, signer: wallet.address }) }),
+    },
+    opts.headers,
+  );
 
   if (opts.verbose) {
     emitProgress('request', {

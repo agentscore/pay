@@ -1,4 +1,5 @@
 import { CliError } from '../errors';
+import { mergeHeaders } from '../headers';
 import { isJson, writeJson, writeLine } from '../output';
 import { chainFromNetworkId } from '../quotes';
 import { lookupRailHint, type RailHint } from '../rail-hints';
@@ -111,7 +112,7 @@ function normalizeMpp(body: unknown): RailSummary[] {
 export async function check(opts: CheckOptions): Promise<void> {
   const init: RequestInit = { method: opts.method };
   if (opts.body !== undefined) init.body = opts.body;
-  init.headers = { 'Content-Type': 'application/json', ...(opts.headers ?? {}) };
+  init.headers = mergeHeaders({ 'Content-Type': 'application/json' }, opts.headers);
 
   let res: Response;
   try {

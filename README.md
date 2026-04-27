@@ -51,6 +51,8 @@ agentscore-pay pay POST https://merchant.example/api --chain tempo -d '...' --ma
 
 ## Agents (scripting)
 
+For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output) — it prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`unlock`, `limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
+
 Every command supports `--json` for machine-readable output. Errors go to stderr as structured JSON; success payloads go to stdout as JSON. Exit codes are stable:
 
 | Code | Meaning |
