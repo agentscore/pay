@@ -5,7 +5,7 @@
     "": {
       "name": "@agent-score/x402",
       "dependencies": {
-        "@agent-score/sdk": "link:@agent-score/sdk",
+        "@agent-score/sdk": "^2.0.0",
         "@clack/prompts": "^1.2.0",
         "@scure/bip39": "^2.2.0",
         "@solana-program/token": "^0.13.0",
@@ -41,7 +41,7 @@
   "packages": {
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
-    "@agent-score/sdk": ["@agent-score/sdk@link:@agent-score/sdk", {}],
+    "@agent-score/sdk": ["@agent-score/sdk@2.0.0", "", {}, "sha512-Ut64BlbeI3Ypyn7efsQ4o1c5EKXf/udZ35thkhcJ7PiKIlMDeZs1k9YTfQOikEiAxXOeoKCXtQ3LDScUMRcTpw=="],
 
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
 
