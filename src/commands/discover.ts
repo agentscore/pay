@@ -1,6 +1,4 @@
-import { bold, cyan, dim, yellow } from '../colors';
 import { CliError } from '../errors';
-import { isJson, writeJson, writeLine } from '../output';
 import { chainFromNetworkId } from '../quotes';
 import { lookupRailHint, type RailHint } from '../rail-hints';
 import type { Chain } from '../constants';
@@ -93,7 +91,14 @@ interface NormalizedService {
   cheapest_usd?: number;
 }
 
-export async function discover(opts: DiscoverOptions = {}): Promise<void> {
+export interface DiscoverResult {
+  count: number;
+  returned: number;
+  sources_failed: string[];
+  services: NormalizedService[];
+}
+
+export async function discover(opts: DiscoverOptions = {}): Promise<DiscoverResult> {
   const protocol = opts.protocol ?? 'both';
   const sources: Promise<NormalizedService[]>[] = [];
   if (protocol === 'x402' || protocol === 'both') sources.push(fetchX402());
@@ -116,43 +121,12 @@ export async function discover(opts: DiscoverOptions = {}): Promise<void> {
   const filtered = applyFilters(merged, opts);
   const limited = opts.limit ? filtered.slice(0, opts.limit) : filtered;
 
-  if (isJson()) {
-    writeJson({
-      count: filtered.length,
-      returned: limited.length,
-      sources_failed: errors,
-      services: limited,
-    });
-    return;
-  }
-
-  if (limited.length === 0) {
-    writeLine(yellow('No services match the given filters.'));
-    return;
-  }
-
-  writeLine(`${bold(String(limited.length))} services from ${dim('x402 Bazaar + mpp.dev/services')}:`);
-  writeLine('');
-  for (const svc of limited) {
-    const price = svc.cheapest_usd !== undefined ? `$${svc.cheapest_usd.toFixed(svc.cheapest_usd < 0.01 ? 4 : 2)}` : '?';
-    const tag = svc.source === 'x402' ? dim('[x402]') : dim('[mpp]');
-    writeLine(`  ${bold(price.padStart(8))}  ${tag}  ${cyan(svc.url ?? svc.domain ?? '(unknown)')}`);
-    if (svc.description) writeLine(`                    ${dim(svc.description.slice(0, 76))}`);
-    const native = svc.rails.filter((r) => r.natively_supported);
-    const other = svc.rails.filter((r) => !r.natively_supported);
-    if (native.length > 0) {
-      const summary = native.map((r) => `${r.chain}/${r.scheme ?? svc.source}`).join(', ');
-      writeLine(`                    ${dim(`rails: ${summary}`)}`);
-    }
-    if (other.length > 0) {
-      const summary = other.map((r) => r.hint?.name ?? `${r.scheme ?? svc.source}/${r.network ?? 'unknown'}`).join(', ');
-      writeLine(`                    ${dim(`other: ${summary}`)}`);
-    }
-  }
-  if (errors.length > 0) {
-    writeLine('');
-    writeLine(yellow(`(some sources failed: ${errors.join('; ')})`));
-  }
+  return {
+    count: filtered.length,
+    returned: limited.length,
+    sources_failed: errors,
+    services: limited,
+  };
 }
 
 async function fetchWithTimeout(url: string, label: string): Promise<unknown> {

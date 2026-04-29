@@ -3,35 +3,48 @@ import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { loadKeystore } from '../keystore';
-import { isJson, writeJson, writeLine } from '../output';
 import { DEFAULT_WALLET_NAME } from '../paths';
 import type { Chain, Network } from '../constants';
 
-export async function qr(chain: Chain, amountUsd?: number, network: Network = 'mainnet', name: string = DEFAULT_WALLET_NAME): Promise<void> {
-  const ks = await loadKeystore(chain, name);
-  const uri =
-    chain === 'base'
-      ? baseChain.qrUri(ks.address, amountUsd, network)
-      : chain === 'solana'
-        ? solanaChain.qrUri(ks.address, amountUsd, network)
-        : tempoChain.qrUri(ks.address, amountUsd, network);
+export interface QrInput {
+  chain: Chain;
+  amountUsd?: number;
+  network?: Network;
+  name?: string;
+}
 
-  if (isJson()) {
-    writeJson({
-      chain,
-      address: ks.address,
-      token: 'USDC',
-      amount_usd: amountUsd ?? null,
-      uri,
-    });
-    return;
-  }
-  qrcode.generate(uri, { small: true });
-  writeLine('');
-  writeLine(`Address:  ${ks.address}`);
-  writeLine(`Chain:    ${chain}`);
-  writeLine('Token:    USDC');
-  if (amountUsd && amountUsd > 0) writeLine(`Amount:   ${amountUsd} USDC`);
-  writeLine('');
-  writeLine(uri.length > 80 ? `URI:      ${uri.slice(0, 77)}...` : `URI:      ${uri}`);
+export interface QrResult {
+  chain: Chain;
+  address: string;
+  token: 'USDC';
+  amount_usd: number | null;
+  uri: string;
+  ascii_qr: string;
+}
+
+export async function qr(input: QrInput): Promise<QrResult> {
+  const network = input.network ?? 'mainnet';
+  const name = input.name ?? DEFAULT_WALLET_NAME;
+  const ks = await loadKeystore(input.chain, name);
+  const uri =
+    input.chain === 'base'
+      ? baseChain.qrUri(ks.address, input.amountUsd, network)
+      : input.chain === 'solana'
+        ? solanaChain.qrUri(ks.address, input.amountUsd, network)
+        : tempoChain.qrUri(ks.address, input.amountUsd, network);
+
+  // Capture QR ascii into a string instead of printing to stdout — caller decides
+  // whether to render it (TTY) or pass it through structured output (JSON/TOON).
+  const ascii_qr = await new Promise<string>((resolve) => {
+    qrcode.generate(uri, { small: true }, (q) => resolve(q));
+  });
+
+  return {
+    chain: input.chain,
+    address: ks.address,
+    token: 'USDC',
+    amount_usd: input.amountUsd ?? null,
+    uri,
+    ascii_qr,
+  };
 }

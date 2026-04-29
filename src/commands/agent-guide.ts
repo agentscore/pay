@@ -4,8 +4,6 @@
  * Plain text in TTY mode (human/agent reads it line-by-line), structured JSON in `--json` mode
  * (programmatic parsing — agents that prefer JSON can ingest the same content).
  */
-import { isJson, writeJson, writeLine } from '../output';
-
 interface GuideStep {
   step: string;
   why: string;
@@ -193,64 +191,7 @@ const GUIDE: AgentGuide = {
     'Recommended for any agent invocation — TTY mode is for humans.',
 };
 
-export async function agentGuide(): Promise<void> {
-  if (isJson()) {
-    writeJson(GUIDE);
-    return;
-  }
 
-  writeLine('agentscore-pay — guidance for LLM tool-loop agents');
-  writeLine('');
-  writeLine(GUIDE.intro);
-  writeLine('');
-  writeLine('━━━ Golden path ━━━');
-  for (const s of GUIDE.golden_path) {
-    writeLine('');
-    writeLine(s.step);
-    writeLine(`  why: ${s.why}`);
-    if (s.command_example) writeLine(`  example: ${s.command_example}`);
-    for (const n of s.notes ?? []) writeLine(`  • ${n}`);
-  }
-  writeLine('');
-  writeLine('━━━ Testnet path ━━━');
-  for (const s of GUIDE.testnet_path) {
-    writeLine('');
-    writeLine(s.step);
-    writeLine(`  why: ${s.why}`);
-    if (s.command_example) writeLine(`  example: ${s.command_example}`);
-    for (const n of s.notes ?? []) writeLine(`  • ${n}`);
-  }
-  writeLine('');
-  writeLine('━━━ Funding ━━━');
-  for (const s of GUIDE.funding) {
-    writeLine('');
-    writeLine(s.step);
-    writeLine(`  why: ${s.why}`);
-    if (s.command_example) writeLine(`  example: ${s.command_example}`);
-    for (const n of s.notes ?? []) writeLine(`  • ${n}`);
-  }
-  writeLine('');
-  writeLine('━━━ Auxiliary commands ━━━');
-  for (const s of GUIDE.auxiliary) {
-    writeLine('');
-    writeLine(s.step);
-    writeLine(`  why: ${s.why}`);
-    if (s.command_example) writeLine(`  example: ${s.command_example}`);
-    for (const n of s.notes ?? []) writeLine(`  • ${n}`);
-  }
-  writeLine('');
-  writeLine('━━━ Pitfalls ━━━');
-  for (const p of GUIDE.pitfalls) {
-    writeLine('');
-    writeLine(p.step);
-    writeLine(`  ${p.why}`);
-  }
-  writeLine('');
-  writeLine('━━━ Exit codes ━━━');
-  for (const [code, meaning] of Object.entries(GUIDE.exit_codes)) {
-    writeLine(`  ${code}  ${meaning}`);
-  }
-  writeLine('');
-  writeLine('━━━ JSON mode ━━━');
-  writeLine(GUIDE.json_mode);
+export async function agentGuide(): Promise<AgentGuide> {
+  return GUIDE;
 }

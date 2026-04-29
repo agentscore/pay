@@ -3,10 +3,9 @@ import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { keystoreExists, loadKeystore } from '../keystore';
-import { isJson, writeJson, writeLine } from '../output';
 import { DEFAULT_WALLET_NAME } from '../paths';
 
-interface BalanceRow {
+export interface BalanceRow {
   chain: Chain;
   name: string;
   address?: string;
@@ -33,20 +32,17 @@ async function readChain(chain: Chain, network: Network, name: string): Promise<
   return { chain, name, address: ks.address, usdc: formatted, raw: raw.toString(), has_wallet: true };
 }
 
-export async function balance(filter?: Chain, network: Network = 'mainnet', name: string = DEFAULT_WALLET_NAME): Promise<void> {
-  const chains = filter ? [filter] : [...SUPPORTED_CHAINS];
+export interface BalanceInput {
+  chain?: Chain;
+  network?: Network;
+  name?: string;
+}
+
+export async function balance(input: BalanceInput = {}): Promise<{ wallets: BalanceRow[] }> {
+  const network: Network = input.network ?? 'mainnet';
+  const name = input.name ?? DEFAULT_WALLET_NAME;
+  const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
   const rows = await Promise.all(chains.map((c) => readChain(c, network, name)));
   rows.sort((a, b) => a.chain.localeCompare(b.chain));
-
-  if (isJson()) {
-    writeJson(rows);
-    return;
-  }
-  for (const row of rows) {
-    if (!row.has_wallet) {
-      writeLine(`${row.chain.padEnd(8)} (no wallet)`);
-    } else {
-      writeLine(`${row.chain.padEnd(8)} ${(row.usdc ?? '0').padStart(14)} USDC  ${row.address}`);
-    }
-  }
+  return { wallets: rows };
 }

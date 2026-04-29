@@ -1,7 +1,6 @@
 import { isKnownUSDC } from '../constants';
 import { CliError } from '../errors';
 import { mergeHeaders } from '../headers';
-import { isJson, writeJson, writeLine } from '../output';
 import { chainFromNetworkId } from '../quotes';
 import { lookupRailHint, type RailHint } from '../rail-hints';
 import { challengeToRail, parsePaymentChallenges } from '../www-authenticate';
@@ -117,7 +116,16 @@ function normalizeMpp(body: unknown): RailSummary[] {
   });
 }
 
-export async function check(opts: CheckOptions): Promise<void> {
+export interface CheckResult {
+  status: number;
+  status_text: string;
+  payment_required: boolean;
+  protocol?: 'x402' | 'mpp' | 'both' | 'unknown';
+  rails?: RailSummary[];
+  body: unknown;
+}
+
+export async function check(opts: CheckOptions): Promise<CheckResult> {
   const init: RequestInit = { method: opts.method };
   if (opts.body !== undefined) init.body = opts.body;
   init.headers = mergeHeaders({ 'Content-Type': 'application/json' }, opts.headers);
@@ -140,19 +148,7 @@ export async function check(opts: CheckOptions): Promise<void> {
   }
 
   if (res.status !== 402) {
-    const payload = {
-      status: res.status,
-      status_text: res.statusText,
-      payment_required: false,
-      body,
-    };
-    if (isJson()) {
-      writeJson(payload);
-    } else {
-      writeLine(`${opts.method} ${opts.url} → ${res.status} ${res.statusText}`);
-      writeLine('No payment required (endpoint returned non-402 status).');
-    }
-    return;
+    return { status: res.status, status_text: res.statusText, payment_required: false, body };
   }
 
   const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -178,47 +174,5 @@ export async function check(opts: CheckOptions): Promise<void> {
     else if (protocol === 'x402') protocol = 'both';
   }
 
-  const payload = {
-    status: 402,
-    status_text: res.statusText,
-    payment_required: true,
-    protocol,
-    rails,
-    body,
-  };
-  if (isJson()) {
-    writeJson(payload);
-    return;
-  }
-
-  writeLine(`${opts.method} ${opts.url} → 402 Payment Required (${protocol})`);
-  if (rails.length === 0) {
-    writeLine('  (could not parse accepted rails; see raw body below)');
-    writeLine(text);
-    return;
-  }
-  writeLine('');
-  const native = rails.filter((r) => r.natively_supported);
-  const other = rails.filter((r) => !r.natively_supported);
-  if (native.length > 0) {
-    writeLine('Accepted rails (natively supported by agentscore-pay):');
-    for (const r of native) {
-      const price = r.price_usd ? `$${r.price_usd}` : '?';
-      writeLine(`  ${r.protocol.padEnd(5)} ${r.rail.padEnd(28)} ${price.padStart(10)}  pay_to=${r.pay_to ?? 'n/a'}`);
-    }
-  }
-  if (other.length > 0) {
-    if (native.length > 0) writeLine('');
-    writeLine('Other rails accepted (use a compatible client):');
-    for (const r of other) {
-      const label = r.hint?.name ?? r.rail;
-      const price = r.price_usd ? `$${r.price_usd}` : '?';
-      writeLine(`  ${r.protocol.padEnd(5)} ${label.padEnd(28)} ${price.padStart(10)}`);
-      if (r.hint?.recommended_client) {
-        writeLine(`         → ${r.hint.recommended_client.name}${r.hint.recommended_client.install ? ` (${r.hint.recommended_client.install})` : ''}`);
-      } else if (r.hint?.docs_url) {
-        writeLine(`         → ${r.hint.docs_url}`);
-      }
-    }
-  }
+  return { status: 402, status_text: res.statusText, payment_required: true, protocol, rails, body };
 }
