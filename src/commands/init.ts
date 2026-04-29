@@ -1,22 +1,30 @@
-import { bold, dim, green, yellow } from '../colors';
 import { saveConfig } from '../config';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
 import { keystoreExists } from '../keystore';
 import { mnemonicExists, mnemonicPath } from '../mnemonic-store';
-import { isJson, writeHumanNote, writeJson } from '../output';
 import { fund } from './fund';
 import { walletCreate } from './wallet';
 
-export interface InitOptions {
+export interface InitInput {
   mnemonic?: boolean;
   fundTempoTestnet?: boolean;
   preferredChains?: string;
   network?: Network;
 }
 
-export async function init(opts: InitOptions = {}): Promise<void> {
-  const useMnemonic = opts.mnemonic ?? true;
+export interface InitResult {
+  ok: true;
+  already_initialized?: boolean;
+  existing_wallets?: Chain[];
+  created_for?: Chain[];
+  preferred_chains?: Chain[];
+  tempo_testnet_funded?: boolean;
+  tempo_testnet_fund_error?: string;
+}
+
+export async function init(input: InitInput = {}): Promise<InitResult> {
+  const useMnemonic = input.mnemonic ?? true;
 
   const existingWallets: Chain[] = [];
   for (const c of SUPPORTED_CHAINS) {
@@ -24,16 +32,7 @@ export async function init(opts: InitOptions = {}): Promise<void> {
   }
 
   if (existingWallets.length === SUPPORTED_CHAINS.length) {
-    if (isJson()) {
-      writeJson({
-        ok: true,
-        already_initialized: true,
-        existing_wallets: existingWallets,
-      });
-      return;
-    }
-    writeHumanNote('All wallets already exist. Use `whoami` to inspect or `wallet create --chain <c>` to add.');
-    return;
+    return { ok: true, already_initialized: true, existing_wallets: existingWallets };
   }
 
   const hasMnemonic = await mnemonicExists();
@@ -59,38 +58,28 @@ export async function init(opts: InitOptions = {}): Promise<void> {
     );
   }
 
-  if (!isJson()) writeHumanNote('Creating wallets for base, solana, tempo' + (useMnemonic ? ' from a single BIP-39 mnemonic' : ' (random keys per chain)') + '...');
-
   await walletCreate({ mnemonic: useMnemonic });
+  const created_for = SUPPORTED_CHAINS.filter((c) => !existingWallets.includes(c));
 
-  if (opts.preferredChains) {
-    const chains = parsePreferredChains(opts.preferredChains);
+  const result: InitResult = { ok: true, created_for };
+
+  if (input.preferredChains) {
+    const chains = parsePreferredChains(input.preferredChains);
     await saveConfig({ preferred_chains: chains });
-    if (!isJson()) writeHumanNote(`${green('✓')} preferred_chains set to ${bold(chains.join(','))}`);
+    result.preferred_chains = chains;
   }
 
-  if (opts.fundTempoTestnet) {
-    if (!isJson()) writeHumanNote('\nFunding Tempo testnet wallet via tempo_fundAddress...');
+  if (input.fundTempoTestnet) {
     try {
-      await fund('tempo', undefined, 'testnet');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (isJson()) {
-        writeJson({ event: 'fund_tempo_testnet_failed', error: msg });
-      } else {
-        writeHumanNote(yellow(`(tempo testnet fund failed: ${msg} — wallets are still created; rerun \`fund --chain tempo --network testnet\` later)`));
-      }
+      await fund({ chain: 'tempo', network: 'testnet' });
+      result.tempo_testnet_funded = true;
+    } catch (err: unknown) {
+      result.tempo_testnet_funded = false;
+      result.tempo_testnet_fund_error = err instanceof Error ? err.message : String(err);
     }
   }
 
-  if (!isJson()) {
-    writeHumanNote('');
-    writeHumanNote(bold('Initialized. Next steps:'));
-    writeHumanNote(dim('  agentscore-pay whoami                   # see addresses + balances'));
-    writeHumanNote(dim('  agentscore-pay fund --chain base        # top up via Coinbase Onramp'));
-    writeHumanNote(dim('  agentscore-pay limits set --daily 50    # cap autonomous spend'));
-    writeHumanNote(dim('  agentscore-pay pay POST <url> -d <body> # spend'));
-  }
+  return result;
 }
 
 function parsePreferredChains(value: string): Chain[] {

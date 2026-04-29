@@ -1,11 +1,8 @@
-import qrcode from 'qrcode-terminal';
-import { bold, cyan, dim, green, yellow } from '../colors';
 import { onrampUrl, SUPPORTED_CHAINS, type Chain } from '../constants';
 import { CliError } from '../errors';
 import { decryptSecret, deleteKeystore, keystoreExists, listWallets, loadKeystore } from '../keystore';
 import { deriveKey, generatePhrase, validatePhrase } from '../mnemonic';
 import { loadMnemonic, mnemonicExists, mnemonicPath, saveMnemonic } from '../mnemonic-store';
-import { isHuman, isJson, writeHumanNote, writeJson, writeLine } from '../output';
 import { DEFAULT_WALLET_NAME, isValidWalletName, keystorePath } from '../paths';
 import { promptNewPassphrase, promptPassphrase } from '../prompts';
 import { clearCache as clearUnlockCache } from '../unlock-cache';
@@ -20,7 +17,7 @@ function validateWalletName(name: string): void {
   }
 }
 
-interface CreateResult {
+export interface CreateResult {
   chain: Chain;
   name: string;
   address: string;
@@ -31,16 +28,23 @@ interface CreateResult {
   onramp_url?: string | null;
 }
 
-export interface WalletCreateOptions {
+export interface WalletCreateInput {
   chain?: Chain;
   mnemonic?: boolean;
   name?: string;
 }
 
-export async function walletCreate(opts: WalletCreateOptions = {}): Promise<void> {
-  const name = opts.name ?? DEFAULT_WALLET_NAME;
+export interface WalletCreateResult {
+  created: CreateResult[];
+  skipped: CreateResult[];
+  mnemonic?: string;
+  mnemonic_stored_at?: string;
+}
+
+export async function walletCreate(input: WalletCreateInput = {}): Promise<WalletCreateResult> {
+  const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
-  if (opts.mnemonic) {
+  if (input.mnemonic) {
     if (name !== DEFAULT_WALLET_NAME) {
       throw new CliError('invalid_input', '--mnemonic is only supported for the default wallet name.', {
         nextSteps: {
@@ -49,10 +53,9 @@ export async function walletCreate(opts: WalletCreateOptions = {}): Promise<void
         },
       });
     }
-    await walletCreateMnemonic(opts.chain);
-    return;
+    return walletCreateMnemonic(input.chain);
   }
-  const chains = opts.chain ? [opts.chain] : [...SUPPORTED_CHAINS];
+  const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
   const targets: Chain[] = [];
   const existing: CreateResult[] = [];
 
@@ -71,32 +74,25 @@ export async function walletCreate(opts: WalletCreateOptions = {}): Promise<void
     }
   }
 
-  if (opts.chain && targets.length === 0) {
-    throw new CliError('wallet_exists', `Keystore for ${opts.chain} (${name}) already exists.`, {
+  if (input.chain && targets.length === 0) {
+    throw new CliError('wallet_exists', `Keystore for ${input.chain} (${name}) already exists.`, {
       nextSteps: {
         action: 'remove_then_create',
-        suggestion: `Delete ${keystorePath(opts.chain, name)} to regenerate, or use a different --wallet name.`,
+        suggestion: `Delete ${keystorePath(input.chain, name)} to regenerate, or use a different --wallet name.`,
       },
-      extra: { chain: opts.chain, name, keystore: keystorePath(opts.chain, name) },
+      extra: { chain: input.chain, name, keystore: keystorePath(input.chain, name) },
     });
   }
 
   if (targets.length === 0) {
-    if (isJson()) {
-      writeJson({ created: [], skipped: existing });
-    } else {
-      writeHumanNote('All requested wallets already exist:');
-      for (const e of existing) writeHumanNote(`  ${e.chain.padEnd(8)} ${e.address}`);
-    }
-    return;
+    return { created: [], skipped: existing };
   }
 
-  if (isHuman()) writeHumanNote(`Creating ${targets.length > 1 ? 'wallets' : `${targets[0]} wallet`} (${name})...`);
   const passphrase = await promptNewPassphrase();
-  const results: CreateResult[] = [...existing];
+  const created: CreateResult[] = [];
   for (const c of targets) {
     const wallet = await createWallet(c, passphrase, undefined, name);
-    results.push({
+    created.push({
       chain: c,
       name,
       address: wallet.address,
@@ -106,11 +102,10 @@ export async function walletCreate(opts: WalletCreateOptions = {}): Promise<void
       onramp_url: onrampUrl(c, wallet.address),
     });
   }
-
-  emitCreateResults(results);
+  return { created, skipped: existing };
 }
 
-async function walletCreateMnemonic(chain?: Chain): Promise<void> {
+async function walletCreateMnemonic(chain?: Chain): Promise<WalletCreateResult> {
   if (await mnemonicExists()) {
     throw new CliError('wallet_exists', 'A mnemonic is already stored.', {
       nextSteps: {
@@ -134,11 +129,11 @@ async function walletCreateMnemonic(chain?: Chain): Promise<void> {
   }
   const phrase = generatePhrase();
   const passphrase = await promptNewPassphrase();
-  const results: CreateResult[] = [];
+  const created: CreateResult[] = [];
   for (const c of chains) {
     const secret = deriveKey(c, phrase);
     const wallet = await createWallet(c, passphrase, secret);
-    results.push({
+    created.push({
       chain: c,
       name: DEFAULT_WALLET_NAME,
       address: wallet.address,
@@ -149,54 +144,63 @@ async function walletCreateMnemonic(chain?: Chain): Promise<void> {
     });
   }
   await saveMnemonic(phrase, passphrase, chains);
-  if (isJson()) {
-    writeJson({
-      mnemonic: phrase,
-      stored_at: mnemonicPath(),
-      created: results,
-    });
-    return;
-  }
-  writeHumanNote('\nBIP-39 mnemonic (write this down, DO NOT share):');
-  writeHumanNote(`  ${phrase}`);
-  writeHumanNote(`\nMnemonic also stored encrypted at ${mnemonicPath()} (AES-256-GCM + scrypt).`);
-  writeHumanNote('');
-  emitCreateResults(results);
+  return { created, skipped: [], mnemonic: phrase, mnemonic_stored_at: mnemonicPath() };
 }
 
-export async function walletImport(chain: Chain, hexOrBase58: string, name: string = DEFAULT_WALLET_NAME): Promise<void> {
+export interface WalletImportInput {
+  chain: Chain;
+  key: string;
+  name?: string;
+}
+
+export interface WalletImportResult {
+  chain: Chain;
+  name: string;
+  address: string;
+  keystore: string;
+}
+
+export async function walletImport(input: WalletImportInput): Promise<WalletImportResult> {
+  const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
   const bytes =
-    chain === 'solana'
-      ? Buffer.from(hexOrBase58, 'base64')
-      : Buffer.from(hexOrBase58.replace(/^0x/, ''), 'hex');
+    input.chain === 'solana'
+      ? Buffer.from(input.key, 'base64')
+      : Buffer.from(input.key.replace(/^0x/, ''), 'hex');
   if (bytes.length !== 32) {
-    const expected = chain === 'solana' ? '32-byte base64 private-key seed' : '32-byte hex private key';
+    const expected = input.chain === 'solana' ? '32-byte base64 private-key seed' : '32-byte hex private key';
     throw new CliError('invalid_key', `Expected ${expected}, got ${bytes.length} bytes.`, {
       nextSteps: { action: 'supply_correct_key_format' },
-      extra: { chain, got_bytes: bytes.length },
+      extra: { chain: input.chain, got_bytes: bytes.length },
     });
   }
-  if (await keystoreExists(chain, name)) {
-    throw new CliError('wallet_exists', `Keystore for ${chain} (${name}) already exists.`, {
+  if (await keystoreExists(input.chain, name)) {
+    throw new CliError('wallet_exists', `Keystore for ${input.chain} (${name}) already exists.`, {
       nextSteps: {
         action: 'remove_then_import',
-        suggestion: `Delete ${keystorePath(chain, name)} first or use a different --wallet name.`,
+        suggestion: `Delete ${keystorePath(input.chain, name)} first or use a different --wallet name.`,
       },
-      extra: { chain, name, keystore: keystorePath(chain, name) },
+      extra: { chain: input.chain, name, keystore: keystorePath(input.chain, name) },
     });
   }
   const passphrase = await promptNewPassphrase();
-  const wallet: Wallet = await createWallet(chain, passphrase, bytes, name);
-  if (isJson()) {
-    writeJson({ chain: wallet.chain, name, address: wallet.address, keystore: keystorePath(chain, name) });
-    return;
-  }
-  writeHumanNote(`Imported ${chain} (${name}). Address: ${wallet.address}`);
+  const wallet: Wallet = await createWallet(input.chain, passphrase, bytes, name);
+  return { chain: wallet.chain, name, address: wallet.address, keystore: keystorePath(input.chain, name) };
 }
 
-export async function walletImportMnemonic(phrase: string, chain?: Chain): Promise<void> {
-  const normalized = phrase.trim().split(/\s+/).join(' ');
+export interface WalletImportMnemonicInput {
+  phrase: string;
+  chain?: Chain;
+}
+
+export interface WalletImportMnemonicResult {
+  imported_from_mnemonic: true;
+  created: CreateResult[];
+  mnemonic_stored_at: string;
+}
+
+export async function walletImportMnemonic(input: WalletImportMnemonicInput): Promise<WalletImportMnemonicResult> {
+  const normalized = input.phrase.trim().split(/\s+/).join(' ');
   if (!validatePhrase(normalized)) {
     throw new CliError('invalid_key', 'Invalid BIP-39 mnemonic phrase.', {
       nextSteps: { action: 'check_phrase', suggestion: 'Confirm word count (12 or 24) and spelling against the BIP-39 English wordlist.' },
@@ -210,7 +214,7 @@ export async function walletImportMnemonic(phrase: string, chain?: Chain): Promi
       },
     });
   }
-  const chains = chain ? [chain] : [...SUPPORTED_CHAINS];
+  const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
   for (const c of chains) {
     if (await keystoreExists(c)) {
       throw new CliError('wallet_exists', `Keystore for ${c} already exists.`, {
@@ -223,11 +227,11 @@ export async function walletImportMnemonic(phrase: string, chain?: Chain): Promi
     }
   }
   const passphrase = await promptNewPassphrase();
-  const results: CreateResult[] = [];
+  const created: CreateResult[] = [];
   for (const c of chains) {
     const secret = deriveKey(c, normalized);
     const wallet = await createWallet(c, passphrase, secret);
-    results.push({
+    created.push({
       chain: c,
       name: DEFAULT_WALLET_NAME,
       address: wallet.address,
@@ -238,53 +242,51 @@ export async function walletImportMnemonic(phrase: string, chain?: Chain): Promi
     });
   }
   await saveMnemonic(normalized, passphrase, chains);
-  if (isJson()) {
-    writeJson({ imported_from_mnemonic: true, created: results, mnemonic_stored_at: mnemonicPath() });
-    return;
-  }
-  writeHumanNote('Mnemonic imported and keystores derived:');
-  emitCreateResults(results);
+  return { imported_from_mnemonic: true, created, mnemonic_stored_at: mnemonicPath() };
 }
 
-export async function walletAddress(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<void> {
+export interface WalletAddressInput {
+  chain: Chain;
+  name?: string;
+}
+
+export async function walletAddress(input: WalletAddressInput): Promise<{ chain: Chain; name: string; address: string }> {
+  const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
-  const file = await loadKeystore(chain, name);
-  if (isJson()) {
-    writeJson({ chain: file.chain, name, address: file.address });
-    return;
-  }
-  writeLine(file.address);
+  const file = await loadKeystore(input.chain, name);
+  return { chain: file.chain, name, address: file.address };
 }
 
-export async function walletList(chain?: Chain): Promise<void> {
-  const chains = chain ? [chain] : [...SUPPORTED_CHAINS];
+export interface WalletListInput {
+  chain?: Chain;
+}
+
+export async function walletList(input: WalletListInput = {}): Promise<{ wallets: Array<{ chain: Chain; names: string[] }> }> {
+  const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
   const rows = await Promise.all(
     chains.map(async (c) => ({ chain: c, names: await listWallets(c) })),
   );
-  if (isJson()) {
-    writeJson({ wallets: rows });
-    return;
-  }
-  for (const row of rows) {
-    if (row.names.length === 0) {
-      if (!chain) writeLine(`${row.chain.padEnd(8)} ${dim('(none)')}`);
-      continue;
-    }
-    for (const n of row.names) {
-      writeLine(`${row.chain.padEnd(8)} ${n}`);
-    }
-  }
+  return { wallets: rows };
 }
 
-export interface WalletRemoveOptions {
+export interface WalletRemoveInput {
   chain: Chain;
   name?: string;
   danger?: boolean;
   skipConfirm?: boolean;
 }
 
-export async function walletRemove(opts: WalletRemoveOptions): Promise<void> {
-  if (!opts.danger) {
+export interface WalletRemoveResult {
+  ok: true;
+  chain: Chain;
+  name: string;
+  address: string;
+  removed_files: string[];
+  unlock_cache_cleared: boolean;
+}
+
+export async function walletRemove(input: WalletRemoveInput): Promise<WalletRemoveResult> {
+  if (!input.danger) {
     throw new CliError('invalid_input', 'wallet remove requires --danger flag (the keystore will be irrecoverably deleted).', {
       nextSteps: {
         action: 'pass_danger_flag',
@@ -292,47 +294,46 @@ export async function walletRemove(opts: WalletRemoveOptions): Promise<void> {
       },
     });
   }
-  const name = opts.name ?? DEFAULT_WALLET_NAME;
+  const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
-  if (!(await keystoreExists(opts.chain, name))) {
-    throw new CliError('no_wallet', `No keystore for ${opts.chain} (${name}).`, {
-      extra: { chain: opts.chain, name },
+  if (!(await keystoreExists(input.chain, name))) {
+    throw new CliError('no_wallet', `No keystore for ${input.chain} (${name}).`, {
+      extra: { chain: input.chain, name },
     });
   }
-  const file = await loadKeystore(opts.chain, name);
-  if (!opts.skipConfirm) {
-    await typeToConfirm(`Type EXPORT to confirm deleting ${opts.chain}/${name} (${file.address})`);
+  const file = await loadKeystore(input.chain, name);
+  if (!input.skipConfirm) {
+    await typeToConfirm(`Type EXPORT to confirm deleting ${input.chain}/${name} (${file.address})`);
   }
-  const removed = await deleteKeystore(opts.chain, name);
-  // Clear the cached passphrase too — keeping it after a wallet delete is residual
-  // credential exposure (the passphrase often unlocks other wallets the same user
-  // created with the same password). Best-effort: ignore failure if cache doesn't exist.
+  const removed = await deleteKeystore(input.chain, name);
   const unlockCacheCleared = await clearUnlockCache().catch(() => false);
-  if (isJson()) {
-    writeJson({
-      ok: true,
-      chain: opts.chain,
-      name,
-      address: file.address,
-      removed_files: removed,
-      unlock_cache_cleared: unlockCacheCleared,
-    });
-    return;
-  }
-  writeLine(`${green('✓')} Removed ${opts.chain}/${name} (${file.address})`);
-  for (const path of removed) writeLine(dim(`  - ${path}`));
-  if (unlockCacheCleared) writeLine(dim('  - cleared cached passphrase (was set via `unlock`)'));
+  return {
+    ok: true,
+    chain: input.chain,
+    name,
+    address: file.address,
+    removed_files: removed,
+    unlock_cache_cleared: unlockCacheCleared,
+  };
 }
 
-export interface WalletExportOptions {
+export interface WalletExportInput {
   chain: Chain;
   name?: string;
   danger?: boolean;
   skipConfirm?: boolean;
 }
 
-export async function walletExport(opts: WalletExportOptions): Promise<void> {
-  if (!opts.danger) {
+export interface WalletExportResult {
+  chain: Chain;
+  name: string;
+  address: string;
+  format: 'hex' | 'base64';
+  private_key: string;
+}
+
+export async function walletExport(input: WalletExportInput): Promise<WalletExportResult> {
+  if (!input.danger) {
     throw new CliError(
       'invalid_input',
       'wallet export requires --danger flag to acknowledge risks.',
@@ -344,11 +345,11 @@ export async function walletExport(opts: WalletExportOptions): Promise<void> {
       },
     );
   }
-  const name = opts.name ?? DEFAULT_WALLET_NAME;
+  const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
-  const file = await loadKeystore(opts.chain, name);
-  if (!opts.skipConfirm) {
-    await typeToConfirm(`Type EXPORT to confirm exporting ${opts.chain}/${name} private key (${file.address})`);
+  const file = await loadKeystore(input.chain, name);
+  if (!input.skipConfirm) {
+    await typeToConfirm(`Type EXPORT to confirm exporting ${input.chain}/${name} private key (${file.address})`);
   }
   const passphrase = await promptPassphrase();
   let secret: Buffer;
@@ -359,26 +360,18 @@ export async function walletExport(opts: WalletExportOptions): Promise<void> {
       nextSteps: { action: 'retry_passphrase' },
     });
   }
-  const format = opts.chain === 'solana' ? 'base64' : 'hex';
+  const format: 'hex' | 'base64' = input.chain === 'solana' ? 'base64' : 'hex';
   const encoded = format === 'base64' ? secret.toString('base64') : '0x' + secret.toString('hex');
-  if (isJson()) {
-    writeJson({ chain: opts.chain, name, address: file.address, format, private_key: encoded });
-    return;
-  }
-  writeLine(`# Chain:   ${opts.chain}`);
-  writeLine(`# Wallet:  ${name}`);
-  writeLine(`# Address: ${file.address}`);
-  writeLine(`# Format:  ${format}`);
-  writeLine(encoded);
+  return { chain: input.chain, name, address: file.address, format, private_key: encoded };
 }
 
-export interface WalletShowMnemonicOptions {
+export interface WalletShowMnemonicInput {
   danger?: boolean;
   skipConfirm?: boolean;
 }
 
-export async function walletShowMnemonic(opts: WalletShowMnemonicOptions): Promise<void> {
-  if (!opts.danger) {
+export async function walletShowMnemonic(input: WalletShowMnemonicInput): Promise<{ mnemonic: string }> {
+  if (!input.danger) {
     throw new CliError('invalid_input', 'wallet show-mnemonic requires --danger.', {
       nextSteps: {
         action: 'pass_danger_flag',
@@ -391,7 +384,7 @@ export async function walletShowMnemonic(opts: WalletShowMnemonicOptions): Promi
       nextSteps: { action: 'create_or_import_mnemonic' },
     });
   }
-  if (!opts.skipConfirm) {
+  if (!input.skipConfirm) {
     await typeToConfirm('Type EXPORT to confirm printing the mnemonic');
   }
   const passphrase = await promptPassphrase();
@@ -403,11 +396,7 @@ export async function walletShowMnemonic(opts: WalletShowMnemonicOptions): Promi
       nextSteps: { action: 'retry_passphrase' },
     });
   }
-  if (isJson()) {
-    writeJson({ mnemonic: phrase });
-    return;
-  }
-  writeLine(phrase);
+  return { mnemonic: phrase };
 }
 
 async function typeToConfirm(message: string): Promise<void> {
@@ -420,31 +409,4 @@ async function typeToConfirm(message: string): Promise<void> {
     cancel('Cancelled.');
     throw new CliError('user_cancelled', 'Operation cancelled.');
   }
-}
-
-function emitCreateResults(results: CreateResult[]): void {
-  if (isJson()) {
-    writeJson({
-      created: results.filter((r) => r.created),
-      skipped: results.filter((r) => !r.created),
-    });
-    return;
-  }
-  for (const r of results) {
-    if (!r.created) {
-      writeHumanNote(dim(`- ${r.chain.padEnd(8)} already exists (${r.address})`));
-      continue;
-    }
-    writeHumanNote(`\n${green('✓')} ${bold(r.chain.toUpperCase())}`);
-    writeHumanNote(`  Address:  ${cyan(r.address)}`);
-    writeHumanNote(dim(`  Keystore: ${r.keystore}`));
-    if (r.onramp_url) {
-      writeHumanNote('  Fund via Coinbase Onramp:');
-      writeHumanNote(`    ${r.onramp_url}`);
-    } else if (r.chain === 'tempo') {
-      writeHumanNote(yellow('  Fund: `agentscore-pay fund --chain tempo --network testnet` (programmatic mint), or transfer USDC.e on chain 4217 mainnet.'));
-    }
-    if (r.qr_uri) qrcode.generate(r.qr_uri, { small: true });
-  }
-  writeHumanNote(dim('\nNext: `agentscore-pay fund --chain <c>` to add USDC, or `agentscore-pay pay ...` to spend.'));
 }

@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const ROOT = '/tmp/pay-revoke-test';
 
@@ -30,27 +30,21 @@ async function plantBaseKeystore() {
 
 describe('revoke command', () => {
   let originalHome: string | undefined;
-  let stdout: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     originalHome = process.env.HOME;
     process.env.HOME = ROOT;
     process.env.AGENTSCORE_PAY_PASSPHRASE = 'integration-test-pass';
     await setup();
-    stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    vi.resetModules();
   });
 
   afterEach(async () => {
     process.env.HOME = originalHome;
     delete process.env.AGENTSCORE_PAY_PASSPHRASE;
-    stdout.mockRestore();
     await rm(ROOT, { recursive: true, force: true });
   });
 
   it('rejects Solana with unsupported_rail (EVM-only feature)', async () => {
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'solana', token: '0x' + '1'.repeat(40), spender: '0x' + '2'.repeat(40) }),
@@ -58,8 +52,6 @@ describe('revoke command', () => {
   });
 
   it('rejects non-hex token addresses', async () => {
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'base', token: 'not-an-address', spender: '0x' + '2'.repeat(40) }),
@@ -67,8 +59,6 @@ describe('revoke command', () => {
   });
 
   it('rejects non-hex spender addresses', async () => {
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'base', token: '0x' + '1'.repeat(40), spender: 'invalid' }),
@@ -76,8 +66,6 @@ describe('revoke command', () => {
   });
 
   it('rejects EVM token without 0x prefix', async () => {
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'base', token: 'abcdef'.repeat(7), spender: '0x' + '2'.repeat(40) }),
@@ -85,9 +73,6 @@ describe('revoke command', () => {
   });
 
   it('rejects when keystore for the chain does not exist', async () => {
-    // No keystore planted — should fail at loadKeystore (decrypt-error wrap path)
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'base', token: '0x' + '1'.repeat(40), spender: '0x' + '2'.repeat(40) }),
@@ -97,8 +82,6 @@ describe('revoke command', () => {
   it('wraps decryption failure as wrong_passphrase (loadWallet path)', async () => {
     await plantBaseKeystore();
     process.env.AGENTSCORE_PAY_PASSPHRASE = 'definitely-wrong-passphrase';
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { revoke } = await import('../src/commands/revoke');
     await expect(
       revoke({ chain: 'base', token: '0x' + '1'.repeat(40), spender: '0x' + '2'.repeat(40) }),

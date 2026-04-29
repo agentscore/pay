@@ -187,8 +187,10 @@ const GUIDE: AgentGuide = {
   },
 
   json_mode:
-    'Pass --json on any command to get machine-parseable output on stdout (errors as JSON on stderr). ' +
-    'Recommended for any agent invocation — TTY mode is for humans.',
+    'Every command emits structured data. Pass --json (or --format json/yaml/md/jsonl) to lock the format; ' +
+    'TOON is the default in agent contexts (token-efficient). Errors emit `{code, message, retryable, hint?}` on stderr ' +
+    'with stable exit codes. Use --filter-output for dot-path pruning, --token-limit/--token-offset for paginated output, ' +
+    '--full-output for the full envelope, and `agentscore-pay --mcp` to expose every command as MCP tools over stdio.',
 };
 
 

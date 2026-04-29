@@ -138,7 +138,7 @@ async function fetchWithTimeout(url: string, label: string): Promise<unknown> {
       throw new Error(`${label} returned ${res.status}: ${res.statusText}`);
     }
     return await res.json();
-  } catch (err) {
+  } catch (err: unknown) {
     if (controller.signal.aborted) {
       throw new Error(`${label} request timed out after ${FETCH_TIMEOUT_MS / 1000}s`);
     }

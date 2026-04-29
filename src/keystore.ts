@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt, type ScryptOptions } from 'crypto';
 import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { dirname } from 'path';
+import { CliError } from './errors';
 import {
   DEFAULT_WALLET_NAME,
   isValidWalletName,
@@ -102,12 +103,28 @@ export async function loadKeystore(chain: Chain, name: string = DEFAULT_WALLET_N
   if (!isValidWalletName(name)) throw new Error(`Invalid wallet name: ${name}`);
   try {
     return await readKeystoreFromPath(_keystorePath(chain, name), chain);
-  } catch (err) {
+  } catch (err: unknown) {
     if (name === DEFAULT_WALLET_NAME && isNotFound(err)) {
-      return readKeystoreFromPath(legacyKeystorePath(chain), chain);
+      try {
+        return await readKeystoreFromPath(legacyKeystorePath(chain), chain);
+      } catch (legacyErr) {
+        if (isNotFound(legacyErr)) throw missingKeystore(chain, name);
+        throw legacyErr;
+      }
     }
+    if (isNotFound(err)) throw missingKeystore(chain, name);
     throw err;
   }
+}
+
+function missingKeystore(chain: Chain, name: string): CliError {
+  return new CliError('no_wallet', `No ${chain} keystore for wallet "${name}".`, {
+    nextSteps: {
+      action: 'create_or_import_wallet',
+      suggestion: `Run \`agentscore-pay wallet create --chain ${chain}\` or import an existing key.`,
+    },
+    extra: { chain, name, keystore: _keystorePath(chain, name) },
+  });
 }
 
 export async function keystoreExists(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<boolean> {
@@ -157,7 +174,7 @@ export async function deleteKeystore(chain: Chain, name: string = DEFAULT_WALLET
   try {
     await rm(newPath);
     removed.push(newPath);
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isNotFound(err)) throw err;
   }
   if (name === DEFAULT_WALLET_NAME) {
@@ -165,7 +182,7 @@ export async function deleteKeystore(chain: Chain, name: string = DEFAULT_WALLET
     try {
       await rm(legacy);
       removed.push(legacy);
-    } catch (err) {
+    } catch (err: unknown) {
       if (!isNotFound(err)) throw err;
     }
   }

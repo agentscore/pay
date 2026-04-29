@@ -133,7 +133,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   let res: Response;
   try {
     res = await fetch(opts.url, init);
-  } catch (err) {
+  } catch (err: unknown) {
     throw new CliError('network_error', err instanceof Error ? err.message : String(err), {
       nextSteps: { action: 'check_url_reachable', suggestion: 'Verify the URL is reachable from this machine.' },
     });

@@ -25,7 +25,7 @@ export async function loadConfig(): Promise<Config> {
       version,
       preferred_chains: parsePreferredChains(parsed.preferred_chains),
     };
-  } catch (err) {
+  } catch (err: unknown) {
     if (isNotFound(err)) return { version: CONFIG_VERSION };
     throw err;
   }

@@ -13,7 +13,7 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | File | Purpose |
 |------|---------|
 | `src/index.ts` | Shebang + error handler, entry point for the `agentscore-pay` bin |
-| `src/cli.ts` | commander program definition |
+| `src/cli.ts` | incur Cli definition (zod-typed args/options, structured envelopes, built-in `--mcp` / `--llms`) |
 | `src/keystore.ts` | AES-256-GCM + scrypt encrypted keystore (generic, chain-agnostic) |
 | `src/wallets.ts` | Wallet factory dispatching to chain modules |
 | `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_PAY_PASSPHRASE` env) |
@@ -21,12 +21,14 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/chains/base.ts` | EVM adapter (x402): viem Account, USDC balance, EIP-681 QR URI |
 | `src/chains/solana.ts` | SVM adapter (x402): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
 | `src/chains/tempo.ts` | EVM adapter (MPP): viem Account on chain 4217, USDC.e balance, EIP-681 QR URI |
-| `src/commands/wallet.ts` | `wallet create/import/address` |
+| `src/commands/wallet.ts` | `wallet create/import/address/list/remove/export/show-mnemonic` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
-| `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo prints `tempo wallet fund` hint) |
+| `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo testnet uses programmatic mint) |
 | `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
-| `tests/` | Vitest unit tests (keystore + QR URI shape per chain) |
+| `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
+| `src/progress.ts` | stderr-only structured progress events (stdout belongs to incur) |
+| `tests/` | Vitest unit tests |
 | `dist/` | tsup output — ESM only with shebang banner |
 
 ## Chain-to-protocol routing

@@ -33,7 +33,7 @@ export async function balance(ownerBase58: string, network: Network = 'mainnet')
     const ata = accounts.value[0].pubkey;
     const token = await fetchToken(rpc, ata);
     return token.data.amount;
-  } catch (err) {
+  } catch (err: unknown) {
     throw wrapRpcError('solana', network, err);
   }
 }

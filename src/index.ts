@@ -1,5 +1,4 @@
 import { run } from './cli';
-import { getMode, writeError } from './output';
 import { getNoticeIfNewer, refreshCacheAwaited, refreshCacheInBackground } from './update-check';
 
 declare const __VERSION__: string;
@@ -7,21 +6,25 @@ declare const __VERSION__: string;
 const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0-dev';
 
 async function emitUpdateNoticeIfAvailable(): Promise<void> {
-  if (getMode() !== 'human') return;
+  if (!process.stdout.isTTY) return;
   const latest = await getNoticeIfNewer(VERSION);
   if (latest) {
-    process.stderr.write(`\n  → A newer @agent-score/pay is available: ${latest} (you have ${VERSION}). Update with: npm i -g @agent-score/pay\n`);
+    process.stderr.write(
+      `\n  → A newer @agent-score/pay is available: ${latest} (you have ${VERSION}). Update with: npm i -g @agent-score/pay\n`,
+    );
   }
 }
 
-run(process.argv)
+run()
   .then(async () => {
     await emitUpdateNoticeIfAvailable();
     refreshCacheInBackground();
   })
   .catch(async (err: unknown) => {
+    // incur's serve() handles its own error formatting + exit codes for thrown errors
+    // from command handlers. This catch only fires on unexpected runtime crashes.
     const e = err instanceof Error ? err : new Error(String(err));
-    const code = writeError(e);
+    process.stderr.write(`agentscore-pay: ${e.message}\n`);
     await refreshCacheAwaited();
-    process.exit(code);
+    process.exit(1);
   });

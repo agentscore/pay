@@ -45,7 +45,7 @@ export async function balance(address: string, network: Network = 'mainnet'): Pr
       functionName: 'balanceOf',
       args: [address as Hex],
     });
-  } catch (err) {
+  } catch (err: unknown) {
     throw wrapRpcError('base', network, err);
   }
 }
