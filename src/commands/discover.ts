@@ -1,7 +1,6 @@
-import { bold, cyan, dim, yellow } from '../colors';
 import { CliError } from '../errors';
-import { isJson, writeJson, writeLine } from '../output';
 import { chainFromNetworkId } from '../quotes';
+import { lookupRailHint, type RailHint } from '../rail-hints';
 import type { Chain } from '../constants';
 
 const X402_BAZAAR_URL = 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources';
@@ -78,6 +77,8 @@ interface NormalizedRail {
   price_usd?: number;
   pay_to?: string;
   asset?: string;
+  natively_supported: boolean;
+  hint?: RailHint;
 }
 
 interface NormalizedService {
@@ -90,7 +91,14 @@ interface NormalizedService {
   cheapest_usd?: number;
 }
 
-export async function discover(opts: DiscoverOptions = {}): Promise<void> {
+export interface DiscoverResult {
+  count: number;
+  returned: number;
+  sources_failed: string[];
+  services: NormalizedService[];
+}
+
+export async function discover(opts: DiscoverOptions = {}): Promise<DiscoverResult> {
   const protocol = opts.protocol ?? 'both';
   const sources: Promise<NormalizedService[]>[] = [];
   if (protocol === 'x402' || protocol === 'both') sources.push(fetchX402());
@@ -113,38 +121,12 @@ export async function discover(opts: DiscoverOptions = {}): Promise<void> {
   const filtered = applyFilters(merged, opts);
   const limited = opts.limit ? filtered.slice(0, opts.limit) : filtered;
 
-  if (isJson()) {
-    writeJson({
-      count: filtered.length,
-      returned: limited.length,
-      sources_failed: errors,
-      services: limited,
-    });
-    return;
-  }
-
-  if (limited.length === 0) {
-    writeLine(yellow('No services match the given filters.'));
-    return;
-  }
-
-  writeLine(`${bold(String(limited.length))} services from ${dim('x402 Bazaar + mpp.dev/services')}:`);
-  writeLine('');
-  for (const svc of limited) {
-    const price = svc.cheapest_usd !== undefined ? `$${svc.cheapest_usd.toFixed(svc.cheapest_usd < 0.01 ? 4 : 2)}` : '?';
-    const tag = svc.source === 'x402' ? dim('[x402]') : dim('[mpp]');
-    writeLine(`  ${bold(price.padStart(8))}  ${tag}  ${cyan(svc.url ?? svc.domain ?? '(unknown)')}`);
-    if (svc.description) writeLine(`                    ${dim(svc.description.slice(0, 76))}`);
-    const railSummary = svc.rails
-      .filter((r) => r.chain)
-      .map((r) => `${r.chain}/${r.scheme ?? svc.source}`)
-      .join(', ');
-    if (railSummary) writeLine(`                    ${dim(`rails: ${railSummary}`)}`);
-  }
-  if (errors.length > 0) {
-    writeLine('');
-    writeLine(yellow(`(some sources failed: ${errors.join('; ')})`));
-  }
+  return {
+    count: filtered.length,
+    returned: limited.length,
+    sources_failed: errors,
+    services: limited,
+  };
 }
 
 async function fetchWithTimeout(url: string, label: string): Promise<unknown> {
@@ -156,7 +138,7 @@ async function fetchWithTimeout(url: string, label: string): Promise<unknown> {
       throw new Error(`${label} returned ${res.status}: ${res.statusText}`);
     }
     return await res.json();
-  } catch (err) {
+  } catch (err: unknown) {
     if (controller.signal.aborted) {
       throw new Error(`${label} request timed out after ${FETCH_TIMEOUT_MS / 1000}s`);
     }
@@ -192,13 +174,16 @@ function normalizeX402(item: BazaarItem): NormalizedService {
         price_usd = undefined;
       }
     }
+    const chain = chainFromNetworkId(a.network);
     return {
-      chain: chainFromNetworkId(a.network),
+      chain,
       network: a.network,
       scheme: a.scheme,
       price_usd,
       pay_to: a.payTo,
       asset: a.asset,
+      natively_supported: chain !== null,
+      hint: chain === null ? lookupRailHint({ network: a.network, scheme: a.scheme }) : undefined,
     };
   });
   const prices = rails.map((r) => r.price_usd).filter((p): p is number => typeof p === 'number');
@@ -231,6 +216,8 @@ function normalizeMpp(svc: MppService): NormalizedService {
       scheme: ep.payment.method,
       price_usd,
       asset: ep.payment.currency,
+      natively_supported: chain !== null,
+      hint: chain === null ? lookupRailHint({ method: ep.payment.method }) : undefined,
     });
   }
   const prices = rails.map((r) => r.price_usd).filter((p): p is number => typeof p === 'number');

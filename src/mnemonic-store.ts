@@ -59,7 +59,7 @@ export async function mnemonicExists(): Promise<boolean> {
 export async function clearMnemonic(): Promise<void> {
   try {
     await rm(mnemonicPath());
-  } catch (err) {
+  } catch (err: unknown) {
     if (!err || typeof err !== 'object' || !('code' in err) || (err as { code: string }).code !== 'ENOENT') {
       throw err;
     }

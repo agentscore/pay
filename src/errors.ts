@@ -18,6 +18,7 @@ export type ErrorCode =
   | 'user_cancelled'
   | 'config_error'
   | 'merchant_error'
+  | 'merchant_spec_violation'
   | 'session_timeout'
   | 'unknown';
 
@@ -39,6 +40,8 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
     case 'merchant_error':
     case 'session_timeout':
       return EXIT_CODES.NETWORK_ERROR;
+    case 'merchant_spec_violation':
+      return EXIT_CODES.PAYMENT_REJECTED;
     case 'insufficient_balance':
     case 'no_funded_rail':
       return EXIT_CODES.INSUFFICIENT_FUNDS;

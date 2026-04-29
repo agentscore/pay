@@ -2,14 +2,14 @@ import { spawn } from 'child_process';
 import { CliError } from '../errors';
 import { faucetUrls, tempoFaucetNote } from '../faucets';
 import { loadKeystore } from '../keystore';
-import { isJson, writeJson, writeLine } from '../output';
 import type { Chain, Network } from '../constants';
 
-interface FaucetInfo {
+export interface FaucetResult {
   chain: Chain;
   network: Network;
   address: string;
   faucet_urls: string[];
+  address_copied_to_clipboard: boolean;
   notes?: string;
 }
 
@@ -36,8 +36,8 @@ async function copyToClipboard(text: string): Promise<boolean> {
   return false;
 }
 
-export async function faucet(chain: Chain, network: Network): Promise<void> {
-  if (network !== 'testnet') {
+export async function faucet(input: { chain: Chain; network: Network }): Promise<FaucetResult> {
+  if (input.network !== 'testnet') {
     throw new CliError('invalid_input', 'faucet only supports --network testnet.', {
       nextSteps: {
         action: 'pass_testnet_flag',
@@ -46,35 +46,16 @@ export async function faucet(chain: Chain, network: Network): Promise<void> {
     });
   }
 
-  const ks = await loadKeystore(chain);
-  const urls = faucetUrls(chain, network);
-  const info: FaucetInfo = {
-    chain,
-    network,
-    address: ks.address,
-    faucet_urls: urls,
-  };
-  if (chain === 'tempo') info.notes = tempoFaucetNote();
-
+  const ks = await loadKeystore(input.chain);
+  const urls = faucetUrls(input.chain, input.network);
   const copied = await copyToClipboard(ks.address);
 
-  if (isJson()) {
-    writeJson({ ...info, address_copied_to_clipboard: copied });
-    return;
-  }
-
-  writeLine(`Faucet for ${chain} ${network}`);
-  writeLine('');
-  writeLine(`  Your address: ${ks.address}${copied ? '  (copied to clipboard)' : ''}`);
-  writeLine('');
-  if (info.notes) {
-    writeLine(info.notes);
-    return;
-  }
-  if (urls.length === 0) {
-    writeLine('No public faucet URL registered for this chain; see Tempo-style testnet notes above.');
-    return;
-  }
-  writeLine('Paste the address on any of these faucets:');
-  for (const url of urls) writeLine(`  • ${url}`);
+  return {
+    chain: input.chain,
+    network: input.network,
+    address: ks.address,
+    faucet_urls: urls,
+    address_copied_to_clipboard: copied,
+    ...(input.chain === 'tempo' ? { notes: tempoFaucetNote() } : {}),
+  };
 }

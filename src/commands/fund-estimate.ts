@@ -2,9 +2,9 @@ import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { CliError } from '../errors';
+import { mergeHeaders } from '../headers';
 import { keystoreExists, loadKeystore } from '../keystore';
-import { isJson, writeJson, writeLine } from '../output';
-import { parseBody, type RailQuote } from '../quotes';
+import { parseBody, type RailQuote, type UnsupportedRail } from '../quotes';
 import type { Chain, Network } from '../constants';
 
 export interface FundEstimateOptions {
@@ -26,16 +26,31 @@ async function balanceUsd(chain: Chain, network: Network, address: string): Prom
   return Number(raw) / 1_000_000;
 }
 
-export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
+export interface FundEstimateResult {
+  url: string;
+  method: string;
+  payment_required: boolean;
+  status?: number;
+  quotes?: Array<RailQuote & {
+    has_wallet: boolean;
+    balance_usd: number | null;
+    calls_affordable: number | null;
+    deficit_for_one_usd: number | null;
+    suggested_top_up_usd_for_10_calls: number | null;
+  }>;
+  unsupported_rails?: UnsupportedRail[];
+}
+
+export async function fundEstimate(opts: FundEstimateOptions): Promise<FundEstimateResult> {
   const network: Network = opts.network ?? 'mainnet';
   const init: RequestInit = { method: opts.method };
   if (opts.body !== undefined) init.body = opts.body;
-  init.headers = { 'Content-Type': 'application/json', ...(opts.headers ?? {}) };
+  init.headers = mergeHeaders({ 'Content-Type': 'application/json' }, opts.headers);
 
   let res: Response;
   try {
     res = await fetch(opts.url, init);
-  } catch (err) {
+  } catch (err: unknown) {
     throw new CliError('network_error', err instanceof Error ? err.message : String(err), {
       nextSteps: { action: 'check_url_reachable' },
     });
@@ -49,19 +64,23 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
   }
 
   if (res.status !== 402) {
-    if (isJson()) {
-      writeJson({ payment_required: false, status: res.status });
-    } else {
-      writeLine(`${opts.url} does not require payment (HTTP ${res.status}). Nothing to fund for.`);
-    }
-    return;
+    return { url: opts.url, method: opts.method, payment_required: false, status: res.status };
   }
 
-  const quotes: RailQuote[] = parseBody(body);
+  const { supported: quotes, unsupported }: { supported: RailQuote[]; unsupported: UnsupportedRail[] } = parseBody(body, res.headers);
   if (quotes.length === 0) {
-    throw new CliError('merchant_error', 'Could not parse any rails from 402 body.', {
-      extra: { raw_body: text.slice(0, 2000) },
-    });
+    throw new CliError(
+      'merchant_error',
+      unsupported.length > 0
+        ? `Merchant only accepts rails not natively supported by agentscore-pay: ${unsupported.map(formatUnsupportedLabel).join(', ')}.`
+        : 'Could not parse any rails from 402 body.',
+      {
+        extra: {
+          raw_body: text.slice(0, 2000),
+          ...(unsupported.length > 0 ? { unsupported_rails: unsupported } : {}),
+        },
+      },
+    );
   }
 
   const rows = await Promise.all(
@@ -91,28 +110,17 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<void> {
 
   if (opts.chain) rows.sort((a, b) => (a.chain === opts.chain ? -1 : b.chain === opts.chain ? 1 : 0));
 
-  if (isJson()) {
-    writeJson({
-      url: opts.url,
-      method: opts.method,
-      payment_required: true,
-      quotes: rows,
-    });
-    return;
-  }
+  return {
+    url: opts.url,
+    method: opts.method,
+    payment_required: true,
+    quotes: rows,
+    ...(unsupported.length > 0 ? { unsupported_rails: unsupported } : {}),
+  };
+}
 
-  writeLine(`${opts.method} ${opts.url} → 402`);
-  writeLine('');
-  writeLine('Chain     Protocol  Price       Balance     Calls   Suggested top-up');
-  for (const r of rows) {
-    const price = r.price_usd !== undefined ? `$${r.price_usd.toFixed(6)}` : '?';
-    const balance = r.balance_usd !== null ? `$${r.balance_usd.toFixed(6)}` : '(no wallet)';
-    const calls =
-      r.calls_affordable === null ? '-' : r.calls_affordable === 0 ? 'none' : String(r.calls_affordable);
-    const topUp = r.suggested_top_up_usd_for_10_calls ?? 0;
-    const suggest = topUp > 0 ? `fund ~$${topUp.toFixed(2)} for 10 calls` : 'covered';
-    writeLine(
-      `${r.chain.padEnd(9)} ${r.protocol.padEnd(9)} ${price.padStart(10)}  ${balance.padStart(12)}  ${calls.padStart(6)}  ${suggest}`,
-    );
-  }
+function formatUnsupportedLabel(u: UnsupportedRail): string {
+  if (u.hint?.name) return u.hint.name;
+  if (u.protocol === 'x402') return `${u.scheme ?? 'exact'}/${u.network ?? 'unknown'}`;
+  return u.method ?? u.network ?? 'unknown';
 }

@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const ROOT = '/tmp/pay-init-test';
 
@@ -49,47 +49,31 @@ async function plantMnemonic() {
 
 describe('init command', () => {
   let originalHome: string | undefined;
-  let stdout: ReturnType<typeof vi.spyOn>;
-  let stderr: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     originalHome = process.env.HOME;
     process.env.HOME = ROOT;
     process.env.AGENTSCORE_PAY_PASSPHRASE = 'integration-test-pass';
     await setup();
-    stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    vi.resetModules();
   });
 
   afterEach(async () => {
     process.env.HOME = originalHome;
     delete process.env.AGENTSCORE_PAY_PASSPHRASE;
-    stdout.mockRestore();
-    stderr.mockRestore();
     await rm(ROOT, { recursive: true, force: true });
   });
 
-  function jsonOutput() {
-    return JSON.parse(stdout.mock.calls.map((c) => String(c[0])).join('').trim());
-  }
-
   it('reports already_initialized when all 3 keystores exist', async () => {
     for (const c of ['base', 'solana', 'tempo']) await plantKeystore(c);
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { init } = await import('../src/commands/init');
-    await init({ mnemonic: false });
-    const out = jsonOutput();
-    expect(out.already_initialized).toBe(true);
-    expect(out.existing_wallets).toEqual(['base', 'solana', 'tempo']);
+    const result = await init({ mnemonic: false });
+    expect(result.already_initialized).toBe(true);
+    expect(result.existing_wallets).toEqual(['base', 'solana', 'tempo']);
   });
 
   it('refuses --no-mnemonic when mnemonic exists and chains are missing', async () => {
     await plantMnemonic();
-    await plantKeystore('base'); // only base exists
-    const { setMode } = await import('../src/output');
-    setMode('json');
+    await plantKeystore('base');
     const { init } = await import('../src/commands/init');
     await expect(init({ mnemonic: false })).rejects.toMatchObject({
       code: 'wallet_exists',
@@ -99,8 +83,6 @@ describe('init command', () => {
 
   it('refuses --mnemonic when mnemonic.json already exists', async () => {
     await plantMnemonic();
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { init } = await import('../src/commands/init');
     await expect(init({ mnemonic: true })).rejects.toMatchObject({
       code: 'wallet_exists',

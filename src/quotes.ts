@@ -1,4 +1,6 @@
-import type { Chain } from './constants';
+import { isKnownUSDC, type Chain } from './constants';
+import { lookupRailHint, type RailHint } from './rail-hints';
+import { challengeToRail, parsePaymentChallenges } from './www-authenticate';
 
 function safeBigInt(raw: string): bigint | null {
   try {
@@ -18,9 +20,26 @@ export interface RailQuote {
   protocol: 'x402' | 'mpp';
 }
 
+export interface UnsupportedRail {
+  protocol: 'x402' | 'mpp';
+  scheme?: string;
+  method?: string;
+  network?: string;
+  asset?: string;
+  pay_to?: string;
+  price_raw?: string;
+  hint?: RailHint;
+}
+
+export interface ParsedRails {
+  supported: RailQuote[];
+  unsupported: UnsupportedRail[];
+}
+
 interface X402Accept {
   scheme?: string;
   network?: string;
+  amount?: string;
   maxAmountRequired?: string;
   asset?: string;
   payTo?: string;
@@ -44,20 +63,35 @@ export function chainFromNetworkId(net?: string): Chain | null {
   return null;
 }
 
-export function parseBody(body: unknown): RailQuote[] {
-  if (!body || typeof body !== 'object') return [];
-  const record = body as Record<string, unknown>;
-  const quotes: RailQuote[] = [];
+export function parseBody(body: unknown, headers?: Headers): ParsedRails {
+  const supported: RailQuote[] = [];
+  const unsupported: UnsupportedRail[] = [];
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
 
   if (Array.isArray(record.accepts)) {
     for (const a of record.accepts as X402Accept[]) {
       const chain = chainFromNetworkId(a.network);
-      if (!chain) continue;
-      const decimals = a.extra?.decimals ?? 6;
-      const priceRaw = a.maxAmountRequired ?? '0';
+      // x402 v1 → maxAmountRequired; v2 → amount. Decimals not at top level; use
+      // extra.decimals if present, else canonical USDC = 6, else leave undefined
+      // rather than display a wrong value.
+      const priceRaw = a.amount ?? a.maxAmountRequired ?? '0';
+      if (!chain) {
+        unsupported.push({
+          protocol: 'x402',
+          scheme: a.scheme,
+          network: a.network,
+          asset: a.asset,
+          pay_to: a.payTo,
+          price_raw: priceRaw,
+          hint: lookupRailHint({ network: a.network, scheme: a.scheme }),
+        });
+        continue;
+      }
+      const declaredDecimals = a.extra?.decimals;
+      const decimals = declaredDecimals ?? (isKnownUSDC(a.asset, chain) ? 6 : undefined);
       const parsed = safeBigInt(priceRaw);
-      const priceUsd = parsed === null ? undefined : Number(parsed) / 10 ** decimals;
-      quotes.push({
+      const priceUsd = decimals !== undefined && parsed !== null ? Number(parsed) / 10 ** decimals : undefined;
+      supported.push({
         chain,
         price_usd: priceUsd,
         decimals,
@@ -75,8 +109,18 @@ export function parseBody(body: unknown): RailQuote[] {
       let chain: Chain | null = null;
       if (m.method?.startsWith('tempo/')) chain = 'tempo';
       else chain = chainFromNetworkId(m.network);
-      if (!chain) continue;
-      quotes.push({
+      if (!chain) {
+        unsupported.push({
+          protocol: 'mpp',
+          method: m.method,
+          network: m.network,
+          asset: m.token,
+          pay_to: m.pay_to,
+          hint: lookupRailHint({ method: m.method, network: m.network }),
+        });
+        continue;
+      }
+      supported.push({
         chain,
         price_usd: Number.isFinite(amountUsd) && amountUsd > 0 ? amountUsd : undefined,
         decimals: m.decimals ?? 6,
@@ -87,5 +131,39 @@ export function parseBody(body: unknown): RailQuote[] {
     }
   }
 
-  return quotes;
+  if (headers) {
+    for (const c of parsePaymentChallenges(headers)) {
+      const r = challengeToRail(c);
+      const chain = chainFromMethodOrNetwork(r.scheme, r.network);
+      if (!chain) {
+        unsupported.push({
+          protocol: 'mpp',
+          method: r.scheme,
+          network: r.network,
+          asset: r.asset,
+          pay_to: r.pay_to,
+          price_raw: r.price_raw,
+          hint: r.hint,
+        });
+        continue;
+      }
+      const priceUsdNum = r.price_usd !== undefined ? Number(r.price_usd) : undefined;
+      supported.push({
+        chain,
+        price_usd: priceUsdNum !== undefined && Number.isFinite(priceUsdNum) ? priceUsdNum : undefined,
+        decimals: 6,
+        price_raw: r.price_raw,
+        asset: r.asset,
+        pay_to: r.pay_to,
+        protocol: 'mpp',
+      });
+    }
+  }
+
+  return { supported, unsupported };
+}
+
+function chainFromMethodOrNetwork(method?: string, network?: string): Chain | null {
+  if (method && /^tempo(\/|$)/i.test(method)) return 'tempo';
+  return chainFromNetworkId(network);
 }

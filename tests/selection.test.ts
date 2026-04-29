@@ -199,7 +199,7 @@ describe('selectRail', () => {
       try {
         await selectRail({ walletName: 'agent-1' });
         throw new Error('should have rejected');
-      } catch (err) {
+      } catch (err: unknown) {
         expect((err as { extra: Record<string, unknown> }).extra.wallet_name).toBe('agent-1');
       }
     });

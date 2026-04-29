@@ -48,7 +48,7 @@ export async function readEntriesWithMeta(limit?: number): Promise<ReadEntriesRe
       .filter((e): e is LedgerEntry => e !== null);
     entries.reverse();
     return { entries: limit ? entries.slice(0, limit) : entries, malformed_lines: malformed };
-  } catch (err) {
+  } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') {
       return { entries: [], malformed_lines: 0 };
     }

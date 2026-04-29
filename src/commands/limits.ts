@@ -1,32 +1,19 @@
-import { bold, dim, green } from '../colors';
 import { CliError } from '../errors';
 import { clearLimits, limitsPath, loadLimits, saveLimits, type Limits } from '../limits';
-import { isJson, writeJson, writeLine } from '../output';
 
-export interface LimitsSetOptions {
+export interface LimitsSetInput {
   daily?: number;
   perCall?: number;
   perMerchant?: number;
 }
 
-export async function limitsShow(): Promise<void> {
+export async function limitsShow(): Promise<{ path: string; limits: Limits }> {
   const limits = await loadLimits();
-  if (isJson()) {
-    writeJson({ path: limitsPath(), limits });
-    return;
-  }
-  writeLine(`${bold('Limits file')}: ${dim(limitsPath())}`);
-  if (!limits.per_call_usd && !limits.daily_usd && !limits.per_merchant_usd) {
-    writeLine(dim('No limits set.'));
-    return;
-  }
-  if (limits.per_call_usd !== undefined) writeLine(`  per-call:     ${bold('$' + limits.per_call_usd)}`);
-  if (limits.daily_usd !== undefined) writeLine(`  daily:        ${bold('$' + limits.daily_usd)}`);
-  if (limits.per_merchant_usd !== undefined) writeLine(`  per-merchant: ${bold('$' + limits.per_merchant_usd)}`);
+  return { path: limitsPath(), limits };
 }
 
-export async function limitsSet(opts: LimitsSetOptions): Promise<void> {
-  const anySet = opts.daily !== undefined || opts.perCall !== undefined || opts.perMerchant !== undefined;
+export async function limitsSet(input: LimitsSetInput): Promise<{ path: string; limits: Limits }> {
+  const anySet = input.daily !== undefined || input.perCall !== undefined || input.perMerchant !== undefined;
   if (!anySet) {
     throw new CliError('invalid_input', 'Pass at least one of --daily, --per-call, --per-merchant.', {
       nextSteps: { action: 'supply_flag', suggestion: 'Example: limits set --daily 50 --per-call 5' },
@@ -34,23 +21,14 @@ export async function limitsSet(opts: LimitsSetOptions): Promise<void> {
   }
   const current = await loadLimits();
   const next: Limits = { ...current };
-  if (opts.daily !== undefined) next.daily_usd = opts.daily;
-  if (opts.perCall !== undefined) next.per_call_usd = opts.perCall;
-  if (opts.perMerchant !== undefined) next.per_merchant_usd = opts.perMerchant;
+  if (input.daily !== undefined) next.daily_usd = input.daily;
+  if (input.perCall !== undefined) next.per_call_usd = input.perCall;
+  if (input.perMerchant !== undefined) next.per_merchant_usd = input.perMerchant;
   await saveLimits(next);
-  if (isJson()) {
-    writeJson({ path: limitsPath(), limits: next });
-    return;
-  }
-  writeLine(`${green('✓')} Limits saved:`);
-  await limitsShow();
+  return { path: limitsPath(), limits: next };
 }
 
-export async function limitsClear(): Promise<void> {
+export async function limitsClear(): Promise<{ cleared: true; path: string }> {
   await clearLimits();
-  if (isJson()) {
-    writeJson({ cleared: true, path: limitsPath() });
-    return;
-  }
-  writeLine(`${green('✓')} Limits cleared.`);
+  return { cleared: true, path: limitsPath() };
 }

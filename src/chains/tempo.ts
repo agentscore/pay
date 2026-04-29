@@ -37,7 +37,7 @@ export async function balance(address: string, network: Network = 'mainnet'): Pr
       functionName: 'balanceOf',
       args: [address as Hex],
     });
-  } catch (err) {
+  } catch (err: unknown) {
     throw wrapRpcError('tempo', network, err);
   }
 }
@@ -74,13 +74,13 @@ export async function fundTestnet(address: string): Promise<string[]> {
         id: 1,
       }),
     });
-  } catch (err) {
+  } catch (err: unknown) {
     throw wrapRpcError('tempo', 'testnet', err);
   }
   let body: { result?: string[]; error?: { code: number; message: string } };
   try {
     body = (await res.json()) as typeof body;
-  } catch (err) {
+  } catch (err: unknown) {
     throw wrapRpcError('tempo', 'testnet', err);
   }
   if (body.error) {

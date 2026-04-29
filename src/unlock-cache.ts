@@ -46,7 +46,7 @@ export async function clearCache(): Promise<boolean> {
   try {
     await rm(unlockCachePath());
     return true;
-  } catch (err) {
+  } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ENOENT') return false;
     throw err;
   }

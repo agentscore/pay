@@ -1,5 +1,9 @@
+import { isKnownUSDC } from '../constants';
 import { CliError } from '../errors';
-import { isJson, writeJson, writeLine } from '../output';
+import { mergeHeaders } from '../headers';
+import { chainFromNetworkId } from '../quotes';
+import { lookupRailHint, type RailHint } from '../rail-hints';
+import { challengeToRail, parsePaymentChallenges } from '../www-authenticate';
 
 export interface CheckOptions {
   method: string;
@@ -11,6 +15,7 @@ export interface CheckOptions {
 interface X402Accept {
   scheme?: string;
   network?: string;
+  amount?: string;
   maxAmountRequired?: string;
   asset?: string;
   payTo?: string;
@@ -36,6 +41,8 @@ interface RailSummary {
   price_raw?: string;
   asset?: string;
   pay_to?: string;
+  natively_supported: boolean;
+  hint?: RailHint;
 }
 
 function safeBigInt(raw: string): bigint | null {
@@ -50,10 +57,17 @@ function normalizeX402(body: unknown): RailSummary[] {
   const record = body as { accepts?: X402Accept[] };
   const accepts = Array.isArray(record.accepts) ? record.accepts : [];
   return accepts.map((a) => {
-    const decimals = a.extra?.decimals ?? 6;
-    const raw = a.maxAmountRequired ?? '0';
+    const chain = chainFromNetworkId(a.network);
+    // x402 v1 uses `maxAmountRequired`; v2 uses `amount`. Decimals is never carried
+    // at the top level — extra.decimals is best-effort, otherwise canonical USDC = 6,
+    // unknown asset = leave price_usd undefined rather than displaying a wrong value.
+    const declaredDecimals = a.extra?.decimals;
+    const decimals = declaredDecimals ?? (chain && isKnownUSDC(a.asset, chain) ? 6 : null);
+    const raw = a.amount ?? a.maxAmountRequired ?? '0';
     const parsed = safeBigInt(raw);
-    const priceUsd = parsed === null ? undefined : (Number(parsed) / 10 ** decimals).toFixed(decimals);
+    const priceUsd =
+      decimals !== null && parsed !== null ? (Number(parsed) / 10 ** decimals).toFixed(decimals) : undefined;
+    const natively_supported = chain !== null;
     return {
       protocol: 'x402',
       rail: `${a.scheme ?? 'exact'}/${a.network ?? 'unknown'}`,
@@ -62,33 +76,64 @@ function normalizeX402(body: unknown): RailSummary[] {
       price_raw: raw,
       asset: a.asset,
       pay_to: a.payTo,
+      natively_supported,
+      hint: natively_supported ? undefined : lookupRailHint({ network: a.network, scheme: a.scheme }),
     } satisfies RailSummary;
   });
+}
+
+function challengeRailToSummary(c: ReturnType<typeof challengeToRail>): RailSummary {
+  return {
+    protocol: 'mpp',
+    rail: c.rail,
+    network: c.network,
+    price_usd: c.price_usd,
+    price_raw: c.price_raw,
+    asset: c.asset,
+    pay_to: c.pay_to,
+    natively_supported: c.natively_supported,
+    hint: c.hint,
+  };
 }
 
 function normalizeMpp(body: unknown): RailSummary[] {
   const record = body as { accepted_methods?: MppAccept[] };
   const accepts = Array.isArray(record.accepted_methods) ? record.accepted_methods : [];
   const amountUsd = (body as { amount_usd?: string }).amount_usd;
-  return accepts.map((a) => ({
-    protocol: 'mpp',
-    rail: a.method ?? 'unknown',
-    network: a.network ?? (a.chain_id ? `eip155:${a.chain_id}` : undefined),
-    price_usd: amountUsd,
-    asset: a.token,
-    pay_to: a.pay_to,
-  } satisfies RailSummary));
+  return accepts.map((a) => {
+    const network = a.network ?? (a.chain_id ? `eip155:${a.chain_id}` : undefined);
+    const natively_supported = a.method?.startsWith('tempo/') === true || chainFromNetworkId(network) !== null;
+    return {
+      protocol: 'mpp',
+      rail: a.method ?? 'unknown',
+      network,
+      price_usd: amountUsd,
+      asset: a.token,
+      pay_to: a.pay_to,
+      natively_supported,
+      hint: natively_supported ? undefined : lookupRailHint({ method: a.method, network }),
+    } satisfies RailSummary;
+  });
 }
 
-export async function check(opts: CheckOptions): Promise<void> {
+export interface CheckResult {
+  status: number;
+  status_text: string;
+  payment_required: boolean;
+  protocol?: 'x402' | 'mpp' | 'both' | 'unknown';
+  rails?: RailSummary[];
+  body: unknown;
+}
+
+export async function check(opts: CheckOptions): Promise<CheckResult> {
   const init: RequestInit = { method: opts.method };
   if (opts.body !== undefined) init.body = opts.body;
-  init.headers = { 'Content-Type': 'application/json', ...(opts.headers ?? {}) };
+  init.headers = mergeHeaders({ 'Content-Type': 'application/json' }, opts.headers);
 
   let res: Response;
   try {
     res = await fetch(opts.url, init);
-  } catch (err) {
+  } catch (err: unknown) {
     throw new CliError('network_error', err instanceof Error ? err.message : String(err), {
       nextSteps: { action: 'check_url_reachable', suggestion: 'Verify the URL is reachable from this machine.' },
     });
@@ -103,24 +148,13 @@ export async function check(opts: CheckOptions): Promise<void> {
   }
 
   if (res.status !== 402) {
-    const payload = {
-      status: res.status,
-      status_text: res.statusText,
-      payment_required: false,
-      body,
-    };
-    if (isJson()) {
-      writeJson(payload);
-    } else {
-      writeLine(`${opts.method} ${opts.url} → ${res.status} ${res.statusText}`);
-      writeLine('No payment required (endpoint returned non-402 status).');
-    }
-    return;
+    return { status: res.status, status_text: res.statusText, payment_required: false, body };
   }
 
   const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const isX402 = Array.isArray(record.accepts);
   const isMpp = Array.isArray(record.accepted_methods);
+  const challenges = parsePaymentChallenges(res.headers);
 
   let rails: RailSummary[] = [];
   let protocol: 'x402' | 'mpp' | 'both' | 'unknown' = 'unknown';
@@ -134,30 +168,11 @@ export async function check(opts: CheckOptions): Promise<void> {
     rails = normalizeMpp(body);
     protocol = 'mpp';
   }
-
-  const payload = {
-    status: 402,
-    status_text: res.statusText,
-    payment_required: true,
-    protocol,
-    rails,
-    body,
-  };
-  if (isJson()) {
-    writeJson(payload);
-    return;
+  if (challenges.length > 0) {
+    rails = [...rails, ...challenges.map(challengeToRail).map(challengeRailToSummary)];
+    if (protocol === 'unknown') protocol = 'mpp';
+    else if (protocol === 'x402') protocol = 'both';
   }
 
-  writeLine(`${opts.method} ${opts.url} → 402 Payment Required (${protocol})`);
-  if (rails.length === 0) {
-    writeLine('  (could not parse accepted rails; see raw body below)');
-    writeLine(text);
-    return;
-  }
-  writeLine('');
-  writeLine('Accepted rails:');
-  for (const r of rails) {
-    const price = r.price_usd ? `$${r.price_usd}` : '?';
-    writeLine(`  ${r.protocol.padEnd(5)} ${r.rail.padEnd(28)} ${price.padStart(10)}  pay_to=${r.pay_to ?? 'n/a'}`);
-  }
+  return { status: 402, status_text: res.statusText, payment_required: true, protocol, rails, body };
 }

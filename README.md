@@ -3,9 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-CLI wallet for one-shell-command agent payments across **x402** (Base, Solana) and **MPP** (Tempo).
+**One CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command — natively across **x402** (Base, Solana) and **MPP** (Tempo), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
-Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire — but works across every rail an AgentScore-gated merchant might accept.
+Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## Install
 
@@ -51,7 +51,27 @@ agentscore-pay pay POST https://merchant.example/api --chain tempo -d '...' --ma
 
 ## Agents (scripting)
 
-Every command supports `--json` for machine-readable output. Errors go to stderr as structured JSON; success payloads go to stdout as JSON. Exit codes are stable:
+For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output) — it prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`unlock`, `limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
+
+### Output formats
+
+Every command emits structured data. Choose your format:
+
+| Flag | Format | Notes |
+|---|---|---|
+| _(default in pipes/agents)_ | TOON | token-efficient, ~40% fewer tokens than JSON |
+| `--json` / `--format json` | JSON | `JSON.parse()`-safe |
+| `--format yaml` | YAML | human-readable |
+| `--format md` | Markdown | tables — paste into PRs / issues / docs |
+| `--format jsonl` | JSON Lines | one record per line, streamable |
+
+Other useful global flags: `--filter-output <keys>` (prune to dot-paths), `--token-count` / `--token-limit n` / `--token-offset n` (manage large outputs), `--full-output` (full envelope with `meta.command` / `meta.duration`).
+
+When stdout is a TTY (humans), output goes pretty-printed. When piped/agent-consumed, you get the structured envelope automatically.
+
+### Errors and exit codes
+
+Errors emit `{ code, message, retryable, hint? }` on stderr. Exit codes are stable:
 
 | Code | Meaning |
 |---|---|
@@ -78,7 +98,34 @@ agentscore-pay pay POST https://merchant.example/api \
   -d '{"x":1}' --max-spend 5 --json
 ```
 
-When stdout is not a TTY (piped, redirected), `--plain` is automatically applied and structured output mirrors `--json`'s shape where applicable.
+### MCP server (one binary, every tool)
+
+Every command — wallet, payment, identity — is exposed as an MCP tool:
+
+```bash
+agentscore-pay --mcp                  # start as a stdio JSON-RPC MCP server
+agentscore-pay mcp add                # register with Claude Code / Cursor / Amp
+agentscore-pay --llms                 # markdown manifest of every command
+agentscore-pay --llms --format json   # JSON Schema manifest
+agentscore-pay <cmd> --schema         # JSON Schema for one command's args/options/output
+```
+
+`agentscore-pay skills add` and `agentscore-pay completions` register skill files and shell completions.
+
+### Idempotency on retry
+
+Every `pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-256 hash of `(url + method + body + signer)` — so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `pay` invocations).
+
+### Test-mode addresses
+
+AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. Pay exports `isAgentScoreTestAddress(addr)` from `@agent-score/pay/test-mode` and `AGENTSCORE_TEST_ADDRESSES` for completion / fixtures.
+
+### Decimals handling
+
+Spec-compliant 402 responses carry `decimals` in the rail requirements. When a merchant omits it, pay applies a strict policy to avoid silent mis-billing:
+
+- **Asset is canonical USDC** (matched against the per-chain Circle USDC registry pinned in pay) — silently use 6 decimals.
+- **Asset is anything else** — abort with `merchant_spec_violation`. Guessing decimals risks orders-of-magnitude mis-billing on tokens with non-6-decimal precision, so pay refuses to pay rather than continuing on partial info.
 
 ### Use from an agent — complete recipe
 
@@ -234,6 +281,19 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL — skip per-call prompts during a session |
 | `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
+### Identity commands (AgentScore SDK — paid tier, set `AGENTSCORE_API_KEY`)
+
+| Command | Purpose |
+|---|---|
+| `reputation <address> [--chain c]` | Cached trust reputation lookup (free tier) |
+| `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (paid tier) |
+| `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` |
+| `sessions get <id> [--poll-secret s]` | Poll a session — returns `operator_token` once status is `verified` |
+| `credentials create [--label s] [--ttl-days N]` | Mint an operator credential (`opc_...`) |
+| `credentials list` | List active (non-expired) credentials |
+| `credentials revoke <id>` | Revoke a credential by ID |
+| `associate-wallet --operator-token o --wallet-address a --network evm\|solana [--idempotency-key k]` | Report a signer wallet seen paying under a credential (cross-merchant attribution) |
+
 ## Mnemonic-based wallets
 
 ```bash
@@ -324,7 +384,7 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 ### Mainnet
 
 - **Base, Solana** — `agentscore-pay fund --chain base --amount 10` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR. Click the URL, or scan the QR from any mobile wallet with USDC to send yourself a transfer. `fund` polls balance and confirms when the deposit lands. Default amount is `$10` (~50-200 typical agent calls).
-- **Tempo** — Coinbase Onramp does not cover Tempo. Use `tempo wallet fund` or transfer USDC.e (chain 4217) from an existing Tempo wallet.
+- **Tempo** — Coinbase Onramp does not cover Tempo. Fund by transferring USDC.e (chain 4217) from another Tempo wallet.
 - **From an existing wallet (no onramp)** — `agentscore-pay wallet address --chain base` prints the address; send USDC on Base to it from MetaMask, Rabby, Coinbase Wallet, Phantom, or a CEX withdrawal. Same pattern on Solana + Tempo.
 
 ### Testnet
@@ -409,15 +469,17 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 | `SOLANA_DEVNET_RPC_URL` | override Solana Devnet RPC endpoint |
 | `TEMPO_RPC_URL` | override Tempo mainnet RPC endpoint |
 | `TEMPO_TESTNET_RPC_URL` | override Tempo testnet RPC endpoint |
+| `AGENTSCORE_API_KEY` | API key for identity commands (`assess`, `sessions`, `credentials`, `associate-wallet`, `reputation`) |
 
 ## Relationship to other AgentScore packages
 
-- [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
-- [`@agent-score/gate`](https://www.npmjs.com/package/@agent-score/gate) — merchant-side trust-gating middleware
-- [`@agent-score/mcp`](https://www.npmjs.com/package/@agent-score/mcp) — MCP server for AgentScore tools
-- **`@agent-score/pay`** (this package) — agent-side CLI wallet across x402 and MPP rails
+`@agent-score/pay` is the universal agent-payment CLI; it works with any 402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
 
-Wallet-to-operator linking happens merchant-side via `captureWallet` in `@agent-score/gate` — this CLI does not duplicate the `POST /v1/credentials/wallets` call.
+- [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
+- [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce) — merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers
+- **`@agent-score/pay`** (this package) — agent-side CLI: wallet + payment across x402/MPP rails + identity commands (assess, sessions, credentials, associate-wallet, reputation). Doubles as an MCP server via `--mcp`.
+
+When a merchant uses `@agent-score/commerce`, wallet-to-operator linking happens merchant-side via `captureWallet` — pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## License
 

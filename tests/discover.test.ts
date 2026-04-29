@@ -39,23 +39,16 @@ describe('discover', () => {
     vi.resetModules();
   });
 
-  it('lists all services in JSON mode', async () => {
+  it('lists all services', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => sampleBazaar,
     } as Response);
-    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { discover } = await import('../src/commands/discover');
-    await discover({});
-    const calls = stdout.mock.calls.map((c) => String(c[0])).join('');
-    const payload = JSON.parse(calls);
-    expect(payload.count).toBe(2);
-    expect(payload.services[0].url).toBe('https://api.exa.ai/search');
-    expect(payload.services[0].cheapest_usd).toBeCloseTo(0.007);
-    stdout.mockRestore();
-    setMode('human');
+    const result = await discover({});
+    expect(result.count).toBe(2);
+    expect(result.services[0].url).toBe('https://api.exa.ai/search');
+    expect(result.services[0].cheapest_usd).toBeCloseTo(0.007);
   });
 
   it('filters by chain', async () => {
@@ -63,16 +56,10 @@ describe('discover', () => {
       ok: true,
       json: async () => sampleBazaar,
     } as Response);
-    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { discover } = await import('../src/commands/discover');
-    await discover({ chain: 'base' });
-    const payload = JSON.parse(stdout.mock.calls.map((c) => String(c[0])).join(''));
-    expect(payload.count).toBe(1);
-    expect(payload.services[0].domain).toBe('api.exa.ai');
-    stdout.mockRestore();
-    setMode('human');
+    const result = await discover({ chain: 'base' });
+    expect(result.count).toBe(1);
+    expect(result.services[0].domain).toBe('api.exa.ai');
   });
 
   it('filters by maxPriceUsd', async () => {
@@ -80,16 +67,10 @@ describe('discover', () => {
       ok: true,
       json: async () => sampleBazaar,
     } as Response);
-    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { discover } = await import('../src/commands/discover');
-    await discover({ maxPriceUsd: 0.5 });
-    const payload = JSON.parse(stdout.mock.calls.map((c) => String(c[0])).join(''));
-    expect(payload.count).toBe(1);
-    expect(payload.services[0].domain).toBe('api.exa.ai');
-    stdout.mockRestore();
-    setMode('human');
+    const result = await discover({ maxPriceUsd: 0.5 });
+    expect(result.count).toBe(1);
+    expect(result.services[0].domain).toBe('api.exa.ai');
   });
 
   it('filters by search substring (case-insensitive)', async () => {
@@ -97,16 +78,10 @@ describe('discover', () => {
       ok: true,
       json: async () => sampleBazaar,
     } as Response);
-    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const { setMode } = await import('../src/output');
-    setMode('json');
     const { discover } = await import('../src/commands/discover');
-    await discover({ search: 'PRICIER' });
-    const payload = JSON.parse(stdout.mock.calls.map((c) => String(c[0])).join(''));
-    expect(payload.count).toBe(1);
-    expect(payload.services[0].domain).toBe('other.example');
-    stdout.mockRestore();
-    setMode('human');
+    const result = await discover({ search: 'PRICIER' });
+    expect(result.count).toBe(1);
+    expect(result.services[0].domain).toBe('other.example');
   });
 
   it('throws network_error on non-2xx', async () => {

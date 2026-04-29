@@ -20,7 +20,7 @@ export async function loadLimits(): Promise<Limits> {
       per_call_usd: numericOrUndefined(parsed.per_call_usd),
       per_merchant_usd: numericOrUndefined(parsed.per_merchant_usd),
     };
-  } catch (err) {
+  } catch (err: unknown) {
     if (isNotFound(err)) return {};
     throw err;
   }
@@ -35,7 +35,7 @@ export async function saveLimits(limits: Limits): Promise<void> {
 export async function clearLimits(): Promise<void> {
   try {
     await rm(limitsPath());
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isNotFound(err)) throw err;
   }
 }

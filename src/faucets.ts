@@ -8,5 +8,5 @@ export function faucetUrls(chain: Chain, network: Network): string[] {
 }
 
 export function tempoFaucetNote(): string {
-  return 'Tempo testnet USDC.e: contact the Tempo team or use `tempo wallet fund --testnet`.';
+  return 'Tempo testnet USDC.e: run `agentscore-pay fund --chain tempo --network testnet` — programmatically mints all 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) via the `tempo_fundAddress` JSON-RPC method. Free, no signup, no API key.';
 }

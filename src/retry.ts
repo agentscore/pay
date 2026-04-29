@@ -32,7 +32,7 @@ export async function withRetries<T>(fn: () => Promise<T>, opts: RetryOptions): 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
-    } catch (err) {
+    } catch (err: unknown) {
       lastErr = err;
       if (!isTransientNetworkError(err) || attempt === retries) throw err;
       const exp = baseDelayMs * 2 ** attempt;

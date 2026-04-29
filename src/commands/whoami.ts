@@ -1,13 +1,11 @@
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
-import { bold, cyan, dim } from '../colors';
 import { loadConfig } from '../config';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { keystoreExists, keystorePath, listWallets, loadKeystore } from '../keystore';
-import { isJson, writeJson, writeLine } from '../output';
 
-interface WalletSummary {
+export interface WalletSummary {
   chain: Chain;
   name: string;
   address: string;
@@ -16,10 +14,15 @@ interface WalletSummary {
   keystore: string;
 }
 
-interface ChainSummary {
+export interface ChainSummary {
   chain: Chain;
   has_wallet: boolean;
   wallets: WalletSummary[];
+}
+
+export interface WhoamiResult {
+  chains: ChainSummary[];
+  config: { preferred_chains: string[] | null };
 }
 
 async function readBalance(chain: Chain, address: string, network: Network): Promise<bigint> {
@@ -59,37 +62,14 @@ async function summarize(chain: Chain, network: Network): Promise<ChainSummary> 
   };
 }
 
-export async function whoami(network: Network = 'mainnet'): Promise<void> {
+export async function whoami(input: { network?: Network } = {}): Promise<WhoamiResult> {
+  const network: Network = input.network ?? 'mainnet';
   const [rows, config] = await Promise.all([
     Promise.all(SUPPORTED_CHAINS.map((c) => summarize(c, network))),
     loadConfig(),
   ]);
-
-  if (isJson()) {
-    writeJson({
-      chains: rows,
-      config: {
-        preferred_chains: config.preferred_chains ?? null,
-      },
-    });
-    return;
-  }
-
-  writeLine(bold('Wallets:'));
-  for (const row of rows) {
-    if (!row.has_wallet) {
-      writeLine(`  ${row.chain.padEnd(8)} ${dim('(no wallet)')}`);
-      continue;
-    }
-    for (const w of row.wallets) {
-      const tag = w.name === 'default' ? '' : `  [${w.name}]`;
-      writeLine(`  ${row.chain.padEnd(8)} ${w.balance_usdc.padStart(14)} USDC  ${cyan(w.address)}${dim(tag)}`);
-    }
-  }
-  writeLine('');
-  if (config.preferred_chains) {
-    writeLine(`Preferred chains: ${bold(config.preferred_chains.join(' > '))}`);
-  } else {
-    writeLine(dim('No config preference set. (agent picks via --chain or single-candidate auto-use)'));
-  }
+  return {
+    chains: rows,
+    config: { preferred_chains: config.preferred_chains ?? null },
+  };
 }
