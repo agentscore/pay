@@ -85,5 +85,5 @@ npm scope is `@agent-score`. User-Agent in payment payloads uses `@agentscore/pa
 ## Scope boundary
 
 - **In scope (MVP):** pay, balance, qr, fund, wallet CRUD on Base + Solana + Tempo
-- **Full polish (TEC-232):** Polygon/Arbitrum/World, BIP-39, keychain, `history/check/whoami/limits/link`, Coinbase Pay SDK embed, Homebrew/Scoop/Docker, sigstore, native binary
+- **Full polish (post-MVP):** Polygon/Arbitrum/World, BIP-39, keychain, `history/check/whoami/limits/link`, Coinbase Pay SDK embed, Homebrew/Scoop/Docker, sigstore, native binary
 - **Out forever:** fiat onramp, custodial wallet, swaps/bridges, GUI, duplicating merchant-side wallet capture

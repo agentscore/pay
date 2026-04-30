@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.1.0-rc.9",
+  "version": "0.1.0-rc.10",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and MPP (Tempo)",
   "type": "module",
   "main": "./dist/index.js",
@@ -56,8 +56,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@agent-score/sdk": "^2.0.0",
-    "@clack/prompts": "^1.2.0",
+    "@agent-score/sdk": "^2.1.0",
+    "@clack/prompts": "^1.3.0",
     "@scure/bip39": "^2.2.0",
     "@solana-program/token": "^0.13.0",
     "@solana/kit": "^6.8.0",
