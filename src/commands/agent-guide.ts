@@ -152,6 +152,16 @@ const GUIDE: AgentGuide = {
       why: 'Every successful pay call appends to ~/.agentscore/history.jsonl. `history --json` returns timestamp, chain, signer, url, status, price, tx_hash — useful for retro/debug or surfacing "this merchant was already paid".',
       command_example: 'agentscore-pay history --json --limit 20',
     },
+    {
+      step: 'Verify identity once with `passport login` (AgentScore-gated merchants only)',
+      why: 'AgentScore-gated merchants (those that return 403 with operator_verification_required) require an X-Operator-Token. Run `passport login` once — the agent shares the verify URL with the user, polls until the AgentScore session is verified, and saves the resulting operator_token to ~/.agentscore/passport.json. From then on, every `pay <url>` call auto-attaches X-Operator-Token. No re-prompting per call. Suppress with --no-passport for explicit-anonymous traffic.',
+      command_example: 'agentscore-pay passport login --json',
+      notes: [
+        'Requires AGENTSCORE_API_KEY in env. Token TTL defaults to 30 days; `passport status` shows expiry; expired tokens trigger a stderr "renew with passport login" warning on the next pay call.',
+        'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport, so existing scripts keep working.',
+        'Non-AgentScore merchants ignore the header — auto-attach is harmless on those endpoints.',
+      ],
+    },
   ],
 
   pitfalls: [

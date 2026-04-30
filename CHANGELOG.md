@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`passport` command group** (`passport login`, `passport status`, `passport logout`) — AgentScore Passport (buyer-side identity) wraps the lower-level `sessions create` + `sessions get` flow into one browser-redirect login. Stores the resulting `operator_token` at `~/.agentscore/passport.json` (mode 0600).
+- **Auto-attach** — every `pay <url>` settle leg now reads the stored Passport and adds `X-Operator-Token` automatically when present. Caller-supplied `-H "X-Operator-Token: ..."` always wins; `--no-passport` opts out for explicit-anonymous traffic.
+- **`--no-passport` flag on `pay`** for explicit anonymous calls.
+- **Soft + hard expiry warnings** on stderr — Passports within 5 days of expiry print a renewal hint; expired Passports surface a `pay passport login` next-step. Phase 2 (cold-start auto-bootstrap + smooth mid-stream reauth) and Phase 3 (refresh tokens) follow on this branch.
+- **MCP tools** auto-registered from the new commands: `passport_login`, `passport_status`, `passport_logout`.
+- **New error codes**: `passport_api_error`, `passport_verification_failed`, `passport_verification_timeout`, `passport_token_expired` (mapped to existing exit-code categories).
+
 ## 0.1.0-rc.8
 
 ### Breaking

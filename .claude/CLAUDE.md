@@ -27,6 +27,8 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo testnet uses programmatic mint) |
 | `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
 | `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
+| `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `pay <url>` settle leg |
+| `src/passport/{auth,storage,attach}.ts` | Passport login flow (mint+poll), conf-style local keystore, X-Operator-Token attach decision tree |
 | `src/progress.ts` | stderr-only structured progress events (stdout belongs to incur) |
 | `tests/` | Vitest unit tests |
 | `dist/` | tsup output — ESM only with shebang banner |

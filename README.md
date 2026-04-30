@@ -285,9 +285,12 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 | Command | Purpose |
 |---|---|
+| `passport login [--address a] [--operator-token o]` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). |
+| `passport status` | Show stored Passport — token prefix, expiry, expired flag |
+| `passport logout` | Revoke the stored token at AgentScore (best-effort) and remove the local file |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (free tier) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (paid tier) |
-| `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` |
+| `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
 | `sessions get <id> [--poll-secret s]` | Poll a session — returns `operator_token` once status is `verified` |
 | `credentials create [--label s] [--ttl-days N]` | Mint an operator credential (`opc_...`) |
 | `credentials list` | List active (non-expired) credentials |

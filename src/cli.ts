@@ -88,7 +88,7 @@ export function buildCli() {
       'CLI wallet for one-shell-command agent payments (x402 on Base + Solana, MPP on Tempo). Built by AgentScore; works with any 402-gated merchant.',
     version: VERSION,
     env: z.object({
-      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation)'),
+      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (passport login, assess, sessions, credentials, associate-wallet, reputation)'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
       AGENTSCORE_PAY_HOME: z.string().optional().describe('Override the state dir (default: ~/.agentscore)'),
       BASE_RPC_URL: z.string().optional().describe('Override Base mainnet RPC endpoint'),
@@ -104,6 +104,7 @@ export function buildCli() {
         'discover paid services with `agentscore-pay discover --search <query>`',
         'probe a 402 endpoint with `agentscore-pay check <url> -X POST -d <body>`',
         'pay an endpoint with `agentscore-pay pay POST <url> -d <body> --max-spend 5`',
+        'verify your AgentScore Passport once with `agentscore-pay passport login` — pay then auto-attaches X-Operator-Token to every gated merchant',
         'check trust reputation for a wallet with `agentscore-pay reputation <address>`',
       ],
     },
