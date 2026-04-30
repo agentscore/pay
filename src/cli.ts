@@ -913,7 +913,7 @@ export function buildCli() {
   passport.command('login', {
     description:
       'Verify identity in your browser and save the resulting operator_token to ~/.agentscore/passport.json.',
-    hint: 'No API key required — uses POST /v1/sessions/public (rate-limited per IP). Opens a verify URL; pay polls until your KYC completes in browser.',
+    hint: 'No API key required. Opens a verify URL; pay polls until your KYC completes in browser.',
     options: z.object({
       pollIntervalSeconds: z.coerce.number().optional().describe('Poll cadence (default 5s)'),
       timeoutSeconds: z.coerce.number().optional().describe('Polling timeout (default 3600s)'),

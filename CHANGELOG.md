@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`passport` command group** (`passport login`, `passport status`, `passport logout`) — AgentScore Passport (buyer-side identity). `passport login` opens a verify URL, polls until KYC completes in the browser, and saves the resulting `operator_token` at `~/.agentscore/passport.json` (mode 0600). **No API key required** — login uses the public `POST /v1/sessions/public` endpoint (rate-limited per IP, X-Client-Id allowlisted).
+- **`passport` command group** (`passport login`, `passport status`, `passport logout`) — AgentScore Passport (buyer-side identity). `passport login` opens a verify URL, polls until KYC completes in the browser, and saves the resulting `operator_token` at `~/.agentscore/passport.json` (mode 0600). **No API key required.**
 - **Auto-attach** — every `pay <url>` settle leg reads the stored Passport and adds `X-Operator-Token` automatically when present. Caller-supplied `-H "X-Operator-Token: ..."` always wins; `--no-passport` opts out for explicit-anonymous traffic.
 - **Cold-start auto-bootstrap** — on a merchant 403 with bootstrap fields (`verify_url` / `session_id` / `poll_secret`), pay drives the verification inline with no separate `passport login` step, then retries the original request with the freshly-minted `X-Operator-Token`. Single shell command, full bootstrap.
 - **Mid-stream auto-reauth on hard expiry** — when the stored Passport has expired before a settle leg, pay surfaces the renewal URL inline and finishes the original purchase in the same invocation. No "you must log in first" wall.

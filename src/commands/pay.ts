@@ -294,8 +294,8 @@ export async function pay(input: PayInput): Promise<PayResult> {
     process.stderr.write(`Passport saved (expires ${new Date(renewal.passport.expires_at).toISOString()}). Retrying payment with X-Operator-Token...\n`);
 
     // Build a new request body that merges any merchant-supplied resume token
-    // (e.g. martin-estate's `order_id`) so the retry continues the pending order
-    // rather than minting a new one.
+    // (e.g. an `order_id`) so the retry continues the pending order rather
+    // than minting a new one.
     let retryBody = input.body;
     if (bootstrapFields.order_id && input.body) {
       const existing = tryParseJson(input.body);
