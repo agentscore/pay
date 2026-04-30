@@ -346,12 +346,6 @@ async function callSafely<T>(fn: () => Promise<T>): Promise<T> {
   } catch (err: unknown) {
     if (err instanceof CliError) throw err;
     if (err instanceof AgentScoreError) {
-      if (err.status === 401) {
-        throw new CliError('config_error', `AgentScore auth error: ${err.message}`, {
-          nextSteps: { action: 'check_api_key', suggestion: 'Confirm AGENTSCORE_API_KEY is valid.' },
-          extra: { code: err.code, status: err.status, ...(err.details ?? {}) },
-        });
-      }
       throw new CliError('passport_api_error', err.message, {
         extra: { code: err.code, status: err.status, ...(err.details ?? {}) },
       });

@@ -281,13 +281,15 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL — skip per-call prompts during a session |
 | `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
-### Identity commands (AgentScore SDK — paid tier, set `AGENTSCORE_API_KEY`)
+### Identity commands
+
+`passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK paid tier — set `AGENTSCORE_API_KEY`.
 
 | Command | Purpose |
 |---|---|
-| `passport login [--address a] [--operator-token o]` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). |
+| `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
 | `passport status` | Show stored Passport — token prefix, expiry, expired flag |
-| `passport logout` | Revoke the stored token at AgentScore (best-effort) and remove the local file |
+| `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (free tier) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (paid tier) |
 | `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |

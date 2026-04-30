@@ -4,11 +4,13 @@
 
 ### Added
 
-- **`passport` command group** (`passport login`, `passport status`, `passport logout`) — AgentScore Passport (buyer-side identity) wraps the lower-level `sessions create` + `sessions get` flow into one browser-redirect login. Stores the resulting `operator_token` at `~/.agentscore/passport.json` (mode 0600).
-- **Auto-attach** — every `pay <url>` settle leg now reads the stored Passport and adds `X-Operator-Token` automatically when present. Caller-supplied `-H "X-Operator-Token: ..."` always wins; `--no-passport` opts out for explicit-anonymous traffic.
+- **`passport` command group** (`passport login`, `passport status`, `passport logout`) — AgentScore Passport (buyer-side identity). `passport login` opens a verify URL, polls until KYC completes in the browser, and saves the resulting `operator_token` at `~/.agentscore/passport.json` (mode 0600). **No API key required** — login uses the public `POST /v1/sessions/public` endpoint (rate-limited per IP, X-Client-Id allowlisted).
+- **Auto-attach** — every `pay <url>` settle leg reads the stored Passport and adds `X-Operator-Token` automatically when present. Caller-supplied `-H "X-Operator-Token: ..."` always wins; `--no-passport` opts out for explicit-anonymous traffic.
+- **Cold-start auto-bootstrap** — on a merchant 403 with bootstrap fields (`verify_url` / `session_id` / `poll_secret`), pay drives the verification inline with no separate `passport login` step, then retries the original request with the freshly-minted `X-Operator-Token`. Single shell command, full bootstrap.
+- **Mid-stream auto-reauth on hard expiry** — when the stored Passport has expired before a settle leg, pay surfaces the renewal URL inline and finishes the original purchase in the same invocation. No "you must log in first" wall.
+- **Silent refresh on near-expiry** — when the stored access token is within 60s of expiry and a refresh token is present, pay swaps in a fresh `opc_` via `POST /v1/sessions/refresh` transparently. Refresh tokens rotate on every renewal (90d default TTL); on refresh failure the inline reauth flow above kicks in.
 - **`--no-passport` flag on `pay`** for explicit anonymous calls.
-- **Soft + hard expiry warnings** on stderr — Passports within 5 days of expiry print a renewal hint; expired Passports surface a `pay passport login` next-step. Phase 2 (cold-start auto-bootstrap + smooth mid-stream reauth) and Phase 3 (refresh tokens) follow on this branch.
-- **MCP tools** auto-registered from the new commands: `passport_login`, `passport_status`, `passport_logout`.
+- **MCP tools** auto-registered: `passport_login`, `passport_status`, `passport_logout`.
 - **New error codes**: `passport_api_error`, `passport_verification_failed`, `passport_verification_timeout`, `passport_token_expired` (mapped to existing exit-code categories).
 
 ## 0.1.0-rc.8

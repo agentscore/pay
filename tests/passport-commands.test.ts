@@ -119,16 +119,19 @@ describe('passport commands', () => {
       expect(polled).toBe(true);
     });
 
-    it('rejects with config_error when SDK returns 401 (invalid API key)', async () => {
+    it('rejects with passport_api_error when /v1/sessions/public returns 401', async () => {
+      // passport login uses the public session endpoint (no API key), so a 401
+      // here means X-Client-Id isn't allowlisted server-side — surface the
+      // server message, not a stale "check your API key" hint.
       globalThis.fetch = vi.fn(async () =>
-        new Response(JSON.stringify({ error: { code: 'invalid_credential', message: 'bad key' } }), {
+        new Response(JSON.stringify({ error: { code: 'unregistered_client_id', message: 'unknown client' } }), {
           status: 401,
           headers: { 'Content-Type': 'application/json' },
         }),
       ) as unknown as typeof globalThis.fetch;
 
       await expect(passportLoginCommand({})).rejects.toMatchObject({
-        code: 'config_error',
+        code: 'passport_api_error',
       });
     });
 
