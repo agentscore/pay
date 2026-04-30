@@ -33,17 +33,13 @@ describe('passport commands', () => {
   });
 
   describe('passportLoginCommand', () => {
-    it('rejects with config_error when no API key is set', async () => {
-      await expect(passportLoginCommand({})).rejects.toMatchObject({ code: 'config_error' });
-    });
-
     it('mints a session, polls until verified, saves the passport', async () => {
       const calls: { url: string; init?: RequestInit }[] = [];
       let pollCount = 0;
       globalThis.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
         const target = url.toString();
         calls.push({ url: target, init });
-        if (target.endsWith('/v1/sessions') && init?.method === 'POST') {
+        if (target.endsWith('/v1/sessions/public') && init?.method === 'POST') {
           return new Response(
             JSON.stringify({
               session_id: 'sess_abc',
@@ -79,7 +75,6 @@ describe('passport commands', () => {
 
       const verifyUrls: string[] = [];
       const result = await passportLoginCommand({
-        apiKey: 'as_test_key',
         pollIntervalSeconds: 0, // tight loop for tests
         timeoutSeconds: 30,
         onVerifyUrl: (u) => verifyUrls.push(u),
@@ -96,7 +91,7 @@ describe('passport commands', () => {
       let polled = false;
       globalThis.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
         const target = url.toString();
-        if (target.endsWith('/v1/sessions') && init?.method === 'POST') {
+        if (target.endsWith('/v1/sessions/public') && init?.method === 'POST') {
           return new Response(
             JSON.stringify({
               session_id: 'sess_deny',
@@ -119,7 +114,7 @@ describe('passport commands', () => {
       }) as unknown as typeof globalThis.fetch;
 
       await expect(
-        passportLoginCommand({ apiKey: 'as_test_key', pollIntervalSeconds: 0 }),
+        passportLoginCommand({ pollIntervalSeconds: 0 }),
       ).rejects.toMatchObject({ code: 'passport_verification_failed' });
       expect(polled).toBe(true);
     });
@@ -132,7 +127,7 @@ describe('passport commands', () => {
         }),
       ) as unknown as typeof globalThis.fetch;
 
-      await expect(passportLoginCommand({ apiKey: 'as_bad_key' })).rejects.toMatchObject({
+      await expect(passportLoginCommand({})).rejects.toMatchObject({
         code: 'config_error',
       });
     });
@@ -145,7 +140,7 @@ describe('passport commands', () => {
         }),
       ) as unknown as typeof globalThis.fetch;
 
-      await expect(passportLoginCommand({ apiKey: 'as_test_key' })).rejects.toMatchObject({
+      await expect(passportLoginCommand({})).rejects.toMatchObject({
         code: 'passport_api_error',
       });
     });
@@ -153,7 +148,7 @@ describe('passport commands', () => {
     it('throws passport_verification_timeout when polling exceeds timeoutSeconds', async () => {
       globalThis.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
         const target = url.toString();
-        if (target.endsWith('/v1/sessions') && init?.method === 'POST') {
+        if (target.endsWith('/v1/sessions/public') && init?.method === 'POST') {
           return new Response(
             JSON.stringify({
               session_id: 'sess_timeout',
@@ -172,7 +167,7 @@ describe('passport commands', () => {
       }) as unknown as typeof globalThis.fetch;
 
       await expect(
-        passportLoginCommand({ apiKey: 'as_test_key', pollIntervalSeconds: 0, timeoutSeconds: 0 }),
+        passportLoginCommand({ pollIntervalSeconds: 0, timeoutSeconds: 0 }),
       ).rejects.toMatchObject({ code: 'passport_verification_timeout' });
     });
   });

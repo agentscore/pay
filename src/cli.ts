@@ -913,27 +913,20 @@ export function buildCli() {
   passport.command('login', {
     description:
       'Verify identity in your browser and save the resulting operator_token to ~/.agentscore/passport.json.',
-    hint: 'Requires AGENTSCORE_API_KEY (or --api-key). Opens a verify URL — complete KYC in browser, pay polls until verified.',
+    hint: 'No API key required — uses POST /v1/sessions/public (rate-limited per IP). Opens a verify URL; pay polls until your KYC completes in browser.',
     options: z.object({
-      address: z.string().optional().describe('Pre-associate the session with a known wallet (EVM or Solana)'),
-      operatorToken: z.string().optional().describe('Refresh KYC for an existing operator credential'),
       pollIntervalSeconds: z.coerce.number().optional().describe('Poll cadence (default 5s)'),
       timeoutSeconds: z.coerce.number().optional().describe('Polling timeout (default 3600s)'),
-      apiKey: apiKeyOpt,
     }),
     examples: [
       { description: 'Cold-start login — opens verify URL, polls until verified' },
-      { options: { address: '0xabc...' }, description: 'Tie the new Passport to an existing wallet' },
     ],
     run(c) {
       return withCliErrors(async () => {
         let printedVerifyUrl = false;
         const result = await passportLoginCommand({
-          address: c.options.address,
-          operatorToken: c.options.operatorToken,
           pollIntervalSeconds: c.options.pollIntervalSeconds,
           timeoutSeconds: c.options.timeoutSeconds,
-          apiKey: c.options.apiKey,
           onVerifyUrl: (verifyUrl) => {
             if (!printedVerifyUrl) {
               process.stderr.write(`\nOpen this URL to verify your AgentScore Passport:\n  ${verifyUrl}\n\nWaiting for verification...\n`);

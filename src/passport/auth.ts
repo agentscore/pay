@@ -1,28 +1,50 @@
-import { AgentScore, AgentScoreError, type SessionPollResponse } from '@agent-score/sdk';
+import { AgentScoreError, type SessionCreateResponse, type SessionPollResponse } from '@agent-score/sdk';
 import { CliError } from '../errors';
 import { type Passport, savePassport } from './storage';
 
 /**
  * Drives the AgentScore Passport login flow:
- *   1. POST /v1/sessions  → returns verify_url + session_id + poll_secret
+ *   1. POST /v1/sessions/public  → returns verify_url + session_id + poll_secret
+ *      (NO AgentScore API key required. The public endpoint is gated by:
+ *       - Required X-Client-Id header validated against an allowlist of
+ *         registered buyer-side tools (pay carries PUBLIC_CLIENT_ID below)
+ *       - Per-IP rate limit (5/hour) + active-pending cap (10)
+ *       Combined: server-side merchant traffic can't trivially bypass the
+ *       paid /v1/sessions endpoint via this path.)
  *   2. Poll GET /v1/sessions/{id} with X-Poll-Secret  → until status === 'verified'
- *   3. Persist the resulting operator_token + verified facts to the keystore
+ *   3. Persist the resulting operator_token to the local keystore
+ *
+ * Inlined directly here (not via the SDK) so the public endpoint stays
+ * exclusive to registered buyer-side tools — exposing it as an SDK method
+ * would let any consumer bypass the paid path.
  *
  * v1 long-lived opc_ (30d default per AgentScore policy). v3 (refresh tokens)
  * extends Passport with refresh_token + access_expires_at and adjusts attach.ts
  * to silent-refresh; this file stays the entry-point for cold logins.
  */
 
+const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.sh';
+
+/**
+ * pay's public client identifier — sent as `X-Client-Id` on /v1/sessions/public
+ * requests. Registered with the AgentScore API's allowlist. This identifier is
+ * deliberately public (visible in pay's published binary) — the defense isn't
+ * secrecy, it's "this header MUST be a registered buyer-side tool, and adding
+ * a new entry to the server allowlist is a deliberate registration step."
+ *
+ * Bumped on incompatible API contract changes for the public endpoint.
+ */
+const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
+
 export interface PassportLoginInput {
-  apiKey: string;
-  /** Optional pre-existing AgentScore wallet to associate with the session. */
-  address?: string;
-  /** Optional pre-existing operator token (refresh-style mint). */
-  operatorToken?: string;
   /** Polling cadence in seconds. Default 5. */
   pollIntervalSeconds?: number;
   /** Polling timeout in seconds. Default 3600 (1 hour). */
   timeoutSeconds?: number;
+  /** Override base URL (testing). */
+  baseUrl?: string;
+  /** Override fetch (testing). */
+  fetch?: typeof globalThis.fetch;
   /** Hook called once with the verify URL — terminal prints it for the user. */
   onVerifyUrl?: (verifyUrl: string) => void;
   /** Hook called on every poll iteration (for a TTY spinner / progress event). */
@@ -35,16 +57,12 @@ export interface PassportLoginResult {
   pollResponse: SessionPollResponse;
 }
 
-export async function passportLogin(input: PassportLoginInput): Promise<PassportLoginResult> {
-  const client = new AgentScore({ apiKey: input.apiKey, userAgent: '@agent-score/pay' });
+export async function passportLogin(input: PassportLoginInput = {}): Promise<PassportLoginResult> {
+  const baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
+  const fetchImpl = input.fetch ?? globalThis.fetch;
 
   const session = await callSafely(() =>
-    client.createSession({
-      ...(input.address ? { address: input.address } : {}),
-      ...(input.operatorToken ? { operator_token: input.operatorToken } : {}),
-      context: 'pay passport login',
-      product_name: '@agent-score/pay',
-    }),
+    mintPublicSession({ baseUrl, fetch: fetchImpl }),
   );
 
   if (input.onVerifyUrl) input.onVerifyUrl(session.verify_url);
@@ -55,7 +73,12 @@ export async function passportLogin(input: PassportLoginInput): Promise<Passport
   let attempt = 0;
   while (Date.now() < deadline) {
     attempt += 1;
-    const poll = await callSafely(() => client.pollSession(session.session_id, session.poll_secret));
+    const poll = await callSafely(() => pollPublicSession({
+      sessionId: session.session_id,
+      pollSecret: session.poll_secret,
+      baseUrl,
+      fetch: fetchImpl,
+    }));
     if (input.onPoll) input.onPoll({ attempt, status: poll.status });
 
     if (poll.status === 'verified' && poll.operator_token) {
@@ -84,6 +107,83 @@ export async function passportLogin(input: PassportLoginInput): Promise<Passport
     nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
     extra: { session_id: session.session_id, verify_url: session.verify_url },
   });
+}
+
+/**
+ * POST /v1/sessions/public — mint a session with no API key. Inlined here so
+ * the public endpoint stays exclusive to registered buyer-side tools (no SDK
+ * surface that any consumer can call to bypass /v1/sessions billing).
+ */
+async function mintPublicSession(input: {
+  baseUrl: string;
+  fetch: typeof globalThis.fetch;
+}): Promise<SessionCreateResponse> {
+  const response = await input.fetch(`${input.baseUrl}/v1/sessions/public`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': '@agent-score/pay',
+      'X-Client-Id': PUBLIC_CLIENT_ID,
+    },
+    body: JSON.stringify({
+      context: 'pay passport login',
+      product_name: '@agent-score/pay',
+    }),
+  });
+  const body = await response.text();
+  if (!response.ok) {
+    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    try {
+      parsed = body ? JSON.parse(body) : null;
+    } catch {
+      parsed = null;
+    }
+    throw new AgentScoreError(
+      parsed?.error?.code ?? 'http_error',
+      parsed?.error?.message ?? `HTTP ${response.status}`,
+      response.status,
+    );
+  }
+  return JSON.parse(body) as SessionCreateResponse;
+}
+
+/**
+ * Poll a session minted via the public endpoint. The /v1/sessions/{id} GET path
+ * is the same for merchant + public sessions (gated by X-Poll-Secret), so we
+ * don't need a separate SDK method — but since we're not constructing an
+ * authenticated client here, we hit it via raw fetch.
+ */
+async function pollPublicSession(input: {
+  sessionId: string;
+  pollSecret: string;
+  baseUrl: string;
+  fetch: typeof globalThis.fetch;
+}): Promise<SessionPollResponse> {
+  const response = await input.fetch(
+    `${input.baseUrl}/v1/sessions/${encodeURIComponent(input.sessionId)}`,
+    {
+      method: 'GET',
+      headers: {
+        'X-Poll-Secret': input.pollSecret,
+        'User-Agent': '@agent-score/pay',
+      },
+    },
+  );
+  const body = await response.text();
+  if (!response.ok) {
+    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    try {
+      parsed = body ? JSON.parse(body) : null;
+    } catch {
+      parsed = null;
+    }
+    throw new AgentScoreError(
+      parsed?.error?.code ?? 'http_error',
+      parsed?.error?.message ?? `HTTP ${response.status}`,
+      response.status,
+    );
+  }
+  return JSON.parse(body) as SessionPollResponse;
 }
 
 async function callSafely<T>(fn: () => Promise<T>): Promise<T> {

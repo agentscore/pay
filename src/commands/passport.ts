@@ -12,11 +12,12 @@ import { clearPassport, expiresInDays, isExpired, loadPassport } from '../passpo
  */
 
 export interface PassportLoginInput {
-  apiKey?: string;
-  address?: string;
-  operatorToken?: string;
   pollIntervalSeconds?: number;
   timeoutSeconds?: number;
+  /** Override base URL (testing). */
+  baseUrl?: string;
+  /** Override fetch (testing). */
+  fetch?: typeof globalThis.fetch;
   /** Hook invoked once with the verify URL — terminal prints it for the user. */
   onVerifyUrl?: (verifyUrl: string) => void;
   /** Hook invoked on each poll iteration. */
@@ -30,14 +31,12 @@ export interface PassportLoginOutput {
   expires_in_days: number;
 }
 
-export async function passportLoginCommand(input: PassportLoginInput): Promise<PassportLoginOutput> {
-  const apiKey = resolveApiKey(input.apiKey);
+export async function passportLoginCommand(input: PassportLoginInput = {}): Promise<PassportLoginOutput> {
   const { passport } = await passportLogin({
-    apiKey,
-    address: input.address,
-    operatorToken: input.operatorToken,
     pollIntervalSeconds: input.pollIntervalSeconds,
     timeoutSeconds: input.timeoutSeconds,
+    baseUrl: input.baseUrl,
+    fetch: input.fetch,
     onVerifyUrl: input.onVerifyUrl,
     onPoll: input.onPoll,
   });
