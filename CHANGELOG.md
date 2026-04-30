@@ -8,7 +8,7 @@
 - **Auto-attach** — every `pay <url>` settle leg reads the stored Passport and adds `X-Operator-Token` automatically when present. Caller-supplied `-H "X-Operator-Token: ..."` always wins; `--no-passport` opts out for explicit-anonymous traffic.
 - **Cold-start auto-bootstrap** — on a merchant 403 with bootstrap fields (`verify_url` / `session_id` / `poll_secret`), pay drives the verification inline with no separate `passport login` step, then retries the original request with the freshly-minted `X-Operator-Token`. Single shell command, full bootstrap.
 - **Mid-stream auto-reauth on hard expiry** — when the stored Passport has expired before a settle leg, pay surfaces the renewal URL inline and finishes the original purchase in the same invocation. No "you must log in first" wall.
-- **Silent refresh on near-expiry** — when the stored access token is within 60s of expiry and a refresh token is present, pay swaps in a fresh `opc_` via `POST /v1/sessions/refresh` transparently. Refresh tokens rotate on every renewal (90d default TTL); on refresh failure the inline reauth flow above kicks in.
+- **Silent refresh near expiry** — when a refresh token is present, pay renews the access token in-flight via `POST /v1/sessions/refresh` so requests don't hit a stale `opc_`. Refresh tokens rotate on every renewal; on refresh failure the inline reauth flow kicks in.
 - **`--no-passport` flag on `pay`** for explicit anonymous calls.
 - **MCP tools** auto-registered: `passport_login`, `passport_status`, `passport_logout`.
 - **New error codes**: `passport_api_error`, `passport_verification_failed`, `passport_verification_timeout`, `passport_token_expired` (mapped to existing exit-code categories).

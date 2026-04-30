@@ -85,7 +85,7 @@ describe('passport/attach', () => {
     expect(result.expiringSoon).toBe(false);
   });
 
-  describe('silent refresh (Phase 3)', () => {
+  describe('silent refresh', () => {
     function withRefresh(overrides: Partial<Passport> = {}): Passport {
       const now = Date.now();
       return {
@@ -181,7 +181,7 @@ describe('passport/attach', () => {
 
       const result = await attachPassport({ fetch: fetchMock });
       expect(result.kind).toBe('expired');
-      // Caller (pay.ts) should now drive Phase 2 inline reauth.
+      // Caller (pay.ts) should now drive inline reauth.
     });
 
     it('honors skipRefresh flag (testing surface)', async () => {
