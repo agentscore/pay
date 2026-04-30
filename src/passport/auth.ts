@@ -3,37 +3,12 @@ import { CliError } from '../errors';
 import { type Passport, savePassport } from './storage';
 
 /**
- * Drives the AgentScore Passport login flow:
- *   1. POST /v1/sessions/public  → returns verify_url + session_id + poll_secret
- *      (NO AgentScore API key required. The public endpoint is gated by:
- *       - Required X-Client-Id header validated against an allowlist of
- *         registered buyer-side tools (pay carries PUBLIC_CLIENT_ID below)
- *       - Per-IP rate limit (5/hour) + active-pending cap (10)
- *       Combined: server-side merchant traffic can't trivially bypass the
- *       paid /v1/sessions endpoint via this path.)
- *   2. Poll GET /v1/sessions/{id} with X-Poll-Secret  → until status === 'verified'
- *   3. Persist the resulting operator_token to the local keystore
- *
- * Inlined directly here (not via the SDK) so the public endpoint stays
- * exclusive to registered buyer-side tools — exposing it as an SDK method
- * would let any consumer bypass the paid path.
- *
- * v1 long-lived opc_ (30d default per AgentScore policy). v3 (refresh tokens)
- * extends Passport with refresh_token + access_expires_at and adjusts attach.ts
- * to silent-refresh; this file stays the entry-point for cold logins.
+ * AgentScore Passport login: mint a verification session, poll it until the
+ * user completes KYC in the browser, persist the resulting operator_token.
  */
 
 const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.sh';
 
-/**
- * pay's public client identifier — sent as `X-Client-Id` on /v1/sessions/public
- * requests. Registered with the AgentScore API's allowlist. This identifier is
- * deliberately public (visible in pay's published binary) — the defense isn't
- * secrecy, it's "this header MUST be a registered buyer-side tool, and adding
- * a new entry to the server allowlist is a deliberate registration step."
- *
- * Bumped on incompatible API contract changes for the public endpoint.
- */
 const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
 
 export interface PassportLoginInput {
@@ -79,14 +54,8 @@ export async function passportLogin(input: PassportLoginInput = {}): Promise<Pas
 }
 
 /**
- * Resume a verification session that someone else already minted (typically
- * the merchant's gate, surfaced in a 403 with `verify_url` + `session_id` +
- * `poll_secret`). The cold-start auto-bootstrap flow inside `pay <url>`
- * calls this so an agent that hits a fresh AgentScore-gated merchant gets
- * the operator_token without needing a prior `pay passport login`.
- *
- * Same poll-and-store machinery as `passportLogin`; only the session source
- * differs.
+ * Resume a verification session minted elsewhere (e.g. by a merchant gate
+ * surfacing `verify_url` + `session_id` + `poll_secret` in a 403 body).
  */
 export interface PassportResumeInput {
   sessionId: string;
@@ -123,11 +92,7 @@ export async function passportResume(input: PassportResumeInput): Promise<Passpo
 }
 
 /**
- * Shared poll-and-store machinery for both flavors of session bootstrap:
- *   - `passportLogin`     (mint via /v1/sessions/public, then poll)
- *   - `passportResume`    (use a merchant-supplied session, just poll)
- * Both converge here once they have a (sessionId, pollSecret, verifyUrl)
- * triple to consume.
+ * Shared poll-and-store loop for both fresh logins and resumed sessions.
  */
 async function pollAndStore(input: {
   sessionId: string;
@@ -158,10 +123,6 @@ async function pollAndStore(input: {
 
     if (poll.status === 'verified' && poll.operator_token) {
       const ttlSeconds = poll.token_ttl_seconds ?? 24 * 60 * 60;
-      // Phase 3: self-serve sessions (pay passport login + bootstrap) issue
-      // a rotating refresh_token alongside the access opc_. Save both so
-      // attach.ts can silently refresh near expiry instead of forcing a
-      // re-verify.
       const pollExtra = poll as SessionPollResponse & {
         refresh_token?: string;
         refresh_token_ttl_seconds?: number;
@@ -200,14 +161,9 @@ async function pollAndStore(input: {
 }
 
 /**
- * Silently exchange a refresh_token for a fresh access opc_ + new rotating
- * refresh_token. Inlined here (not via the SDK) so the refresh path stays
- * exclusive to registered buyer-side tools — same security posture as
- * /v1/sessions/public.
- *
- * Returns the new Passport (already saved) on success. Throws when the
- * refresh_token is revoked / expired / unknown — caller (attach.ts) should
- * fall through to the inline reauth flow (Phase 2's bootstrapFromExpiry).
+ * Exchange a refresh_token for a fresh access token + rotated refresh_token.
+ * Returns the new Passport (already saved) on success; throws on failure so
+ * the caller can fall through to the inline reauth flow.
  */
 export interface RefreshAccessTokenInput {
   refreshToken: string;
@@ -263,11 +219,7 @@ export async function refreshAccessToken(input: RefreshAccessTokenInput): Promis
   return passport;
 }
 
-/**
- * POST /v1/sessions/public — mint a session with no API key. Inlined here so
- * the public endpoint stays exclusive to registered buyer-side tools (no SDK
- * surface that any consumer can call to bypass /v1/sessions billing).
- */
+/** Mint a verification session via the public endpoint (no API key). */
 async function mintPublicSession(input: {
   baseUrl: string;
   fetch: typeof globalThis.fetch;

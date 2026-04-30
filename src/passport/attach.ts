@@ -2,28 +2,11 @@ import { refreshAccessToken } from './auth';
 import { isExpired, loadPassport, type Passport } from './storage';
 
 /**
- * Attaches the stored AgentScore Passport's operator_token to outgoing merchant
- * requests. Used on every settle leg of `pay <url>` so agents with a stored
- * Passport never have to manually pass `--header X-Operator-Token: opc_...`.
- *
- * Decision tree:
- *   1. `--no-passport` opt-out → skip
- *   2. No Passport stored → skip silently (cold-start path; bootstrap.ts handles
- *      the merchant 403 if it comes; otherwise the request flows anonymously)
- *   3. Passport hard-expired → return `{ kind: 'expired' }` so the caller can
- *      drive inline reauth via bootstrap.ts (Phase 2). Don't attach.
- *   4. Passport access token within REFRESH_THRESHOLD of expiry AND we have
- *      a refresh_token → silently refresh in-place. The new opc_ + new rotating
- *      refresh_token are saved before returning. User-visible UX: nothing.
- *      On refresh failure (revoked / expired refresh_token / network blip),
- *      surface `kind: 'expired'` so caller drives Phase 2 inline reauth.
- *   5. Passport valid → attach `X-Operator-Token` (caller may still merge with a
- *      caller-supplied X-Operator-Token; caller-supplied wins)
+ * Attach the stored Passport's operator_token to outgoing merchant requests
+ * on the settle leg, with silent refresh near expiry. Caller-supplied
+ * X-Operator-Token always wins.
  */
 
-/** Silent-refresh window: when access token has < this many ms left, refresh
- *  proactively so the request lands with a fresh token instead of one that may
- *  expire mid-flight. 60s covers any reasonable merchant request latency. */
 const REFRESH_THRESHOLD_MS = 60 * 1000;
 
 export interface AttachResult {
@@ -67,11 +50,6 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
     return { kind: 'expired', passport };
   }
 
-  // Silent refresh: if the access token is within REFRESH_THRESHOLD_MS of
-  // expiry AND we have a refresh_token AND the refresh_token itself is still
-  // valid, swap in a fresh access token transparently. User sees nothing —
-  // the request lands with a fresh opc_, the new rotating refresh_token is
-  // saved, and the next call benefits from the same machinery.
   const accessNearExpiry = passport.expires_at - now < REFRESH_THRESHOLD_MS;
   const hasUsableRefresh =
     !!passport.refresh_token
@@ -84,8 +62,6 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
         fetch: input.fetch,
       });
     } catch {
-      // Refresh failed (revoked / expired / network blip). Treat as hard
-      // expiry so caller (pay.ts) falls through to inline reauth (Phase 2).
       return { kind: 'expired', passport };
     }
   }

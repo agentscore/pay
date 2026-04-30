@@ -110,9 +110,8 @@ export async function pay(input: PayInput): Promise<PayResult> {
     callerSuppliedOperatorToken: callerOperatorToken,
   });
 
-  // Mid-stream reauth on expiry — drive inline browser-redirect reauth (Phase 2).
-  // Only on the live path; dry-run shows `kind: 'expired'` verbatim so the user can
-  // see "would have re-authed" without actually opening a browser.
+  // Live path only: drive inline reauth on expired Passport. Dry-run leaves
+  // `kind: 'expired'` visible so the user sees what would have happened.
   if (passportAttach.kind === 'expired' && !input.dryRun) {
     process.stderr.write('Stored Passport has expired — re-verifying (KYC stays valid, this is a one-click renewal)...\n');
     let printedVerifyUrl = false;

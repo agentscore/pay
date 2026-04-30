@@ -3,12 +3,8 @@ import { dirname } from 'path';
 import { baseDir, passportPath } from '../paths';
 
 /**
- * On-disk passport: AgentScore identity credential + cached verified facts +
- * expiry. Stored at `~/.agentscore/passport.json` with 0600 perms; same posture
- * as the wallet keystore. Treat the file like an SSH key: don't commit, restrict
- * perms, rotate on compromise. v3 (refresh tokens) layers refresh_token +
- * access_expires_at fields on top of this same file; readers tolerant of
- * unknown extra keys.
+ * On-disk Passport at `~/.agentscore/passport.json` (mode 0600). Treat the
+ * file like an SSH key: don't commit, restrict perms, rotate on compromise.
  */
 
 export const PASSPORT_VERSION = 1;
@@ -22,24 +18,15 @@ export interface PassportVerifiedFacts {
 
 export interface Passport {
   version: number;
-  /** Operator token (opc_...) — bearer credential for X-Operator-Token. */
   operator_token: string;
-  /** Operator id (op_...) — stable identifier for the AgentScore account. */
   operator_id?: string;
-  /** Email associated with the verified account, when known. */
   email?: string;
-  /** Cached verified facts; refreshed on `pay passport status` from `assess()`. */
   verified_facts?: PassportVerifiedFacts;
-  /** Absolute epoch-ms when the operator_token (access token) expires. */
+  /** Absolute epoch-ms when operator_token expires. */
   expires_at: number;
-  /** When this passport was minted/refreshed (epoch-ms). */
+  /** When this Passport was minted/refreshed (epoch-ms). */
   saved_at: number;
-  /** Long-lived rotating refresh token (prt_...). Only present for self_serve
-   *  Passports minted via `passport login`. Used by attach.ts to silently
-   *  renew the access token (operator_token) when it's within 60s of expiry. */
   refresh_token?: string;
-  /** Absolute epoch-ms when the refresh_token itself expires (90d default).
-   *  After this point the inline reauth flow (Phase 2) takes over. */
   refresh_expires_at?: number;
 }
 

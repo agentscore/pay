@@ -3,13 +3,7 @@ import { CliError } from '../errors';
 import { passportLogin } from '../passport/auth';
 import { clearPassport, expiresInDays, isExpired, loadPassport } from '../passport/storage';
 
-/**
- * Top-level Passport commands — `pay passport {login,status,logout}`.
- * Owns the keystore + browser-redirect UX for AgentScore identity. Auto-attach
- * happens transparently inside `pay <url>`'s settle leg via `passport/attach.ts`;
- * users only run these commands explicitly when minting / inspecting / clearing
- * the stored Passport.
- */
+/** `pay passport {login,status,logout}` command handlers. */
 
 export interface PassportLoginInput {
   pollIntervalSeconds?: number;
