@@ -30,10 +30,17 @@ export interface Passport {
   email?: string;
   /** Cached verified facts; refreshed on `pay passport status` from `assess()`. */
   verified_facts?: PassportVerifiedFacts;
-  /** Absolute epoch-ms when the operator_token expires. */
+  /** Absolute epoch-ms when the operator_token (access token) expires. */
   expires_at: number;
   /** When this passport was minted/refreshed (epoch-ms). */
   saved_at: number;
+  /** Long-lived rotating refresh token (prt_...). Only present for self_serve
+   *  Passports minted via `passport login`. Used by attach.ts to silently
+   *  renew the access token (operator_token) when it's within 60s of expiry. */
+  refresh_token?: string;
+  /** Absolute epoch-ms when the refresh_token itself expires (90d default).
+   *  After this point the inline reauth flow (Phase 2) takes over. */
+  refresh_expires_at?: number;
 }
 
 export async function loadPassport(): Promise<Passport | null> {
@@ -51,6 +58,8 @@ export async function loadPassport(): Promise<Passport | null> {
       verified_facts: parsed.verified_facts as PassportVerifiedFacts | undefined,
       expires_at: parsed.expires_at,
       saved_at: typeof parsed.saved_at === 'number' ? parsed.saved_at : Date.now(),
+      refresh_token: typeof parsed.refresh_token === 'string' ? parsed.refresh_token : undefined,
+      refresh_expires_at: typeof parsed.refresh_expires_at === 'number' ? parsed.refresh_expires_at : undefined,
     };
   } catch (err: unknown) {
     if (isNotFound(err)) return null;

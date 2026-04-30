@@ -157,12 +157,27 @@ async function pollAndStore(input: {
     if (input.onPoll) input.onPoll({ attempt, status: poll.status });
 
     if (poll.status === 'verified' && poll.operator_token) {
-      const ttlSeconds = poll.token_ttl_seconds ?? 30 * 24 * 60 * 60; // 30d default
+      const ttlSeconds = poll.token_ttl_seconds ?? 24 * 60 * 60;
+      // Phase 3: self-serve sessions (pay passport login + bootstrap) issue
+      // a rotating refresh_token alongside the access opc_. Save both so
+      // attach.ts can silently refresh near expiry instead of forcing a
+      // re-verify.
+      const pollExtra = poll as SessionPollResponse & {
+        refresh_token?: string;
+        refresh_token_ttl_seconds?: number;
+      };
+      const refreshTtlSeconds = pollExtra.refresh_token_ttl_seconds ?? 90 * 24 * 60 * 60;
       const passport: Passport = {
         version: 1,
         operator_token: poll.operator_token,
         expires_at: Date.now() + ttlSeconds * 1000,
         saved_at: Date.now(),
+        ...(pollExtra.refresh_token
+          ? {
+              refresh_token: pollExtra.refresh_token,
+              refresh_expires_at: Date.now() + refreshTtlSeconds * 1000,
+            }
+          : {}),
       };
       await savePassport(passport);
       return { passport, pollResponse: poll };
@@ -182,6 +197,70 @@ async function pollAndStore(input: {
     nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
     extra: { session_id: input.sessionId, verify_url: input.verifyUrl },
   });
+}
+
+/**
+ * Silently exchange a refresh_token for a fresh access opc_ + new rotating
+ * refresh_token. Inlined here (not via the SDK) so the refresh path stays
+ * exclusive to registered buyer-side tools — same security posture as
+ * /v1/sessions/public.
+ *
+ * Returns the new Passport (already saved) on success. Throws when the
+ * refresh_token is revoked / expired / unknown — caller (attach.ts) should
+ * fall through to the inline reauth flow (Phase 2's bootstrapFromExpiry).
+ */
+export interface RefreshAccessTokenInput {
+  refreshToken: string;
+  baseUrl?: string;
+  fetch?: typeof globalThis.fetch;
+}
+
+export async function refreshAccessToken(input: RefreshAccessTokenInput): Promise<Passport> {
+  const baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
+  const fetchImpl = input.fetch ?? globalThis.fetch;
+
+  const response = await fetchImpl(`${baseUrl}/v1/sessions/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': '@agent-score/pay',
+      'X-Client-Id': PUBLIC_CLIENT_ID,
+    },
+    body: JSON.stringify({ refresh_token: input.refreshToken }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    try {
+      parsed = body ? JSON.parse(body) : null;
+    } catch {
+      parsed = null;
+    }
+    throw new AgentScoreError(
+      parsed?.error?.code ?? 'http_error',
+      parsed?.error?.message ?? `HTTP ${response.status}`,
+      response.status,
+    );
+  }
+
+  const result = JSON.parse(body) as {
+    operator_token: string;
+    token_ttl_seconds: number;
+    refresh_token: string;
+    refresh_token_ttl_seconds: number;
+  };
+
+  const passport: Passport = {
+    version: 1,
+    operator_token: result.operator_token,
+    expires_at: Date.now() + result.token_ttl_seconds * 1000,
+    saved_at: Date.now(),
+    refresh_token: result.refresh_token,
+    refresh_expires_at: Date.now() + result.refresh_token_ttl_seconds * 1000,
+  };
+  await savePassport(passport);
+  return passport;
 }
 
 /**

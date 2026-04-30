@@ -1,9 +1,9 @@
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attachPassport, attachResultToHeaders } from '../src/passport/attach';
-import { savePassport, type Passport } from '../src/passport/storage';
+import { loadPassport, savePassport, type Passport } from '../src/passport/storage';
 
 describe('passport/attach', () => {
   let tmp: string;
@@ -83,5 +83,115 @@ describe('passport/attach', () => {
     const result = await attachPassport({ now });
     expect(result.kind).toBe('attached');
     expect(result.expiringSoon).toBe(false);
+  });
+
+  describe('silent refresh (Phase 3)', () => {
+    function withRefresh(overrides: Partial<Passport> = {}): Passport {
+      const now = Date.now();
+      return {
+        version: 1,
+        operator_token: 'opc_about_to_expire',
+        expires_at: now + 30 * 1000, // 30s left — within REFRESH_THRESHOLD_MS (60s)
+        saved_at: now,
+        refresh_token: 'prt_test_refresh_token',
+        refresh_expires_at: now + 90 * 24 * 60 * 60 * 1000,
+        ...overrides,
+      };
+    }
+
+    it('silently refreshes when access token is within 60s of expiry and saves the new pair', async () => {
+      const calls: string[] = [];
+      const fetchMock = vi.fn(async (url: string | URL) => {
+        calls.push(url.toString());
+        return new Response(
+          JSON.stringify({
+            operator_token: 'opc_freshly_minted',
+            token_ttl_seconds: 24 * 60 * 60,
+            refresh_token: 'prt_freshly_rotated',
+            refresh_token_ttl_seconds: 90 * 24 * 60 * 60,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }) as unknown as typeof globalThis.fetch;
+
+      const stored = withRefresh();
+      await savePassport(stored);
+
+      const result = await attachPassport({ fetch: fetchMock });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_freshly_minted');
+      // Hit /v1/sessions/refresh once.
+      expect(calls.filter((c) => c.endsWith('/v1/sessions/refresh'))).toHaveLength(1);
+
+      // Disk got the new pair.
+      const reloaded = await loadPassport();
+      expect(reloaded?.operator_token).toBe('opc_freshly_minted');
+      expect(reloaded?.refresh_token).toBe('prt_freshly_rotated');
+    });
+
+    it('does NOT refresh when access token is comfortably away from expiry', async () => {
+      const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
+      const now = Date.now();
+      await savePassport(withRefresh({ expires_at: now + 24 * 60 * 60 * 1000 }));
+
+      const result = await attachPassport({ fetch: fetchMock, now });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_about_to_expire');
+      expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+    });
+
+    it('does NOT refresh when there is no refresh_token (legacy passport)', async () => {
+      const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
+      await savePassport({
+        version: 1,
+        operator_token: 'opc_legacy',
+        expires_at: Date.now() + 30 * 1000,
+        saved_at: Date.now(),
+      });
+
+      const result = await attachPassport({ fetch: fetchMock });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_legacy');
+      expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+    });
+
+    it('does NOT refresh when the refresh_token itself has expired — surfaces as expired', async () => {
+      const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
+      const now = Date.now();
+      await savePassport(withRefresh({
+        expires_at: now + 30 * 1000,
+        refresh_expires_at: now - 1000,
+      }));
+
+      const result = await attachPassport({ fetch: fetchMock, now });
+      // Access token is still nominally valid, but refresh window has closed —
+      // we still attach (access_expires_at hasn't hit zero yet) without a refresh.
+      // On the next call when access fully expires, we'll fall through to reauth.
+      expect(result.kind).toBe('attached');
+      expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+    });
+
+    it('falls through to expired when refresh fails (revoked / network)', async () => {
+      const fetchMock = vi.fn(async () => new Response(
+        JSON.stringify({ error: { code: 'refresh_token_revoked', message: 'Revoked' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      )) as unknown as typeof globalThis.fetch;
+
+      await savePassport(withRefresh());
+
+      const result = await attachPassport({ fetch: fetchMock });
+      expect(result.kind).toBe('expired');
+      // Caller (pay.ts) should now drive Phase 2 inline reauth.
+    });
+
+    it('honors skipRefresh flag (testing surface)', async () => {
+      const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
+      await savePassport(withRefresh());
+
+      const result = await attachPassport({ fetch: fetchMock, skipRefresh: true });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_about_to_expire');
+      expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+    });
   });
 });
