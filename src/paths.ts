@@ -41,3 +41,7 @@ export function ledgerPath(): string {
 export function limitsPath(): string {
   return join(baseDir(), 'limits.json');
 }
+
+export function passportPath(): string {
+  return join(baseDir(), 'passport.json');
+}

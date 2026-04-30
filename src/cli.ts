@@ -20,6 +20,11 @@ import {
 } from './commands/identity';
 import { init } from './commands/init';
 import { limitsClear, limitsSet, limitsShow } from './commands/limits';
+import {
+  passportLoginCommand,
+  passportLogoutCommand,
+  passportStatusCommand,
+} from './commands/passport';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { revoke } from './commands/revoke';
@@ -655,6 +660,7 @@ export function buildCli() {
       retries: z.coerce.number().optional().describe('Retry transient network errors up to N times'),
       dryRun: z.boolean().optional().describe('Print the payment plan without signing or sending'),
       verbose: z.boolean().optional().describe('Log rail selection + balances to stderr'),
+      noPassport: z.boolean().optional().describe('Skip auto-attach of stored AgentScore Passport (X-Operator-Token)'),
     }),
     alias: { data: 'd', header: 'H', verbose: 'v' },
     examples: [
@@ -689,6 +695,7 @@ export function buildCli() {
           retries: c.options.retries,
           dryRun: c.options.dryRun,
           verbose: c.options.verbose,
+          noPassport: c.options.noPassport,
         });
         return c.ok(result, {
           cta: {
@@ -896,6 +903,84 @@ export function buildCli() {
     },
   });
   cli.command(credentials);
+
+  // ── passport group (AgentScore identity, browser-redirect login) ────────────
+  const passport = Cli.create('passport', {
+    description:
+      'AgentScore Passport — buyer-side identity (KYC + verified facts). Stores an operator_token locally; auto-attached to merchant requests on settle.',
+  });
+  passport.command('login', {
+    description:
+      'Verify identity in your browser and save the resulting operator_token to ~/.agentscore/passport.json.',
+    hint: 'Requires AGENTSCORE_API_KEY (or --api-key). Opens a verify URL — complete KYC in browser, pay polls until verified.',
+    options: z.object({
+      address: z.string().optional().describe('Pre-associate the session with a known wallet (EVM or Solana)'),
+      operatorToken: z.string().optional().describe('Refresh KYC for an existing operator credential'),
+      pollIntervalSeconds: z.coerce.number().optional().describe('Poll cadence (default 5s)'),
+      timeoutSeconds: z.coerce.number().optional().describe('Polling timeout (default 3600s)'),
+      apiKey: apiKeyOpt,
+    }),
+    examples: [
+      { description: 'Cold-start login — opens verify URL, polls until verified' },
+      { options: { address: '0xabc...' }, description: 'Tie the new Passport to an existing wallet' },
+    ],
+    run(c) {
+      return withCliErrors(async () => {
+        let printedVerifyUrl = false;
+        const result = await passportLoginCommand({
+          address: c.options.address,
+          operatorToken: c.options.operatorToken,
+          pollIntervalSeconds: c.options.pollIntervalSeconds,
+          timeoutSeconds: c.options.timeoutSeconds,
+          apiKey: c.options.apiKey,
+          onVerifyUrl: (verifyUrl) => {
+            if (!printedVerifyUrl) {
+              process.stderr.write(`\nOpen this URL to verify your AgentScore Passport:\n  ${verifyUrl}\n\nWaiting for verification...\n`);
+              printedVerifyUrl = true;
+            }
+          },
+        });
+        return c.ok(result, {
+          cta: {
+            description: 'Passport active. Next steps:',
+            commands: [
+              { command: 'pay', description: 'Make a payment — pay auto-attaches X-Operator-Token to merchant requests' },
+              { command: 'passport status', description: 'View verified facts + expiry at any time' },
+            ],
+          },
+        });
+      });
+    },
+  });
+  passport.command('status', {
+    description: 'Show stored AgentScore Passport — token prefix, expiry, expired flag.',
+    options: z.object({}),
+    run(c) {
+      return withCliErrors(async () => {
+        const result = await passportStatusCommand();
+        if (!result.authenticated) {
+          return c.ok(result, {
+            cta: {
+              description: 'Not authenticated. Next steps:',
+              commands: [{ command: 'passport login', description: 'Verify your identity and store an operator_token locally' }],
+            },
+          });
+        }
+        return c.ok(result);
+      });
+    },
+  });
+  passport.command('logout', {
+    description: 'Revoke the stored operator_token at AgentScore (best-effort) and remove ~/.agentscore/passport.json.',
+    options: z.object({ apiKey: apiKeyOpt }),
+    run(c) {
+      return withCliErrors(async () => {
+        const result = await passportLogoutCommand({ apiKey: c.options.apiKey });
+        return c.ok(result);
+      });
+    },
+  });
+  cli.command(passport);
 
   // ── associate-wallet ────────────────────────────────────────────────────────
   cli.command('associate-wallet', {

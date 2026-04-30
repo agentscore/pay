@@ -20,6 +20,10 @@ export type ErrorCode =
   | 'merchant_error'
   | 'merchant_spec_violation'
   | 'session_timeout'
+  | 'passport_api_error'
+  | 'passport_verification_failed'
+  | 'passport_verification_timeout'
+  | 'passport_token_expired'
   | 'unknown';
 
 export const EXIT_CODES = {
@@ -39,6 +43,8 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
     case 'rpc_error':
     case 'merchant_error':
     case 'session_timeout':
+    case 'passport_api_error':
+    case 'passport_verification_timeout':
       return EXIT_CODES.NETWORK_ERROR;
     case 'merchant_spec_violation':
       return EXIT_CODES.PAYMENT_REJECTED;

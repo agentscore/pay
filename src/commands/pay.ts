@@ -9,6 +9,7 @@ import { CliError } from '../errors';
 import { mergeHeaders } from '../headers';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
+import { attachPassport } from '../passport/attach';
 import { DEFAULT_WALLET_NAME } from '../paths';
 import { extractNextStepsAction, extractTxHash } from '../payment-receipt';
 import { emitProgress } from '../progress';
@@ -32,6 +33,8 @@ export interface PayInput {
   timeoutSeconds?: number;
   retries?: number;
   name?: string;
+  /** When true, do not auto-attach the stored AgentScore Passport. Default false. */
+  noPassport?: boolean;
 }
 
 export type Protocol = 'x402' | 'mpp';
@@ -95,12 +98,28 @@ export async function pay(input: PayInput): Promise<PayResult> {
 
   const protocol: Protocol = candidate.chain === 'tempo' ? 'mpp' : 'x402';
 
+  // Resolve AgentScore Passport once (also reused on the live path below). When the
+  // caller provided their own X-Operator-Token or set --no-passport, this is a no-op.
+  const userHeaderKeysAll = Object.keys(input.headers ?? {}).map((k) => k.toLowerCase());
+  const callerOperatorToken = userHeaderKeysAll.includes('x-operator-token')
+    ? Object.entries(input.headers ?? {}).find(([k]) => k.toLowerCase() === 'x-operator-token')?.[1]
+    : undefined;
+  const passportAttach = await attachPassport({
+    noPassport: input.noPassport,
+    callerSuppliedOperatorToken: callerOperatorToken,
+  });
+
   if (input.dryRun) {
-    const userKeys = Object.keys(input.headers ?? {}).map((k) => k.toLowerCase());
-    const hasIdentity = userKeys.includes('x-operator-token') || userKeys.includes('x-wallet-address');
+    const userKeys = userHeaderKeysAll;
+    const callerHasIdentity = userKeys.includes('x-operator-token') || userKeys.includes('x-wallet-address');
+    const passportInjects = passportAttach.kind === 'attached';
+    const hasIdentity = callerHasIdentity || passportInjects;
     const headers = mergeHeaders(
       {
         'Content-Type': 'application/json',
+        ...(passportInjects && passportAttach.operatorToken
+          ? { 'X-Operator-Token': passportAttach.operatorToken }
+          : {}),
         ...(hasIdentity ? {} : { 'X-Wallet-Address': candidate.address }),
       },
       input.headers,
@@ -132,20 +151,40 @@ export async function pay(input: PayInput): Promise<PayResult> {
   // header. If the agent passed X-Operator-Token, layering X-Wallet-Address on top makes
   // the merchant's gate evaluate BOTH identities — and unlinked wallets without their
   // own KYC will fail compliance even though the operator_token is fully verified.
-  const userHeaderKeys = Object.keys(input.headers ?? {}).map((k) => k.toLowerCase());
+  const userHeaderKeys = userHeaderKeysAll;
   const userSpecifiedIdentity =
     userHeaderKeys.includes('x-operator-token') || userHeaderKeys.includes('x-wallet-address');
+  const passportInjectsIdentity = passportAttach.kind === 'attached';
   const userSpecifiedIdempotency = userHeaderKeys.includes('x-idempotency-key');
   init.headers = mergeHeaders(
     {
       'Content-Type': 'application/json',
-      ...(userSpecifiedIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
+      ...(passportInjectsIdentity && passportAttach.operatorToken
+        ? { 'X-Operator-Token': passportAttach.operatorToken }
+        : {}),
+      ...(userSpecifiedIdentity || passportInjectsIdentity ? {} : { 'X-Wallet-Address': wallet.address }),
       ...(userSpecifiedIdempotency
         ? {}
         : { 'X-Idempotency-Key': computeIdempotencyKey({ url: input.url, method: input.method, body: input.body, signer: wallet.address }) }),
     },
     input.headers,
   );
+
+  if (input.verbose && passportInjectsIdentity) {
+    emitProgress('passport_attached', {
+      operator_token_prefix: passportAttach.operatorToken!.slice(0, 8) + '…',
+      expires_in_days: passportAttach.passport
+        ? Math.max(0, Math.floor((passportAttach.passport.expires_at - Date.now()) / (24 * 60 * 60 * 1000)))
+        : null,
+      expiring_soon: passportAttach.expiringSoon ?? false,
+    });
+  }
+  if (passportAttach.expiringSoon) {
+    process.stderr.write(`Passport expires soon — run \`pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
+  }
+  if (passportAttach.kind === 'expired') {
+    process.stderr.write('Stored Passport has expired. Run `pay passport login` to renew.\n');
+  }
 
   if (input.verbose) {
     emitProgress('request', {
