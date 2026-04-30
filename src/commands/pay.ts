@@ -10,6 +10,7 @@ import { mergeHeaders } from '../headers';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
 import { attachPassport } from '../passport/attach';
+import { bootstrapFromExpiry, bootstrapFromMerchantSession, detectMerchantBootstrap } from '../passport/bootstrap';
 import { DEFAULT_WALLET_NAME } from '../paths';
 import { extractNextStepsAction, extractTxHash } from '../payment-receipt';
 import { emitProgress } from '../progress';
@@ -104,10 +105,33 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const callerOperatorToken = userHeaderKeysAll.includes('x-operator-token')
     ? Object.entries(input.headers ?? {}).find(([k]) => k.toLowerCase() === 'x-operator-token')?.[1]
     : undefined;
-  const passportAttach = await attachPassport({
+  let passportAttach = await attachPassport({
     noPassport: input.noPassport,
     callerSuppliedOperatorToken: callerOperatorToken,
   });
+
+  // Mid-stream reauth on expiry — drive inline browser-redirect reauth (Phase 2).
+  // Only on the live path; dry-run shows `kind: 'expired'` verbatim so the user can
+  // see "would have re-authed" without actually opening a browser.
+  if (passportAttach.kind === 'expired' && !input.dryRun) {
+    process.stderr.write('Stored Passport has expired — re-verifying (KYC stays valid, this is a one-click renewal)...\n');
+    let printedVerifyUrl = false;
+    const renewal = await bootstrapFromExpiry({
+      onVerifyUrl: (verifyUrl) => {
+        if (!printedVerifyUrl) {
+          process.stderr.write(`Open this URL to renew:\n  ${verifyUrl}\n\nWaiting for verification...\n`);
+          printedVerifyUrl = true;
+        }
+      },
+    });
+    process.stderr.write(`Passport renewed (expires ${new Date(renewal.passport.expires_at).toISOString()}).\n`);
+    passportAttach = {
+      kind: 'attached',
+      passport: renewal.passport,
+      operatorToken: renewal.passport.operator_token,
+      expiringSoon: false,
+    };
+  }
 
   if (input.dryRun) {
     const userKeys = userHeaderKeysAll;
@@ -182,9 +206,8 @@ export async function pay(input: PayInput): Promise<PayResult> {
   if (passportAttach.expiringSoon) {
     process.stderr.write(`Passport expires soon — run \`pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
   }
-  if (passportAttach.kind === 'expired') {
-    process.stderr.write('Stored Passport has expired. Run `pay passport login` to renew.\n');
-  }
+  // Note: kind === 'expired' on the live path was already handled inline above.
+  // Dry-run doesn't drive reauth; the user can see kind: 'expired' in the dry-run output.
 
   if (input.verbose) {
     emitProgress('request', {
@@ -239,8 +262,84 @@ export async function pay(input: PayInput): Promise<PayResult> {
 
   if (input.verbose) emitProgress('response', { status: res.status, status_text: res.statusText });
 
-  const text = await res.text();
-  const parsed = tryParseJson(text);
+  let text = await res.text();
+  let parsed = tryParseJson(text);
+
+  // Cold-start bootstrap on 403 — when a merchant gate auto-mints a verification
+  // session for us and surfaces it in the deny body. Drives the inline browser-
+  // redirect flow once, then RETRIES the original payment with X-Operator-Token
+  // attached + (when present) the merchant's order_id merged into the body so
+  // the retry resumes the same pending order.
+  //
+  // Only triggers when:
+  //   1. Status is 403
+  //   2. Body has session_id + poll_secret + verify_url
+  //   3. Caller didn't pre-supply X-Operator-Token (theirs would have failed already)
+  //   4. We didn't already attach one this round (no infinite-loop)
+  //
+  // The retry is single-shot: if it returns 403 again we surface it.
+  const bootstrapFields = res.status === 403 ? detectMerchantBootstrap(parsed) : null;
+  const callerAlreadyHadIdentity = userHeaderKeysAll.includes('x-operator-token');
+  const passportAlreadyAttached = passportAttach.kind === 'attached';
+  if (bootstrapFields && !callerAlreadyHadIdentity && !passportAlreadyAttached && !input.noPassport) {
+    process.stderr.write('Merchant requires identity verification — bootstrapping inline...\n');
+    let printedVerifyUrl = false;
+    const renewal = await bootstrapFromMerchantSession(bootstrapFields, {
+      onVerifyUrl: (verifyUrl) => {
+        if (!printedVerifyUrl) {
+          process.stderr.write(`Open this URL to verify:\n  ${verifyUrl}\n\nWaiting for verification...\n`);
+          printedVerifyUrl = true;
+        }
+      },
+    });
+    process.stderr.write(`Passport saved (expires ${new Date(renewal.passport.expires_at).toISOString()}). Retrying payment with X-Operator-Token...\n`);
+
+    // Build a new request body that merges any merchant-supplied resume token
+    // (e.g. martin-estate's `order_id`) so the retry continues the pending order
+    // rather than minting a new one.
+    let retryBody = input.body;
+    if (bootstrapFields.order_id && input.body) {
+      const existing = tryParseJson(input.body);
+      if (existing && typeof existing === 'object') {
+        retryBody = JSON.stringify({ ...(existing as Record<string, unknown>), order_id: bootstrapFields.order_id });
+      }
+    }
+
+    // Rebuild init for the retry — fresh signal, fresh headers (with the new opc).
+    const retryController = new AbortController();
+    const retryTimer = setTimeout(() => retryController.abort(), timeoutSeconds * 1000);
+    const retryInit: RequestInit = { method: input.method, signal: retryController.signal };
+    if (retryBody !== undefined) retryInit.body = retryBody;
+    retryInit.headers = mergeHeaders(
+      {
+        'Content-Type': 'application/json',
+        'X-Operator-Token': renewal.passport.operator_token,
+        ...(userSpecifiedIdempotency
+          ? {}
+          : { 'X-Idempotency-Key': computeIdempotencyKey({ url: input.url, method: input.method, body: retryBody, signer: wallet.address }) }),
+      },
+      input.headers,
+    );
+
+    const retrySettled: PaymentSettled = {};
+    try {
+      res = await (
+        wallet.chain === 'tempo'
+          ? payViaMpp(wallet, { ...input, body: retryBody }, retryInit, retrySettled)
+          : payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
+      );
+    } catch (err: unknown) {
+      if (retrySettled.cliError) throw retrySettled.cliError;
+      throw mapNetworkError(err);
+    } finally {
+      clearTimeout(retryTimer);
+    }
+
+    text = await res.text();
+    parsed = tryParseJson(text);
+    settled.price_usd = retrySettled.price_usd ?? settled.price_usd;
+    settled.tx_hash = retrySettled.tx_hash ?? settled.tx_hash;
+  }
 
   if (!settled.tx_hash) settled.tx_hash = extractTxHash(res.headers, parsed);
   const nextStepsAction = extractNextStepsAction(parsed);

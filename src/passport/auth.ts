@@ -65,7 +65,82 @@ export async function passportLogin(input: PassportLoginInput = {}): Promise<Pas
     mintPublicSession({ baseUrl, fetch: fetchImpl }),
   );
 
-  if (input.onVerifyUrl) input.onVerifyUrl(session.verify_url);
+  return pollAndStore({
+    sessionId: session.session_id,
+    pollSecret: session.poll_secret,
+    verifyUrl: session.verify_url,
+    baseUrl,
+    fetch: fetchImpl,
+    pollIntervalSeconds: input.pollIntervalSeconds,
+    timeoutSeconds: input.timeoutSeconds,
+    onVerifyUrl: input.onVerifyUrl,
+    onPoll: input.onPoll,
+  });
+}
+
+/**
+ * Resume a verification session that someone else already minted (typically
+ * the merchant's gate, surfaced in a 403 with `verify_url` + `session_id` +
+ * `poll_secret`). The cold-start auto-bootstrap flow inside `pay <url>`
+ * calls this so an agent that hits a fresh AgentScore-gated merchant gets
+ * the operator_token without needing a prior `pay passport login`.
+ *
+ * Same poll-and-store machinery as `passportLogin`; only the session source
+ * differs.
+ */
+export interface PassportResumeInput {
+  sessionId: string;
+  pollSecret: string;
+  verifyUrl: string;
+  /** Optional poll URL from the merchant 403 — falls back to baseUrl-derived. */
+  pollUrl?: string;
+  pollIntervalSeconds?: number;
+  timeoutSeconds?: number;
+  baseUrl?: string;
+  fetch?: typeof globalThis.fetch;
+  onVerifyUrl?: (verifyUrl: string) => void;
+  onPoll?: (info: { attempt: number; status: string }) => void;
+}
+
+export async function passportResume(input: PassportResumeInput): Promise<PassportLoginResult> {
+  // If pollUrl points to a different host than our default baseUrl, derive baseUrl from it.
+  let baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
+  if (input.pollUrl) {
+    const m = input.pollUrl.match(/^(https?:\/\/[^/]+)/);
+    if (m && m[1]) baseUrl = m[1];
+  }
+  return pollAndStore({
+    sessionId: input.sessionId,
+    pollSecret: input.pollSecret,
+    verifyUrl: input.verifyUrl,
+    baseUrl,
+    fetch: input.fetch ?? globalThis.fetch,
+    pollIntervalSeconds: input.pollIntervalSeconds,
+    timeoutSeconds: input.timeoutSeconds,
+    onVerifyUrl: input.onVerifyUrl,
+    onPoll: input.onPoll,
+  });
+}
+
+/**
+ * Shared poll-and-store machinery for both flavors of session bootstrap:
+ *   - `passportLogin`     (mint via /v1/sessions/public, then poll)
+ *   - `passportResume`    (use a merchant-supplied session, just poll)
+ * Both converge here once they have a (sessionId, pollSecret, verifyUrl)
+ * triple to consume.
+ */
+async function pollAndStore(input: {
+  sessionId: string;
+  pollSecret: string;
+  verifyUrl: string;
+  baseUrl: string;
+  fetch: typeof globalThis.fetch;
+  pollIntervalSeconds?: number;
+  timeoutSeconds?: number;
+  onVerifyUrl?: (verifyUrl: string) => void;
+  onPoll?: (info: { attempt: number; status: string }) => void;
+}): Promise<PassportLoginResult> {
+  if (input.onVerifyUrl) input.onVerifyUrl(input.verifyUrl);
 
   const pollIntervalMs = (input.pollIntervalSeconds ?? 5) * 1000;
   const deadline = Date.now() + (input.timeoutSeconds ?? 3600) * 1000;
@@ -74,10 +149,10 @@ export async function passportLogin(input: PassportLoginInput = {}): Promise<Pas
   while (Date.now() < deadline) {
     attempt += 1;
     const poll = await callSafely(() => pollPublicSession({
-      sessionId: session.session_id,
-      pollSecret: session.poll_secret,
-      baseUrl,
-      fetch: fetchImpl,
+      sessionId: input.sessionId,
+      pollSecret: input.pollSecret,
+      baseUrl: input.baseUrl,
+      fetch: input.fetch,
     }));
     if (input.onPoll) input.onPoll({ attempt, status: poll.status });
 
@@ -96,7 +171,7 @@ export async function passportLogin(input: PassportLoginInput = {}): Promise<Pas
     if (poll.status === 'denied' || poll.status === 'failed') {
       throw new CliError('passport_verification_failed', `Passport verification ${poll.status}.`, {
         nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again.' },
-        extra: { session_id: session.session_id, status: poll.status },
+        extra: { session_id: input.sessionId, status: poll.status },
       });
     }
 
@@ -105,7 +180,7 @@ export async function passportLogin(input: PassportLoginInput = {}): Promise<Pas
 
   throw new CliError('passport_verification_timeout', 'Passport verification timed out.', {
     nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
-    extra: { session_id: session.session_id, verify_url: session.verify_url },
+    extra: { session_id: input.sessionId, verify_url: input.verifyUrl },
   });
 }
 
