@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@agent-score/sdk": "^2.0.0",
-    "@clack/prompts": "^1.2.0",
+    "@clack/prompts": "^1.3.0",
     "@scure/bip39": "^2.2.0",
     "@solana-program/token": "^0.13.0",
     "@solana/kit": "^6.8.0",
