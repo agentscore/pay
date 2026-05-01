@@ -186,6 +186,20 @@ describe('identity commands — SDK typed-error mapping', () => {
     });
   });
 
+  it('getReputation also routes typed errors through wrapApiError (e.g. PaymentRequiredError → insufficient_balance)', async () => {
+    // /v1/reputation is free in normal operation, but the wrap function should still
+    // map a typed error correctly if the API ever returns 402 for this endpoint
+    // (e.g. gated region, account state). Regression guard against the wrap function
+    // accidentally only handling the assess path.
+    vi.spyOn(AgentScore.prototype, 'getReputation').mockRejectedValueOnce(
+      new PaymentRequiredError('Endpoint not enabled'),
+    );
+    await expect(reputation({ address: '0xabc' })).rejects.toMatchObject({
+      code: 'insufficient_balance',
+      nextSteps: { action: 'upgrade_plan' },
+    });
+  });
+
   it('AssessResponse.quota field flows through pay\'s JSON envelope', async () => {
     // SDK populates `quota` on AssessResponse from X-Quota-* headers; pay's assess()
     // returns the SDK response unchanged, so `c.ok(result)` serializes it into the
