@@ -186,7 +186,7 @@ describe('identity commands — SDK typed-error mapping', () => {
     });
   });
 
-  it('AssessResponse.quota field flows through pay\'s JSON envelope (TEC-274 quota observability)', async () => {
+  it('AssessResponse.quota field flows through pay\'s JSON envelope', async () => {
     // SDK populates `quota` on AssessResponse from X-Quota-* headers; pay's assess()
     // returns the SDK response unchanged, so `c.ok(result)` serializes it into the
     // structured envelope without further wiring. Regression guard for that contract.
