@@ -51,8 +51,8 @@ function wrapApiError(err: unknown): never {
       });
     }
     if (err.status === 402) {
-      throw new CliError('insufficient_balance', 'AgentScore tier requires a paid API key.', {
-        nextSteps: { action: 'upgrade_plan', suggestion: 'See pricing at https://agentscore.sh/pricing.' },
+      throw new CliError('insufficient_balance', 'This endpoint is not enabled for your AgentScore account.', {
+        nextSteps: { action: 'upgrade_plan', suggestion: 'See https://agentscore.sh/pricing.' },
         extra: { code: err.code, status: err.status },
       });
     }

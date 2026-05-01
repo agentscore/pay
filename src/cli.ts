@@ -88,7 +88,7 @@ export function buildCli() {
       'CLI wallet for one-shell-command agent payments (x402 on Base + Solana, MPP on Tempo). Built by AgentScore; works with any 402-gated merchant.',
     version: VERSION,
     env: z.object({
-      AGENTSCORE_API_KEY: z.string().optional().describe('API key for paid-tier identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
+      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
       AGENTSCORE_PAY_HOME: z.string().optional().describe('Override the state dir (default: ~/.agentscore)'),
       BASE_RPC_URL: z.string().optional().describe('Override Base mainnet RPC endpoint'),
@@ -716,7 +716,7 @@ export function buildCli() {
   const apiKeyOpt = z.string().optional().describe('AgentScore API key (falls back to AGENTSCORE_API_KEY)');
 
   cli.command('reputation', {
-    description: 'Look up the cached trust reputation for a wallet address (free tier — read-only)',
+    description: 'Look up the cached trust reputation for a wallet address (no API key required)',
     args: z.object({ address: z.string().describe('EVM (0x...) or Solana base58 wallet address') }),
     options: z.object({
       chain: z.string().optional().describe('Optional chain filter (e.g., base, ethereum)'),
@@ -736,8 +736,8 @@ export function buildCli() {
 
   cli.command('assess', {
     description:
-      "Assess a wallet/operator's trustworthiness with policy (paid tier). Pass --address (wallet) or --operator-token (credential).",
-    hint: 'Requires AGENTSCORE_API_KEY (or --api-key). Free-tier reputation is via `reputation`.',
+      "Assess a wallet/operator's trustworthiness with policy. Pass --address (wallet) or --operator-token (credential).",
+    hint: 'Requires AGENTSCORE_API_KEY (or --api-key). Reputation lookup (no key) is via `reputation`.',
     options: z.object({
       address: z.string().optional().describe('Wallet address — EVM (0x...) or Solana (base58)'),
       operatorToken: z.string().optional().describe('Operator credential (opc_...) for non-wallet identity'),
@@ -775,7 +775,7 @@ export function buildCli() {
 
   // ── sessions group ──────────────────────────────────────────────────────────
   const sessions = Cli.create('sessions', {
-    description: 'Identity verification sessions (paid tier)',
+    description: 'Identity verification sessions (requires API key)',
   });
   sessions.command('create', {
     description: 'Create an identity verification session — returns verify_url + poll credentials',
@@ -840,7 +840,7 @@ export function buildCli() {
 
   // ── credentials group ───────────────────────────────────────────────────────
   const credentials = Cli.create('credentials', {
-    description: 'Operator credentials (opc_...) for non-wallet agent identity (paid tier)',
+    description: 'Operator credentials (opc_...) for non-wallet agent identity (requires API key)',
   });
   credentials.command('create', {
     description: 'Create an operator credential. Run `credentials list` first — reuse beats creating.',

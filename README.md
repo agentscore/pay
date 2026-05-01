@@ -282,7 +282,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 ### Identity commands
 
-`passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK paid tier — set `AGENTSCORE_API_KEY`.
+`passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK — set `AGENTSCORE_API_KEY`.
 
 AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
 
@@ -291,8 +291,8 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
 | `passport status` | Show stored Passport — token prefix, expiry, expired flag |
 | `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
-| `reputation <address> [--chain c]` | Cached trust reputation lookup (free tier) |
-| `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (paid tier) |
+| `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |
+| `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (requires API key) |
 | `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
 | `sessions get <id> [--poll-secret s]` | Poll a session — returns `operator_token` once status is `verified` |
 | `credentials create [--label s] [--ttl-days N]` | Mint an operator credential (`opc_...`) |
