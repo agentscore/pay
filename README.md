@@ -20,9 +20,8 @@ agentscore-pay --help
 # Or via the install script (auto-detects npm vs native binary)
 curl -fsSL https://raw.githubusercontent.com/agentscore/pay/main/install.sh | sh
 
-# Or via Homebrew (once the tap is published)
-brew tap agentscore/tap
-brew install agentscore-pay
+# Or via Homebrew
+brew install agentscore/tap/agentscore-pay
 ```
 
 Requires Node 20+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release via `bun run build:binary:all`.
