@@ -383,6 +383,20 @@ AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay wallet create
 AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay pay --network testnet ...
 ```
 
+## Unlocking the keystore
+
+Three ways to satisfy the passphrase prompt, in precedence order:
+
+| Mechanism | Best for | Persistence |
+|---|---|---|
+| `AGENTSCORE_PAY_PASSPHRASE=<pass>` env var | Containers, CI, serverless, daemons, any non-interactive agent | Lifetime of the process / shell session |
+| `agentscore-pay unlock --for 1h` | Interactive shell session where you'll run multiple commands | Cached in `~/.agentscore/.unlock` (mode `0600`) until TTL expires (max 8h); `unlock --clear` wipes early |
+| Per-call interactive prompt | First-time setup, one-off commands | None — never written |
+
+**Env var wins** when set: it produces no on-disk artifact and is the right primitive for every agent context (CI secrets, container env, K8s secrets, Lambda config, MCP host config). When env vars aren't controllable (e.g. an interactive Claude Code session running locally), `unlock` is the fallback.
+
+**For agent authors**: prefer env var. Read it from your secret store at agent startup; don't bake it into the agent's prompt or memory. Pay's `agent-guide` command (`agentscore-pay agent-guide`) explains the precedence in its own structured output.
+
 ## Funding
 
 The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP Tempo are both gasless for the signer; the facilitator pays.
