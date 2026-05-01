@@ -75,7 +75,7 @@ Errors emit `{ code, message, retryable, hint? }` on stderr. Exit codes are stab
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | user error (bad args, missing wallet, wrong passphrase) |
+| 1 | user error (bad args, missing wallet, wrong passphrase, account quota) |
 | 2 | network error (merchant unreachable, RPC failure) |
 | 3 | insufficient funds |
 | 4 | payment rejected (exceeds `--max-spend`, local limit hit) |
@@ -299,6 +299,28 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | `credentials list` | List active (non-expired) credentials |
 | `credentials revoke <id>` | Revoke a credential by ID |
 | `associate-wallet --operator-token o --wallet-address a --network evm\|solana [--idempotency-key k]` | Report a signer wallet seen paying under a credential (cross-merchant attribution) |
+
+#### Identity error codes
+
+`assess`, `sessions`, `credentials`, and `associate-wallet` surface the SDK's typed errors as structured CliErrors. The JSON envelope's `code` discriminates the recovery path:
+
+| `code` | Source | Recovery |
+|---|---|---|
+| `config_error` | API-key missing/invalid, OR `TokenExpiredError` (extra carries `verify_url`/`session_id`/`poll_secret`), OR `InvalidCredentialError` | Run `passport login` to mint a fresh `operator_token` (no API key needed); for API-key issues, fix `AGENTSCORE_API_KEY` |
+| `insufficient_balance` | `PaymentRequiredError` — endpoint not enabled for this account | Surface `next_steps.suggestion` to the user; agent retry won't help |
+| `quota_exceeded` | `QuotaExceededError` — account-level cap hit | Surface to user; cap won't lift until period resets or plan upgrades. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
+| `network_error` | `RateLimitedError` (per-second cap), `TimeoutError`, or any other transient failure | Retry with backoff per `next_steps.suggestion` |
+
+#### Quota observability
+
+`assess` (and the other identity commands when the account has a per-period quota) emits the response's `X-Quota-Limit` / `X-Quota-Used` / `X-Quota-Reset` headers as a `quota: { limit, used, reset }` block on the success envelope. Agents monitoring approach-to-cap should warn at 80% and alert at 95%.
+
+```bash
+agentscore-pay assess --address 0xabc... --json | jq '.quota'
+# → { "limit": 1000, "used": 780, "reset": "2026-06-01T00:00:00Z" }
+```
+
+`quota` is absent on accounts with no per-period quota.
 
 ## Mnemonic-based wallets
 

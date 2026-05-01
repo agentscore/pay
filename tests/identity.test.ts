@@ -185,4 +185,20 @@ describe('identity commands — SDK typed-error mapping', () => {
       nextSteps: { action: 'retry_with_backoff' },
     });
   });
+
+  it('AssessResponse.quota field flows through pay\'s JSON envelope (TEC-274 quota observability)', async () => {
+    // SDK populates `quota` on AssessResponse from X-Quota-* headers; pay's assess()
+    // returns the SDK response unchanged, so `c.ok(result)` serializes it into the
+    // structured envelope without further wiring. Regression guard for that contract.
+    vi.spyOn(AgentScore.prototype, 'assess').mockResolvedValueOnce({
+      decision: 'allow',
+      decision_reasons: [],
+      identity_method: 'wallet',
+      on_the_fly: false,
+      updated_at: '2026-01-01T00:00:00Z',
+      quota: { limit: 1000, used: 780, reset: '2026-06-01T00:00:00Z' },
+    });
+    const result = await assess({ address: '0xabc' });
+    expect(result.quota).toEqual({ limit: 1000, used: 780, reset: '2026-06-01T00:00:00Z' });
+  });
 });

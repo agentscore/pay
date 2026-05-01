@@ -11,6 +11,13 @@ interface GuideStep {
   notes?: string[];
 }
 
+interface IdentityErrorPattern {
+  cli_code: string;
+  thrown_when: string;
+  next_action: string;
+  recovery: string;
+}
+
 interface AgentGuide {
   for_agents: true;
   intro: string;
@@ -19,6 +26,7 @@ interface AgentGuide {
   funding: GuideStep[];
   auxiliary: GuideStep[];
   pitfalls: GuideStep[];
+  identity_error_recovery: IdentityErrorPattern[];
   exit_codes: Record<string, string>;
   json_mode: string;
 }
@@ -197,9 +205,41 @@ const GUIDE: AgentGuide = {
     },
   ],
 
+  identity_error_recovery: [
+    {
+      cli_code: 'config_error',
+      thrown_when:
+        'AGENTSCORE_API_KEY missing or invalid; OR operator_token expired/revoked (TokenExpiredError, exposes verify_url + session_id + poll_secret in extra); OR operator_token unrecognized (InvalidCredentialError).',
+      next_action: 'reauth or check_api_key (see envelope.next_steps.action)',
+      recovery:
+        'For TokenExpiredError: run `agentscore-pay passport login` to mint a fresh operator_token (no API key needed), or use the verify_url + session_id + poll_secret from extra to drive the verify/poll flow manually. For InvalidCredentialError: switch to a different stored operator_token, or run `passport login`. For check_api_key: confirm AGENTSCORE_API_KEY is valid; key issues will not reauth-fix via passport.',
+    },
+    {
+      cli_code: 'insufficient_balance',
+      thrown_when: 'PaymentRequiredError — the requested endpoint is not enabled for the API key\'s account (HTTP 402).',
+      next_action: 'upgrade_plan',
+      recovery: 'Surface the suggestion to the user. See https://agentscore.sh/pricing — agent retry will not fix this.',
+    },
+    {
+      cli_code: 'quota_exceeded',
+      thrown_when: 'QuotaExceededError — account-level cap hit (HTTP 429 quota_exceeded).',
+      next_action: 'upgrade_plan',
+      recovery:
+        'Do NOT retry. Surface to user. Cap will not lift until the period resets or plan is upgraded. Use AssessResponse.quota field on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
+    },
+    {
+      cli_code: 'network_error',
+      thrown_when:
+        'RateLimitedError (per-second cap, HTTP 429 rate_limited), SdkTimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
+      next_action: 'retry_with_backoff',
+      recovery:
+        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with the merchant\'s support contact.',
+    },
+  ],
+
   exit_codes: {
     '0': 'success',
-    '1': 'user error (bad args, missing wallet, wrong passphrase)',
+    '1': 'user error (bad args, missing wallet, wrong passphrase, account quota)',
     '2': 'network error (merchant unreachable, RPC failure)',
     '3': 'insufficient funds',
     '4': 'payment rejected (exceeds --max-spend, signer mismatch)',

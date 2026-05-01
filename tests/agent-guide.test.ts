@@ -17,4 +17,18 @@ describe('agent-guide', () => {
       expect(step.why).toBeTruthy();
     }
   });
+
+  it('identity_error_recovery covers config_error, insufficient_balance, quota_exceeded, network_error', async () => {
+    const guide = await agentGuide();
+    const codes = guide.identity_error_recovery.map((p) => p.cli_code);
+    expect(codes).toContain('config_error');
+    expect(codes).toContain('insufficient_balance');
+    expect(codes).toContain('quota_exceeded');
+    expect(codes).toContain('network_error');
+    for (const pattern of guide.identity_error_recovery) {
+      expect(pattern.thrown_when).toBeTruthy();
+      expect(pattern.next_action).toBeTruthy();
+      expect(pattern.recovery).toBeTruthy();
+    }
+  });
 });
