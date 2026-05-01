@@ -20,6 +20,11 @@ import {
 } from './commands/identity';
 import { init } from './commands/init';
 import { limitsClear, limitsSet, limitsShow } from './commands/limits';
+import {
+  passportLoginCommand,
+  passportLogoutCommand,
+  passportStatusCommand,
+} from './commands/passport';
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { revoke } from './commands/revoke';
@@ -44,7 +49,7 @@ const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0-dev';
 
 const chainSchema = z.enum(SUPPORTED_CHAINS).describe('Blockchain rail (base, solana, tempo)');
 const networkSchema = z.enum(SUPPORTED_NETWORKS).default('mainnet').describe('Mainnet (default) or testnet');
-const walletNameSchema = z.string().default('default').describe('Named keystore — pass a name to use a non-default wallet');
+const walletNameSchema = z.string().default('default').describe('Named keystore — pass a name to pick a non-default wallet');
 
 function parseHeaders(values: string[] | undefined): Record<string, string> | undefined {
   if (!values || values.length === 0) return undefined;
@@ -83,7 +88,7 @@ export function buildCli() {
       'CLI wallet for one-shell-command agent payments (x402 on Base + Solana, MPP on Tempo). Built by AgentScore; works with any 402-gated merchant.',
     version: VERSION,
     env: z.object({
-      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation)'),
+      AGENTSCORE_API_KEY: z.string().optional().describe('API key for paid-tier identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
       AGENTSCORE_PAY_HOME: z.string().optional().describe('Override the state dir (default: ~/.agentscore)'),
       BASE_RPC_URL: z.string().optional().describe('Override Base mainnet RPC endpoint'),
@@ -96,6 +101,7 @@ export function buildCli() {
     sync: {
       suggestions: [
         'create a wallet on every supported chain with `agentscore-pay init`',
+        'verify your AgentScore Passport once with `agentscore-pay passport login` — pay then auto-attaches X-Operator-Token to every gated merchant',
         'discover paid services with `agentscore-pay discover --search <query>`',
         'probe a 402 endpoint with `agentscore-pay check <url> -X POST -d <body>`',
         'pay an endpoint with `agentscore-pay pay POST <url> -d <body> --max-spend 5`',
@@ -131,6 +137,7 @@ export function buildCli() {
           cta: {
             description: 'Next steps:',
             commands: [
+              { command: 'passport login', description: 'Verify identity once — required for AgentScore-gated merchants. Skipped automatically for unregulated ones. ~30 seconds in browser, no money needed.' },
               { command: 'fund', options: { chain: true }, description: 'Top up a wallet via Coinbase Onramp + QR' },
               { command: 'balance', description: 'Confirm wallet balances' },
               { command: 'discover', description: 'Browse paid services in the x402 + MPP ecosystem' },
@@ -148,18 +155,18 @@ export function buildCli() {
     description: 'Generate a new encrypted keystore. Omit --chain to create all three chains.',
     options: z.object({
       chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       mnemonic: z.boolean().optional().describe('Generate a BIP-39 mnemonic and derive keys from it'),
     }),
     examples: [
       { description: 'Create base, solana, tempo wallets (random keys per chain)' },
       { options: { chain: 'base' }, description: 'Create only the base wallet' },
       { options: { mnemonic: true }, description: 'Generate a BIP-39 mnemonic and derive all three chains' },
-      { options: { chain: 'base', wallet: 'trading' }, description: 'Create a named secondary wallet' },
+      { options: { chain: 'base', name: 'trading' }, description: 'Create a named secondary wallet' },
     ],
     run({ options }) {
       return withCliErrors(() =>
-        walletCreate({ chain: options.chain, mnemonic: options.mnemonic, name: options.wallet }),
+        walletCreate({ chain: options.chain, mnemonic: options.mnemonic, name: options.name }),
       );
     },
   });
@@ -171,7 +178,7 @@ export function buildCli() {
     }),
     options: z.object({
       chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       mnemonic: z.string().optional().describe('BIP-39 mnemonic phrase (12 or 24 words, quoted)'),
     }),
     examples: [
@@ -181,17 +188,17 @@ export function buildCli() {
     run({ args, options }) {
       return withCliErrors(async () => {
         if (options.mnemonic) {
-          if (options.wallet !== 'default') {
+          if (options.name !== 'default') {
             throw new CliError(
               'invalid_input',
-              '--mnemonic stores keys under the "default" wallet name; --wallet is not supported in this mode.',
+              '--mnemonic stores keys under the "default" wallet name; --name is not supported in this mode.',
             );
           }
           return walletImportMnemonic({ phrase: options.mnemonic, chain: options.chain });
         }
         if (!args.key) throw new CliError('invalid_input', 'Pass either <key> positional or --mnemonic <phrase>');
         if (!options.chain) throw new CliError('invalid_input', '--chain is required when importing a raw key');
-        return walletImport({ chain: options.chain, key: args.key, name: options.wallet });
+        return walletImport({ chain: options.chain, key: args.key, name: options.name });
       });
     },
   });
@@ -227,14 +234,14 @@ export function buildCli() {
     description: 'Print a wallet address',
     options: z.object({
       chain: chainSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
     }),
     examples: [
       { options: { chain: 'base' }, description: 'Print the default base address' },
-      { options: { chain: 'solana', wallet: 'trading' }, description: 'Print a named wallet address' },
+      { options: { chain: 'solana', name: 'trading' }, description: 'Print a named wallet address' },
     ],
     run({ options }) {
-      return withCliErrors(() => walletAddress({ chain: options.chain, name: options.wallet }));
+      return withCliErrors(() => walletAddress({ chain: options.chain, name: options.name }));
     },
   });
 
@@ -244,7 +251,7 @@ export function buildCli() {
     outputPolicy: 'agent-only',
     options: z.object({
       chain: chainSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       danger: z.boolean().optional().describe('Acknowledge the risk of this destructive operation'),
       skipConfirm: z.boolean().optional().describe('Skip the type-EXPORT prompt (for scripting)'),
     }),
@@ -252,7 +259,7 @@ export function buildCli() {
       return withCliErrors(() =>
         walletExport({
           chain: options.chain,
-          name: options.wallet,
+          name: options.name,
           danger: options.danger,
           skipConfirm: options.skipConfirm,
         }),
@@ -265,7 +272,7 @@ export function buildCli() {
     hint: 'No undo. Run `wallet show-mnemonic --danger` first if you want to be able to restore.',
     options: z.object({
       chain: chainSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       danger: z.boolean().optional().describe('Acknowledge the risk of this destructive operation'),
       skipConfirm: z.boolean().optional().describe('Skip the type-EXPORT prompt (for scripting)'),
     }),
@@ -273,7 +280,7 @@ export function buildCli() {
       return withCliErrors(() =>
         walletRemove({
           chain: options.chain,
-          name: options.wallet,
+          name: options.name,
           danger: options.danger,
           skipConfirm: options.skipConfirm,
         }),
@@ -289,7 +296,7 @@ export function buildCli() {
     options: z.object({
       chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
       network: networkSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
     }),
     examples: [
       { description: 'USDC balance across base, solana, tempo (mainnet)' },
@@ -298,7 +305,7 @@ export function buildCli() {
     ],
     run({ options }) {
       return withCliErrors(() =>
-        balance({ chain: options.chain, network: options.network, name: options.wallet }),
+        balance({ chain: options.chain, network: options.network, name: options.name }),
       );
     },
   });
@@ -309,7 +316,7 @@ export function buildCli() {
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       amount: z.coerce.number().optional().describe('Pre-fill amount in USD'),
     }),
     examples: [
@@ -322,7 +329,7 @@ export function buildCli() {
           chain: options.chain,
           amountUsd: options.amount,
           network: options.network,
-          name: options.wallet,
+          name: options.name,
         }),
       );
     },
@@ -336,7 +343,7 @@ export function buildCli() {
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       amount: z.coerce.number().optional().describe('Target amount in USD (default 10)'),
     }),
     examples: [
@@ -349,7 +356,7 @@ export function buildCli() {
           chain: c.options.chain,
           amountUsd: c.options.amount ?? 10,
           network: c.options.network,
-          name: c.options.wallet,
+          name: c.options.name,
         });
         return c.ok(result, {
           cta: {
@@ -428,7 +435,7 @@ export function buildCli() {
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       token: z.string().describe('ERC-20 token contract (0x...)'),
       spender: z.string().describe('Spender to revoke (0x...)'),
     }),
@@ -442,7 +449,7 @@ export function buildCli() {
           network: options.network,
           token: options.token,
           spender: options.spender,
-          name: options.wallet,
+          name: options.name,
         }),
       );
     },
@@ -647,7 +654,7 @@ export function buildCli() {
     options: z.object({
       chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
       network: networkSchema,
-      wallet: walletNameSchema,
+      name: walletNameSchema,
       data: z.string().optional().describe('Request body'),
       header: z.array(z.string()).optional().describe("Additional header (repeatable, 'Name: value')"),
       maxSpend: z.coerce.number().optional().describe('Reject payments above this USD amount'),
@@ -655,6 +662,7 @@ export function buildCli() {
       retries: z.coerce.number().optional().describe('Retry transient network errors up to N times'),
       dryRun: z.boolean().optional().describe('Print the payment plan without signing or sending'),
       verbose: z.boolean().optional().describe('Log rail selection + balances to stderr'),
+      noPassport: z.boolean().optional().describe('Skip auto-attach of stored AgentScore Passport (X-Operator-Token)'),
     }),
     alias: { data: 'd', header: 'H', verbose: 'v' },
     examples: [
@@ -679,7 +687,7 @@ export function buildCli() {
         const result = await pay({
           chain: c.options.chain,
           network: c.options.network,
-          name: c.options.wallet,
+          name: c.options.name,
           method: c.args.method.toUpperCase(),
           url: c.args.url,
           body: c.options.data,
@@ -689,6 +697,7 @@ export function buildCli() {
           retries: c.options.retries,
           dryRun: c.options.dryRun,
           verbose: c.options.verbose,
+          noPassport: c.options.noPassport,
         });
         return c.ok(result, {
           cta: {
@@ -896,6 +905,77 @@ export function buildCli() {
     },
   });
   cli.command(credentials);
+
+  // ── passport group (AgentScore identity, browser-redirect login) ────────────
+  const passport = Cli.create('passport', {
+    description:
+      'AgentScore Passport — buyer-side identity (KYC + verified facts). Stores an operator_token locally; auto-attached to merchant requests on settle.',
+  });
+  passport.command('login', {
+    description:
+      'Verify identity in your browser and save the resulting operator_token to ~/.agentscore/passport.json.',
+    hint: 'No API key required. Opens a verify URL; pay polls until your KYC completes in browser.',
+    options: z.object({
+      pollIntervalSeconds: z.coerce.number().optional().describe('Poll cadence (default 5s)'),
+      timeoutSeconds: z.coerce.number().optional().describe('Polling timeout (default 3600s)'),
+    }),
+    examples: [
+      { description: 'Cold-start login — opens verify URL, polls until verified' },
+    ],
+    run(c) {
+      return withCliErrors(async () => {
+        let printedVerifyUrl = false;
+        const result = await passportLoginCommand({
+          pollIntervalSeconds: c.options.pollIntervalSeconds,
+          timeoutSeconds: c.options.timeoutSeconds,
+          onVerifyUrl: (verifyUrl) => {
+            if (!printedVerifyUrl) {
+              process.stderr.write(`\nOpen this URL to verify your AgentScore Passport:\n  ${verifyUrl}\n\nWaiting for verification...\n`);
+              printedVerifyUrl = true;
+            }
+          },
+        });
+        return c.ok(result, {
+          cta: {
+            description: 'Passport active. Next steps:',
+            commands: [
+              { command: 'pay', description: 'Make a payment — pay auto-attaches X-Operator-Token to merchant requests' },
+              { command: 'passport status', description: 'View verified facts + expiry at any time' },
+            ],
+          },
+        });
+      });
+    },
+  });
+  passport.command('status', {
+    description: 'Show stored AgentScore Passport — token prefix, expiry, expired flag.',
+    options: z.object({}),
+    run(c) {
+      return withCliErrors(async () => {
+        const result = await passportStatusCommand();
+        if (!result.authenticated) {
+          return c.ok(result, {
+            cta: {
+              description: 'Not authenticated. Next steps:',
+              commands: [{ command: 'passport login', description: 'Verify your identity and store an operator_token locally' }],
+            },
+          });
+        }
+        return c.ok(result);
+      });
+    },
+  });
+  passport.command('logout', {
+    description: 'Revoke the stored operator_token at AgentScore (best-effort) and remove ~/.agentscore/passport.json.',
+    options: z.object({ apiKey: apiKeyOpt }),
+    run(c) {
+      return withCliErrors(async () => {
+        const result = await passportLogoutCommand({ apiKey: c.options.apiKey });
+        return c.ok(result);
+      });
+    },
+  });
+  cli.command(passport);
 
   // ── associate-wallet ────────────────────────────────────────────────────────
   cli.command('associate-wallet', {

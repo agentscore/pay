@@ -49,7 +49,7 @@ export async function walletCreate(input: WalletCreateInput = {}): Promise<Walle
       throw new CliError('invalid_input', '--mnemonic is only supported for the default wallet name.', {
         nextSteps: {
           action: 'use_default_name_or_random_key',
-          suggestion: 'Drop --wallet, or omit --mnemonic to derive a random key for the named wallet.',
+          suggestion: 'Drop --name, or omit --mnemonic to derive a random key for the named wallet.',
         },
       });
     }
@@ -78,7 +78,7 @@ export async function walletCreate(input: WalletCreateInput = {}): Promise<Walle
     throw new CliError('wallet_exists', `Keystore for ${input.chain} (${name}) already exists.`, {
       nextSteps: {
         action: 'remove_then_create',
-        suggestion: `Delete ${keystorePath(input.chain, name)} to regenerate, or use a different --wallet name.`,
+        suggestion: `Delete ${keystorePath(input.chain, name)} to regenerate, or use a different --name.`,
       },
       extra: { chain: input.chain, name, keystore: keystorePath(input.chain, name) },
     });
@@ -178,7 +178,7 @@ export async function walletImport(input: WalletImportInput): Promise<WalletImpo
     throw new CliError('wallet_exists', `Keystore for ${input.chain} (${name}) already exists.`, {
       nextSteps: {
         action: 'remove_then_import',
-        suggestion: `Delete ${keystorePath(input.chain, name)} first or use a different --wallet name.`,
+        suggestion: `Delete ${keystorePath(input.chain, name)} first or use a different --name.`,
       },
       extra: { chain: input.chain, name, keystore: keystorePath(input.chain, name) },
     });

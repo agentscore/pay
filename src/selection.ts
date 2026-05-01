@@ -64,7 +64,7 @@ export async function selectRail(input: SelectInput = {}): Promise<Candidate> {
   const createSuggestion =
     walletName === DEFAULT_WALLET_NAME
       ? '`agentscore-pay wallet create`'
-      : `\`agentscore-pay wallet create --wallet ${walletName}\``;
+      : `\`agentscore-pay wallet create --name ${walletName}\``;
 
   if (heldCandidates.length === 0) {
     throw new CliError('no_wallet', `No wallets on disk${walletSuffix}.`, {
@@ -84,7 +84,7 @@ export async function selectRail(input: SelectInput = {}): Promise<Candidate> {
       throw new CliError('no_wallet', `No wallet on disk for chain: ${chainOverride}${walletSuffix}.`, {
         nextSteps: {
           action: 'create_wallet',
-          suggestion: `Run \`agentscore-pay wallet create --chain ${chainOverride}${walletName === DEFAULT_WALLET_NAME ? '' : ` --wallet ${walletName}`}\`.`,
+          suggestion: `Run \`agentscore-pay wallet create --chain ${chainOverride}${walletName === DEFAULT_WALLET_NAME ? '' : ` --name ${walletName}`}\`.`,
         },
         extra: { requested_chain: chainOverride, wallet_name: walletName, held_chains: heldCandidates.map((c) => c.chain) },
       });
@@ -93,7 +93,7 @@ export async function selectRail(input: SelectInput = {}): Promise<Candidate> {
       throw new CliError('insufficient_balance', `${chainOverride} wallet${walletSuffix} has insufficient USDC.`, {
         nextSteps: {
           action: 'fund_wallet',
-          suggestion: `Run \`agentscore-pay fund --chain ${chainOverride}${walletName === DEFAULT_WALLET_NAME ? '' : ` --wallet ${walletName}`}\`.`,
+          suggestion: `Run \`agentscore-pay fund --chain ${chainOverride}${walletName === DEFAULT_WALLET_NAME ? '' : ` --name ${walletName}`}\`.`,
         },
         extra: { chain: chainOverride, wallet_name: walletName, balance_usdc: hit.balance_usdc, balance_raw: hit.balance_raw.toString() },
       });

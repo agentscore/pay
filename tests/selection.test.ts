@@ -137,7 +137,7 @@ describe('selectRail', () => {
     await expect(selectRail({ minBalanceRaw: 100n })).rejects.toMatchObject({ code: 'no_funded_rail' });
   });
 
-  describe('named wallets (--wallet)', () => {
+  describe('named wallets (--name)', () => {
     async function writeNamedKeystore(chain: 'base' | 'solana' | 'tempo', name: string, address: string) {
       const file = join(ROOT, '.agentscore', 'wallets', `${chain}-${name}.json`);
       const dummy = {
@@ -157,7 +157,7 @@ describe('selectRail', () => {
       await writeFile(file, JSON.stringify(dummy));
     }
 
-    it('selects a named wallet when --wallet is passed', async () => {
+    it('selects a named wallet when --name is passed', async () => {
       await writeNamedKeystore('base', 'trading', '0xtradingbase');
       await mockBalances({ base: 100n });
       const { selectRail } = await import('../src/selection');
@@ -167,7 +167,7 @@ describe('selectRail', () => {
       expect(picked.address).toBe('0xtradingbase');
     });
 
-    it('errors no_wallet when --wallet name has no keystore', async () => {
+    it('errors no_wallet when --name has no keystore', async () => {
       await writeKeystore('base', '0xbase');
       await mockBalances({ base: 100n });
       const { selectRail } = await import('../src/selection');

@@ -4,7 +4,7 @@ CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and M
 
 ## Purpose
 
-Closes the UX gap for shell-tool LLM agents that want to pay protocol-gated endpoints. Mirrors `tempo request` ergonomics but covers every rail any 402/MPP merchant might accept: one shell command, body preserved, agent never sees a private key on the wire. Built by AgentScore; works with any 402-gated merchant — AgentScore-gated or not. Brand-as-maker stays prominent (binary name `agentscore-pay`, package `@agent-score/pay`); brand-as-scope explicitly does not — pay is the universal agent-payment CLI for the ecosystem.
+One shell command for shell-tool LLM agents to pay any 402/MPP merchant. POST body preserved through the round-trip; agent never sees a private key on the wire. Works with any 402-gated merchant — AgentScore-gated or not.
 
 ## Architecture
 
@@ -27,6 +27,8 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo testnet uses programmatic mint) |
 | `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
 | `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
+| `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `pay <url>` settle leg |
+| `src/passport/{auth,storage,attach}.ts` | Passport login flow (mint+poll), conf-style local keystore, X-Operator-Token attach decision tree |
 | `src/progress.ts` | stderr-only structured progress events (stdout belongs to incur) |
 | `tests/` | Vitest unit tests |
 | `dist/` | tsup output — ESM only with shebang banner |
@@ -81,9 +83,3 @@ bun run build
 The publish workflow runs on `ubuntu-latest` (required for npm trusted publishing), builds, publishes to npm with provenance, and creates a GitHub Release.
 
 npm scope is `@agent-score`. User-Agent in payment payloads uses `@agentscore/pay`.
-
-## Scope boundary
-
-- **In scope (MVP):** pay, balance, qr, fund, wallet CRUD on Base + Solana + Tempo
-- **Full polish (post-MVP):** Polygon/Arbitrum/World, BIP-39, keychain, `history/check/whoami/limits/link`, Coinbase Pay SDK embed, Homebrew/Scoop/Docker, sigstore, native binary
-- **Out forever:** fiat onramp, custodial wallet, swaps/bridges, GUI, duplicating merchant-side wallet capture
