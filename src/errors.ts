@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'invalid_input'
   | 'user_cancelled'
   | 'config_error'
+  | 'quota_exceeded'
   | 'merchant_error'
   | 'merchant_spec_violation'
   | 'session_timeout'

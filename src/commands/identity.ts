@@ -1,6 +1,12 @@
 import {
   AgentScore,
   AgentScoreError,
+  InvalidCredentialError,
+  PaymentRequiredError,
+  QuotaExceededError,
+  RateLimitedError,
+  TimeoutError as SdkTimeoutError,
+  TokenExpiredError,
   type AssessResponse,
   type AssociateWalletResponse,
   type CredentialCreateResponse,
@@ -43,21 +49,66 @@ function getClient(apiKey?: string): AgentScore {
 
 function wrapApiError(err: unknown): never {
   if (err instanceof CliError) throw err;
+
+  // Branch on the SDK's typed error subclasses so the code path is what's actually true at
+  // runtime, not an after-the-fact guess from .status / .code.
+  if (err instanceof PaymentRequiredError) {
+    throw new CliError('insufficient_balance', 'This endpoint is not enabled for your AgentScore account.', {
+      nextSteps: { action: 'upgrade_plan', suggestion: 'See https://agentscore.sh/pricing.' },
+      extra: { code: err.code, status: err.status },
+    });
+  }
+  if (err instanceof TokenExpiredError) {
+    throw new CliError('config_error', 'AgentScore operator token expired or revoked.', {
+      nextSteps: {
+        action: 'reauth',
+        suggestion: 'Run `agentscore-pay passport login` to refresh, or follow err.details.verify_url.',
+      },
+      extra: { code: err.code, status: err.status, verify_url: err.verifyUrl, session_id: err.sessionId, poll_secret: err.pollSecret },
+    });
+  }
+  if (err instanceof InvalidCredentialError) {
+    throw new CliError('config_error', 'AgentScore operator token not recognized.', {
+      nextSteps: {
+        action: 'switch_token_or_restart_session',
+        suggestion: 'Use a different stored token, or drop AGENTSCORE_API_KEY and run `passport login` to bootstrap a new session.',
+      },
+      extra: { code: err.code, status: err.status },
+    });
+  }
+  if (err instanceof QuotaExceededError) {
+    throw new CliError('quota_exceeded', 'AgentScore account quota exceeded.', {
+      nextSteps: {
+        action: 'contact_merchant',
+        suggestion: 'Account quota reached. See https://agentscore.sh/pricing — retry will keep failing until the period resets.',
+      },
+      extra: { code: err.code, status: err.status },
+    });
+  }
+  if (err instanceof RateLimitedError) {
+    throw new CliError('network_error', `AgentScore rate limit hit: ${err.message}`, {
+      nextSteps: { action: 'retry_with_backoff', suggestion: 'Retry after the Retry-After interval (typically <= 1s).' },
+      extra: { code: err.code, status: err.status },
+    });
+  }
+  if (err instanceof SdkTimeoutError) {
+    throw new CliError('network_error', `AgentScore API timed out: ${err.message}`, {
+      nextSteps: { action: 'retry_with_backoff', suggestion: 'Retry in 30–60s with exponential backoff.' },
+      extra: { code: err.code, status: err.status },
+    });
+  }
   if (err instanceof AgentScoreError) {
+    // 401 with no specific subclass (rare — most 401s subclass to TokenExpiredError or
+    // InvalidCredentialError above). Treat as auth-config issue.
     if (err.status === 401) {
       throw new CliError('config_error', `AgentScore auth error: ${err.message}`, {
         nextSteps: { action: 'check_api_key', suggestion: 'Confirm AGENTSCORE_API_KEY is valid and not expired.' },
         extra: { code: err.code, status: err.status, ...(err.details ?? {}) },
       });
     }
-    if (err.status === 402) {
-      throw new CliError('insufficient_balance', 'This endpoint is not enabled for your AgentScore account.', {
-        nextSteps: { action: 'upgrade_plan', suggestion: 'See https://agentscore.sh/pricing.' },
-        extra: { code: err.code, status: err.status },
-      });
-    }
-    if (err.status === 503 || err.code === 'api_error') {
-      throw new CliError('network_error', `AgentScore API temporarily unavailable: ${err.message}`, {
+    // network_error and any other generic AgentScoreError (5xx unwrapped, body parse fail).
+    if (err.status === 0 || err.status >= 500 || err.code === 'api_error' || err.code === 'network_error') {
+      throw new CliError('network_error', `AgentScore API error: ${err.message}`, {
         nextSteps: { action: 'retry_with_backoff', suggestion: 'Retry in 30–60s with exponential backoff.' },
         extra: { code: err.code, status: err.status },
       });
