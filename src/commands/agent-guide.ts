@@ -209,10 +209,10 @@ const GUIDE: AgentGuide = {
     {
       cli_code: 'config_error',
       thrown_when:
-        'AGENTSCORE_API_KEY missing or invalid; OR operator_token expired/revoked (TokenExpiredError, exposes verify_url + session_id + poll_secret in extra); OR operator_token unrecognized (InvalidCredentialError).',
-      next_action: 'reauth or check_api_key (see envelope.next_steps.action)',
+        'AGENTSCORE_API_KEY missing (getClient throws directly with action=set_api_key); OR API key invalid/expired (generic 401 → action=check_api_key); OR operator_token expired/revoked (TokenExpiredError → action=reauth, exposes verify_url + session_id + poll_secret in extra); OR operator_token unrecognized (InvalidCredentialError → action=switch_token_or_restart_session).',
+      next_action: 'See envelope.next_steps.action — set_api_key / check_api_key / reauth / switch_token_or_restart_session',
       recovery:
-        'For TokenExpiredError: run `agentscore-pay passport login` to mint a fresh operator_token (no API key needed), or use the verify_url + session_id + poll_secret from extra to drive the verify/poll flow manually. For InvalidCredentialError: switch to a different stored operator_token, or run `passport login`. For check_api_key: confirm AGENTSCORE_API_KEY is valid; key issues will not reauth-fix via passport.',
+        'For reauth: run `agentscore-pay passport login` to mint a fresh operator_token (no API key needed), or use the verify_url + session_id + poll_secret from extra to drive the verify/poll flow manually. For switch_token_or_restart_session: use a different stored operator_token, or run `passport login`. For check_api_key / set_api_key: confirm AGENTSCORE_API_KEY is valid and set in env; key issues will not reauth-fix via passport.',
     },
     {
       cli_code: 'insufficient_balance',
@@ -233,7 +233,15 @@ const GUIDE: AgentGuide = {
         'RateLimitedError (per-second cap, HTTP 429 rate_limited), SdkTimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
       next_action: 'retry_with_backoff',
       recovery:
-        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with the merchant\'s support contact.',
+        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with AgentScore\'s status page or support contact — pay calls api.agentscore.sh directly, no merchant in the loop here.',
+    },
+    {
+      cli_code: 'merchant_error',
+      thrown_when:
+        'Fallback for any other AgentScoreError that does not match the typed subclasses above (e.g. HTTP 400 invalid_request, 404 not_found, 410 route_deprecated). The original code + status are preserved in extra.',
+      next_action: 'inspect_extra',
+      recovery:
+        'Read extra.code and extra.status to understand the specific failure. 400-class issues mean the agent\'s request body or args were wrong (validate inputs); 410 means the endpoint was deprecated (consult the integrations doc for the replacement).',
     },
   ],
 
