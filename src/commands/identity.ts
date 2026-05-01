@@ -80,7 +80,7 @@ function wrapApiError(err: unknown): never {
     throw new CliError('quota_exceeded', 'AgentScore account quota exceeded.', {
       nextSteps: {
         action: 'upgrade_plan',
-        suggestion: 'Your account has hit its quota. See https://agentscore.sh/pricing — retry will keep failing until the period resets or the plan is upgraded.',
+        suggestion: 'Your account has reached its cap. Surface to the user — agent retry will not fix this. See https://agentscore.sh/pricing.',
       },
       extra: { code: err.code, status: err.status },
     });

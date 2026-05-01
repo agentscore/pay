@@ -225,7 +225,7 @@ const GUIDE: AgentGuide = {
       thrown_when: 'QuotaExceededError — account-level cap hit (HTTP 429 quota_exceeded).',
       next_action: 'upgrade_plan',
       recovery:
-        'Do NOT retry. Surface to user. Cap will not lift until the period resets or plan is upgraded. Use AssessResponse.quota field on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
+        'Do NOT retry — agent retry will not fix this. Surface to the user with https://agentscore.sh/pricing. Use AssessResponse.quota on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
     },
     {
       cli_code: 'network_error',
