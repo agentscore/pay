@@ -62,7 +62,7 @@ function wrapApiError(err: unknown): never {
     throw new CliError('config_error', 'AgentScore operator token expired or revoked.', {
       nextSteps: {
         action: 'reauth',
-        suggestion: 'Run `agentscore-pay passport login` to refresh, or follow err.details.verify_url.',
+        suggestion: 'Run `agentscore-pay passport login` to mint a fresh operator_token (no API key needed). The error envelope also includes verify_url + session_id + poll_secret for callers driving the verify/poll flow manually.',
       },
       extra: { code: err.code, status: err.status, verify_url: err.verifyUrl, session_id: err.sessionId, poll_secret: err.pollSecret },
     });
@@ -71,7 +71,7 @@ function wrapApiError(err: unknown): never {
     throw new CliError('config_error', 'AgentScore operator token not recognized.', {
       nextSteps: {
         action: 'switch_token_or_restart_session',
-        suggestion: 'Use a different stored token, or drop AGENTSCORE_API_KEY and run `passport login` to bootstrap a new session.',
+        suggestion: 'Use a different stored operator_token (drop --operator-token / X-Operator-Token), or run `agentscore-pay passport login` to mint a fresh one (no API key needed).',
       },
       extra: { code: err.code, status: err.status },
     });
@@ -79,8 +79,8 @@ function wrapApiError(err: unknown): never {
   if (err instanceof QuotaExceededError) {
     throw new CliError('quota_exceeded', 'AgentScore account quota exceeded.', {
       nextSteps: {
-        action: 'contact_merchant',
-        suggestion: 'Account quota reached. See https://agentscore.sh/pricing — retry will keep failing until the period resets.',
+        action: 'upgrade_plan',
+        suggestion: 'Your account has hit its quota. See https://agentscore.sh/pricing — retry will keep failing until the period resets or the plan is upgraded.',
       },
       extra: { code: err.code, status: err.status },
     });
