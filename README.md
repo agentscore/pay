@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**One CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command — natively across **x402** (Base, Solana) and **MPP** (Tempo), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
+**AgentScore Pay — one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command — natively across **x402** (Base, Solana) and **MPP** (Tempo), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
 Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
@@ -284,7 +284,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 `passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK paid tier — set `AGENTSCORE_API_KEY`.
 
-Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
+AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
 
 | Command | Purpose |
 |---|---|
