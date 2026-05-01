@@ -284,6 +284,8 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 `passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK paid tier — set `AGENTSCORE_API_KEY`.
 
+Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
+
 | Command | Purpose |
 |---|---|
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
