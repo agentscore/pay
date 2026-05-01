@@ -41,7 +41,17 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: '1. (Optional) Discover merchants with `discover`',
+      step: '1. (First run only) Verify identity with `passport login`',
+      why: 'Required for AgentScore-gated merchants (regulated commerce: wine, age-restricted goods, jurisdiction-restricted services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `pay <url>` call auto-attaches `X-Operator-Token` — no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants — pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
+      command_example: 'agentscore-pay passport login --json',
+      notes: [
+        'No API key required. ~30 seconds in browser. No money needed for this step.',
+        'If you skip this and later hit an AgentScore-gated merchant, pay drives the same verify flow inline mid-purchase (cold-start bootstrap) — but the resulting Passport lacks a refresh token and re-verifies after 24h. Doing `passport login` first gets the better long-term UX.',
+        'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport. Use `--no-passport` for explicit-anonymous traffic.',
+      ],
+    },
+    {
+      step: '2. (Optional) Discover merchants with `discover`',
       why: 'Lists 402/MPP services from the x402 Bazaar (Coinbase) + MPP services directory (Tempo) — works against any merchant, AgentScore-gated or not.',
       command_example: 'agentscore-pay discover --json',
       notes: [
@@ -50,7 +60,7 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: '2. Confirm funds with `balance`',
+      step: '3. Confirm funds with `balance`',
       why: 'Pay rejects with exit code 3 when the chosen chain has insufficient USDC. Check first to avoid wasted round-trips.',
       command_example: 'agentscore-pay balance --json',
       notes: [
@@ -59,7 +69,7 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: '3. Probe the endpoint with `check` BEFORE paying',
+      step: '4. Probe the endpoint with `check` BEFORE paying',
       why: 'Confirms the merchant returns a 402, parses the accepted rails + price, and tells you which chain you should pay from. No funds move.',
       command_example: 'agentscore-pay check <URL> -X POST -d \'{"key":"value"}\' --json',
       notes: [
@@ -68,7 +78,7 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: '4. Dry-run the payment before paying real money',
+      step: '5. Dry-run the payment before paying real money',
       why: 'Shows the rail pay would select, the signer wallet, the balance, and the body it would send — without signing or sending. Catches misconfigurations cheaply.',
       command_example: 'agentscore-pay pay POST <URL> -d \'{...}\' --chain <base|solana|tempo> --max-spend 0.05 --dry-run --json',
       notes: [
@@ -77,7 +87,7 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: '5. Pay for real when ready',
+      step: '6. Pay for real when ready',
       why: 'Same command, drop --dry-run. Pay handles the 402 round-trip end-to-end: probe → sign → settle → resend with payment proof → return the merchant\'s 200 response body.',
       command_example: 'agentscore-pay pay POST <URL> -d \'{...}\' --chain <chain> --max-spend 0.05 --json',
       notes: [
@@ -153,13 +163,13 @@ const GUIDE: AgentGuide = {
       command_example: 'agentscore-pay history --json --limit 20',
     },
     {
-      step: 'Verify identity once with `passport login` (AgentScore-gated merchants only)',
-      why: 'AgentScore-gated merchants (those that return 403 with operator_verification_required) require an X-Operator-Token. Run `passport login` once — the agent shares the verify URL with the user, polls until the AgentScore session is verified, and saves the resulting operator_token to ~/.agentscore/passport.json. From then on, every `pay <url>` call auto-attaches X-Operator-Token. No re-prompting per call. Suppress with --no-passport for explicit-anonymous traffic.',
-      command_example: 'agentscore-pay passport login --json',
+      step: 'Inspect / renew the stored Passport with `passport status` / `passport login`',
+      why: 'After the initial `passport login` (golden-path step 1), most flows are zero-touch — silent refresh keeps the token fresh. Use `passport status` to inspect what\'s saved (token prefix, expiry, expired flag); re-run `passport login` if expired or to re-mint after `passport logout`.',
+      command_example: 'agentscore-pay passport status --json',
       notes: [
-        'No API key required — `passport login` mints a verification session you complete in the browser. Tokens are short-lived; pay refreshes them silently in the background and drives inline reauth on hard expiry — never a "log in first" wall.',
         'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport, so existing scripts keep working.',
         'Non-AgentScore merchants ignore the header — auto-attach is harmless on those endpoints.',
+        'Use `--no-passport` on `pay <url>` for explicit-anonymous traffic.',
       ],
     },
   ],

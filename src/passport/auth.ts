@@ -233,7 +233,6 @@ async function mintPublicSession(input: {
     },
     body: JSON.stringify({
       context: 'pay passport login',
-      product_name: '@agent-score/pay',
     }),
   });
   const body = await response.text();

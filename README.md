@@ -259,12 +259,12 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | Command | Purpose |
 |---|---|
 | `init [--no-mnemonic] [--fund-tempo-testnet] [--preferred-chains <list>]` | One-shot first-run: create all 3 wallets (mnemonic by default) + optional testnet fund + preferred-chain config |
-| `wallet create [--chain c] [--wallet name] [--mnemonic]` | Generate keystore(s). Omit `--chain` to create all three. Pass `--mnemonic` to derive from a BIP-39 seed. `--wallet` for named secondary wallets. |
-| `wallet import [<key>] --chain c [--wallet name]` / `wallet import --mnemonic "<phrase>"` | Import raw private key (hex/base64) OR a 12/24-word phrase |
+| `wallet create [--chain c] [--name name] [--mnemonic]` | Generate keystore(s). Omit `--chain` to create all three. Pass `--mnemonic` to derive from a BIP-39 seed. `--name` for named secondary wallets. |
+| `wallet import [<key>] --chain c [--name name]` / `wallet import --mnemonic "<phrase>"` | Import raw private key (hex/base64) OR a 12/24-word phrase |
 | `wallet list [--chain c]` | List named keystores per chain |
-| `wallet address --chain c [--wallet name]` | Print the address |
-| `wallet export --chain c [--wallet name] --danger [--skip-confirm]` | Decrypt + print the private key |
-| `wallet remove --chain c [--wallet name] --danger [--skip-confirm]` | Irrecoverably delete a keystore |
+| `wallet address --chain c [--name name]` | Print the address |
+| `wallet export --chain c [--name name] --danger [--skip-confirm]` | Decrypt + print the private key |
+| `wallet remove --chain c [--name name] --danger [--skip-confirm]` | Irrecoverably delete a keystore |
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
 | `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
@@ -329,13 +329,13 @@ Two layers of multi-wallet support:
 
 ### Named wallets per chain (in-place)
 
-Each chain can hold multiple keystores. The default name is `default`; pass `--wallet <name>` to address others:
+Each chain can hold multiple keystores. The default name is `default`; pass `--name <name>` to address others:
 
 ```bash
-agentscore-pay wallet create --chain base --wallet trading
+agentscore-pay wallet create --chain base --name trading
 agentscore-pay wallet list                          # enumerate per chain
-agentscore-pay balance --chain base --wallet trading
-agentscore-pay pay POST <url> --chain base --wallet trading -d '...' --max-spend 5
+agentscore-pay balance --chain base --name trading
+agentscore-pay pay POST <url> --chain base --name trading -d '...' --max-spend 5
 ```
 
 Names are limited to `[a-z0-9-]` (max 32 chars). Mnemonic-derived wallets are always stored under `default` — for additional named wallets use random keys (`wallet create`) or import (`wallet import`).
@@ -348,10 +348,10 @@ agentscore-pay init                                 # creates base/solana/tempo 
 agentscore-pay fund --chain base --amount 10        # tops up default
 
 # Separate "trading" wallet for a high-budget bot
-agentscore-pay wallet create --chain base --wallet trading
-agentscore-pay wallet address --chain base --wallet trading
+agentscore-pay wallet create --chain base --name trading
+agentscore-pay wallet address --chain base --name trading
 # → 0xTRADINGADDRESS — fund this address externally (CEX withdrawal, transfer, etc.)
-agentscore-pay balance --chain base --wallet trading
+agentscore-pay balance --chain base --name trading
 
 # Inspect everything
 agentscore-pay wallet list
@@ -360,11 +360,11 @@ agentscore-pay wallet list
 
 # Pay from each
 agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base                    # uses default
-agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base --wallet trading   # uses trading
+agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base --name trading   # uses trading
 
 # Remove a wallet (irrecoverable — back up the mnemonic or export the key first)
-agentscore-pay wallet export --chain base --wallet trading --danger --skip-confirm > trading.key
-agentscore-pay wallet remove --chain base --wallet trading --danger --skip-confirm
+agentscore-pay wallet export --chain base --name trading --danger --skip-confirm > trading.key
+agentscore-pay wallet remove --chain base --name trading --danger --skip-confirm
 ```
 
 Per-wallet limits aren't supported today (limits are global). Use separate `AGENTSCORE_PAY_HOME` profiles if you need per-wallet daily caps.
