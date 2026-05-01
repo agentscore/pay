@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/agentscore/pay/main/install.sh | sh
 brew install agentscore/tap/agentscore-pay
 ```
 
-Requires Node 20+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release via `bun run build:binary:all`.
+Requires Node 20+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release.
 
 ## Quick start
 
@@ -223,7 +223,7 @@ The CLI never touches stdout for human chrome when `--json` is passed — every 
 | `solana` | x402 (SPL Token) | `@x402/fetch` + `@x402/svm` | `solana:5eykt...` |
 | `tempo` | MPP | `mppx/client` | chain 4217 |
 
-The rail set matches Stripe's x402 facilitator chains (Tempo, Base, Solana). Tempo is always MPP — its x402 story is Stripe-facilitator-only and nascent.
+The rail set matches Stripe's x402 facilitator chains (Tempo, Base, Solana). Tempo is always MPP — pay routes Tempo through `mppx/client`; the x402-on-Tempo path is a Stripe-facilitator surface that pay does not call directly.
 
 ## Rail selection
 
