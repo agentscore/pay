@@ -11,6 +11,13 @@ interface GuideStep {
   notes?: string[];
 }
 
+interface IdentityErrorPattern {
+  cli_code: string;
+  thrown_when: string;
+  next_action: string;
+  recovery: string;
+}
+
 interface AgentGuide {
   for_agents: true;
   intro: string;
@@ -19,6 +26,7 @@ interface AgentGuide {
   funding: GuideStep[];
   auxiliary: GuideStep[];
   pitfalls: GuideStep[];
+  identity_error_recovery: IdentityErrorPattern[];
   exit_codes: Record<string, string>;
   json_mode: string;
 }
@@ -197,9 +205,49 @@ const GUIDE: AgentGuide = {
     },
   ],
 
+  identity_error_recovery: [
+    {
+      cli_code: 'config_error',
+      thrown_when:
+        'AGENTSCORE_API_KEY missing (getClient throws directly with action=set_api_key); OR API key invalid/expired (generic 401 → action=check_api_key); OR operator_token expired/revoked (TokenExpiredError → action=reauth, exposes verify_url + session_id + poll_secret in extra); OR operator_token unrecognized (InvalidCredentialError → action=switch_token_or_restart_session).',
+      next_action: 'See envelope.next_steps.action — set_api_key / check_api_key / reauth / switch_token_or_restart_session',
+      recovery:
+        'For reauth: run `agentscore-pay passport login` to mint a fresh operator_token (no API key needed), or use the verify_url + session_id + poll_secret from extra to drive the verify/poll flow manually. For switch_token_or_restart_session: use a different stored operator_token, or run `passport login`. For check_api_key / set_api_key: confirm AGENTSCORE_API_KEY is valid and set in env; key issues will not reauth-fix via passport.',
+    },
+    {
+      cli_code: 'insufficient_balance',
+      thrown_when: 'PaymentRequiredError — the requested endpoint is not enabled for the API key\'s account (HTTP 402).',
+      next_action: 'upgrade_plan',
+      recovery: 'Surface the suggestion to the user. See https://agentscore.sh/pricing — agent retry will not fix this.',
+    },
+    {
+      cli_code: 'quota_exceeded',
+      thrown_when: 'QuotaExceededError — account-level cap hit (HTTP 429 quota_exceeded).',
+      next_action: 'upgrade_plan',
+      recovery:
+        'Do NOT retry — agent retry will not fix this. Surface to the user with https://agentscore.sh/pricing. Use AssessResponse.quota on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
+    },
+    {
+      cli_code: 'network_error',
+      thrown_when:
+        'RateLimitedError (per-second cap, HTTP 429 rate_limited), SdkTimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
+      next_action: 'retry_with_backoff',
+      recovery:
+        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with AgentScore\'s status page or support contact — pay calls api.agentscore.sh directly, no merchant in the loop here.',
+    },
+    {
+      cli_code: 'merchant_error',
+      thrown_when:
+        'Fallback for any other AgentScoreError that does not match the typed subclasses above (e.g. HTTP 400 invalid_request, 404 not_found, 410 route_deprecated). The original code + status are preserved in extra.',
+      next_action: 'inspect_extra',
+      recovery:
+        'Read extra.code and extra.status to understand the specific failure. 400-class issues mean the agent\'s request body or args were wrong (validate inputs); 410 means the endpoint was deprecated (consult the integrations doc for the replacement).',
+    },
+  ],
+
   exit_codes: {
     '0': 'success',
-    '1': 'user error (bad args, missing wallet, wrong passphrase)',
+    '1': 'user error (bad args, missing wallet, wrong passphrase, account quota)',
     '2': 'network error (merchant unreachable, RPC failure)',
     '3': 'insufficient funds',
     '4': 'payment rejected (exceeds --max-spend, signer mismatch)',
