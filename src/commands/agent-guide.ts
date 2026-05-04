@@ -73,7 +73,7 @@ const GUIDE: AgentGuide = {
       command_example: 'agentscore-pay balance --json',
       notes: [
         'Pass --network testnet to check testnet balances (Base Sepolia, Solana devnet, Tempo testnet).',
-        'If a chain is empty, run `agentscore-pay fund --chain <chain>` for an onramp link or testnet faucet.',
+        'If a chain is empty, run `agentscore-pay fund --chain <chain>` for a receive QR (mainnet) or testnet faucet/programmatic mint.',
       ],
     },
     {
@@ -130,12 +130,11 @@ const GUIDE: AgentGuide = {
     },
     {
       step: 'Get MAINNET USDC with `fund`',
-      why: '`fund` walks the user through Coinbase Onramp (Base + Solana mainnet) or prints a receive QR + balance polling (Tempo mainnet has no public onramp).',
+      why: '`fund` prints a receive QR for the wallet address and polls balance until USDC lands. The user funds from any source they prefer (CEX withdrawal, another wallet, fiat onramp).',
       command_example: 'agentscore-pay fund --chain base --json',
       notes: [
         'Tempo TESTNET via `fund` calls the same programmatic mint as `faucet` — free, immediate, no browser. `fund --chain tempo --network testnet` works without prompts.',
-        'Tempo MAINNET via `fund` prints a receive QR; the user has to acquire USDC.e on Tempo via a CEX or bridge themselves (no onramp partner today).',
-        'Base/Solana mainnet `fund` opens Coinbase Onramp — the user completes a card or bank purchase, pay polls until USDC lands in the wallet.',
+        'All mainnet networks behave the same: receive QR + balance poll. The user picks the funding source — CEX, another wallet, or any third-party onramp that supports the destination chain.',
         'Use `fund-estimate <URL>` to compute "how many calls does my current balance cover for this merchant" — useful before deciding whether to top up.',
       ],
     },

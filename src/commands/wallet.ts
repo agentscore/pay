@@ -1,4 +1,4 @@
-import { onrampUrl, SUPPORTED_CHAINS, type Chain } from '../constants';
+import { SUPPORTED_CHAINS, type Chain } from '../constants';
 import { CliError } from '../errors';
 import { decryptSecret, deleteKeystore, keystoreExists, listWallets, loadKeystore } from '../keystore';
 import { deriveKey, generatePhrase, validatePhrase } from '../mnemonic';
@@ -25,7 +25,6 @@ export interface CreateResult {
   created: boolean;
   reason?: string;
   qr_uri?: string;
-  onramp_url?: string | null;
 }
 
 export interface WalletCreateInput {
@@ -99,7 +98,6 @@ export async function walletCreate(input: WalletCreateInput = {}): Promise<Walle
       keystore: keystorePath(c, name),
       created: true,
       qr_uri: getQrUri(wallet),
-      onramp_url: onrampUrl(c, wallet.address),
     });
   }
   return { created, skipped: existing };
@@ -140,7 +138,6 @@ async function walletCreateMnemonic(chain?: Chain): Promise<WalletCreateResult> 
       keystore: keystorePath(c),
       created: true,
       qr_uri: getQrUri(wallet),
-      onramp_url: onrampUrl(c, wallet.address),
     });
   }
   await saveMnemonic(phrase, passphrase, chains);
@@ -238,7 +235,6 @@ export async function walletImportMnemonic(input: WalletImportMnemonicInput): Pr
       keystore: keystorePath(c),
       created: true,
       qr_uri: getQrUri(wallet),
-      onramp_url: onrampUrl(c, wallet.address),
     });
   }
   await saveMnemonic(normalized, passphrase, chains);

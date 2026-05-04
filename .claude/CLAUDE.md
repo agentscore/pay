@@ -17,14 +17,14 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/keystore.ts` | AES-256-GCM + scrypt encrypted keystore (generic, chain-agnostic) |
 | `src/wallets.ts` | Wallet factory dispatching to chain modules |
 | `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_PAY_PASSPHRASE` env) |
-| `src/constants.ts` | Chain network IDs, USDC addresses, RPC URLs, Coinbase Onramp builder |
+| `src/constants.ts` | Chain network IDs, USDC addresses, RPC URLs |
 | `src/chains/base.ts` | EVM adapter (x402): viem Account, USDC balance, EIP-681 QR URI |
 | `src/chains/solana.ts` | SVM adapter (x402): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
 | `src/chains/tempo.ts` | EVM adapter (MPP): viem Account on chain 4217, USDC.e balance, EIP-681 QR URI |
 | `src/commands/wallet.ts` | `wallet create/import/address/list/remove/export/show-mnemonic` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
-| `src/commands/fund.ts` | `fund` — onramp link + QR + balance polling (Tempo testnet uses programmatic mint) |
+| `src/commands/fund.ts` | `fund` — receive QR + balance polling (Tempo testnet uses programmatic mint via tempo_fundAddress) |
 | `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
 | `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
 | `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `pay <url>` settle leg |

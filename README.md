@@ -32,7 +32,7 @@ Requires Node 20+ for the npm path. Native single-file binaries (no Node require
 # 1. One-shot init — encrypted keystores on every chain, derived from a single BIP-39 mnemonic
 agentscore-pay init
 
-# 2. Fund one of them (prints Coinbase Onramp URL + QR + polls balance)
+# 2. Fund one of them (prints receive QR + polls balance)
 agentscore-pay fund --chain base --amount 10
 
 # 3. Pay — rail auto-selected from the single funded wallet
@@ -267,7 +267,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
 | `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
-| `fund --chain c [--amount N] [--network n]` | Onramp URL + QR + balance poll. Default amount is `10` USD (~50-200 typical agent calls). |
+| `fund --chain c [--amount N] [--network n]` | Receive QR + balance poll. Default amount is `10` USD (~50-200 typical agent calls). Send USDC from any wallet, exchange, or fiat onramp; `fund` polls until it lands. |
 | `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
 | `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
@@ -425,9 +425,9 @@ The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP T
 
 ### Mainnet
 
-- **Base, Solana** — `agentscore-pay fund --chain base --amount 10` prints a [Coinbase Onramp](https://www.coinbase.com/onramp) URL (card → USDC on your chain) and an ASCII QR. Click the URL, or scan the QR from any mobile wallet with USDC to send yourself a transfer. `fund` polls balance and confirms when the deposit lands. Default amount is `$10` (~50-200 typical agent calls).
-- **Tempo** — Coinbase Onramp does not cover Tempo. Fund by transferring USDC.e (chain 4217) from another Tempo wallet.
-- **From an existing wallet (no onramp)** — `agentscore-pay wallet address --chain base` prints the address; send USDC on Base to it from MetaMask, Rabby, Coinbase Wallet, Phantom, or a CEX withdrawal. Same pattern on Solana + Tempo.
+- **All chains** — `agentscore-pay fund --chain <chain> --amount 10` prints an ASCII QR and your wallet address, then polls balance until the deposit lands. Send USDC from any source: another wallet (MetaMask, Rabby, Coinbase Wallet, Phantom), a CEX withdrawal, or any third-party fiat onramp that supports the destination chain (Coinbase Pay, MoonPay, Transak, Onramper, Stripe Crypto Onramp, etc.). Default amount is `$10` (~50-200 typical agent calls).
+- **Tempo specifics** — most fiat-onramp partners don't cover Tempo (chain 4217) yet. Fund by transferring USDC.e from another Tempo wallet, or via a bridge (LayerZero / Squid / Relay) from Base.
+- **No-frills receive** — `agentscore-pay wallet address --chain base` prints just the address if you already know your funding source.
 
 ### Testnet
 
