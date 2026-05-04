@@ -138,7 +138,7 @@ export function buildCli() {
             description: 'Next steps:',
             commands: [
               { command: 'passport login', description: 'Verify identity once — required for AgentScore-gated merchants. Skipped automatically for unregulated ones. ~30 seconds in browser, no money needed.' },
-              { command: 'fund', options: { chain: true }, description: 'Top up a wallet via Coinbase Onramp + QR' },
+              { command: 'fund', options: { chain: true }, description: 'Print a receive QR + poll for the deposit' },
               { command: 'balance', description: 'Confirm wallet balances' },
               { command: 'discover', description: 'Browse paid services in the x402 + MPP ecosystem' },
             ],
@@ -338,8 +338,8 @@ export function buildCli() {
   // ── fund ────────────────────────────────────────────────────────────────────
   cli.command('fund', {
     description:
-      'Fund the wallet. Base/Solana mainnet: Coinbase Onramp URL + receive QR + balance polling. Tempo testnet: programmatic mint via tempo_fundAddress (free, no signup). Tempo mainnet: receive QR + balance polling.',
-    hint: 'Tempo testnet funds instantly via JSON-RPC — no browser required. Other networks open Coinbase Onramp in your browser.',
+      'Fund the wallet. Mainnet networks: receive QR + balance polling. Tempo testnet: programmatic mint via tempo_fundAddress (free, no signup). Base/Solana testnets: see the `faucet` command.',
+    hint: 'Tempo testnet funds instantly via JSON-RPC. Mainnet networks print a receive QR — send USDC from another wallet, exchange, or fiat onramp; pay polls until it lands.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
@@ -347,7 +347,7 @@ export function buildCli() {
       amount: z.coerce.number().optional().describe('Target amount in USD (default 10)'),
     }),
     examples: [
-      { options: { chain: 'base', amount: 10 }, description: 'Fund $10 USDC on Base via Coinbase Onramp' },
+      { options: { chain: 'base', amount: 10 }, description: 'Print receive QR for $10 USDC on Base and poll for the deposit' },
       { options: { chain: 'tempo', network: 'testnet' }, description: 'Programmatically mint Tempo testnet stablecoins (free)' },
     ],
     run(c) {

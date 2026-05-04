@@ -2,7 +2,7 @@ import { setTimeout as sleep } from 'timers/promises';
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
-import { onrampUrl, type Chain, type Network } from '../constants';
+import { type Chain, type Network } from '../constants';
 import { loadKeystore } from '../keystore';
 import { DEFAULT_WALLET_NAME } from '../paths';
 
@@ -24,7 +24,6 @@ export interface FundResult {
   address: string;
   amount_usd: number | null;
   status: 'deposit_detected' | 'tempo_testnet_minted' | 'tempo_testnet_mint_pending' | 'timeout';
-  onramp_url?: string | null;
   qr_uri?: string;
   initial_usdc?: string;
   final_usdc?: string;
@@ -86,7 +85,6 @@ export async function fund(input: FundInput): Promise<FundResult> {
     };
   }
 
-  const onramp = network === 'mainnet' ? onrampUrl(input.chain, ks.address, input.amountUsd) : null;
   const uri = buildQrUri(input.chain, ks.address, input.amountUsd, network);
   const initial = await readBalance(input.chain, ks.address, network);
   const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
@@ -101,7 +99,6 @@ export async function fund(input: FundInput): Promise<FundResult> {
         address: ks.address,
         amount_usd: input.amountUsd ?? null,
         status: 'deposit_detected',
-        onramp_url: onramp,
         qr_uri: uri,
         initial_usdc: formatBalance(input.chain, initial),
         final_usdc: formatBalance(input.chain, current),
@@ -116,7 +113,6 @@ export async function fund(input: FundInput): Promise<FundResult> {
     address: ks.address,
     amount_usd: input.amountUsd ?? null,
     status: 'timeout',
-    onramp_url: onramp,
     qr_uri: uri,
     initial_usdc: formatBalance(input.chain, initial),
     final_usdc: formatBalance(input.chain, current),

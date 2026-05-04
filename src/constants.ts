@@ -58,20 +58,6 @@ export const USDC = {
   },
 } as const;
 
-export function onrampUrl(chain: Chain, address: string, amountUsd?: number): string | null {
-  if (chain === 'tempo') return null;
-  const network = chain === 'base' ? 'base' : 'solana';
-  const asset = 'USDC';
-  const base = 'https://pay.coinbase.com/buy/select-asset';
-  const params = new URLSearchParams({
-    defaultAsset: asset,
-    defaultNetwork: network,
-    addresses: JSON.stringify({ [address]: [network] }),
-  });
-  if (amountUsd && amountUsd > 0) params.set('presetFiatAmount', String(amountUsd));
-  return `${base}?${params.toString()}`;
-}
-
 export type EvmConfig = {
   address: `0x${string}`;
   decimals: number;
