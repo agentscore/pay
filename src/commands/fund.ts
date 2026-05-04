@@ -1,10 +1,12 @@
 import { setTimeout as sleep } from 'timers/promises';
+import qrcode from 'qrcode-terminal';
 import * as baseChain from '../chains/base';
 import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { type Chain, type Network } from '../constants';
 import { loadKeystore } from '../keystore';
 import { DEFAULT_WALLET_NAME } from '../paths';
+import { emitProgress } from '../progress';
 
 const POLL_INTERVAL_MS = 5_000;
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
@@ -87,6 +89,32 @@ export async function fund(input: FundInput): Promise<FundResult> {
 
   const uri = buildQrUri(input.chain, ks.address, input.amountUsd, network);
   const initial = await readBalance(input.chain, ks.address, network);
+
+  // Surface the receive surface BEFORE the poll loop so the user sees actionable
+  // info immediately. Without this, fund() silently polls for up to 15 minutes
+  // and only renders at the end. JSON consumers get the structured event on
+  // stderr; TTY users additionally see the rendered QR + status message.
+  emitProgress('funding_started', {
+    chain: input.chain,
+    network,
+    address: ks.address,
+    amount_usd: input.amountUsd ?? null,
+    qr_uri: uri,
+    poll_interval_seconds: POLL_INTERVAL_MS / 1000,
+    timeout_seconds: DEFAULT_TIMEOUT_MS / 1000,
+  });
+  if (process.stderr.isTTY) {
+    const ascii = await new Promise<string>((resolve) => {
+      qrcode.generate(uri, { small: true }, (q) => resolve(q));
+    });
+    const minutes = Math.round(DEFAULT_TIMEOUT_MS / 60_000);
+    const seconds = POLL_INTERVAL_MS / 1000;
+    process.stderr.write(
+      `\nSend USDC on ${input.chain} (${network}) to:\n  ${ks.address}\n\n${ascii}\n` +
+        `Polling balance every ${seconds}s (timeout ${minutes}m). Send from any wallet, exchange, or fiat onramp; pay will detect the deposit and exit.\n\n`,
+    );
+  }
+
   const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
   let current = initial;
   while (Date.now() < deadline) {
