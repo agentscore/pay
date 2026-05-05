@@ -223,7 +223,7 @@ The CLI never touches stdout for human chrome when `--json` is passed — every 
 | `solana` | MPP `solana/charge` | `mppx/client` + `@solana/mpp/client` | `solana:5eykt...` |
 | `tempo` | MPP `tempo/charge` | `mppx/client` | chain 4217 |
 
-Solana payments route through MPP `solana/charge` (Solana Foundation's `@solana/mpp` package) rather than x402 SPL transfers; the x402 SVM scheme had a known idempotent-ATA-create gap that the upstream maintainers won't fix. Tempo is always MPP via `mppx/client`. Base is the only x402 rail pay funds directly.
+Solana payments route through MPP `solana/charge` (Solana Foundation's `@solana/mpp` package) rather than x402. Tempo is always MPP via `mppx/client`. Base is the only x402 rail pay funds directly.
 
 ## Rail selection
 
