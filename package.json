@@ -67,7 +67,7 @@
     "@x402/fetch": "^2.11.0",
     "ed25519-hd-key": "^2.0.0",
     "incur": "^0.4.5",
-    "mppx": "^0.6.14",
+    "mppx": "^0.6.15",
     "qrcode-terminal": "^0.12.0",
     "viem": "2.48.7"
   },
@@ -84,7 +84,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.1",
+    "typescript-eslint": "^8.59.2",
     "vitest": "^4.1.5"
   }
 }
