@@ -26,4 +26,4 @@ can run them on a best-effort basis.
 
 - `tests/integration/balance.test.ts` — reads balance against each testnet
 - (future) `tests/integration/pay.test.ts` — completes a real 402 payment round-trip
-  against an x402 demo endpoint on Base Sepolia + Solana Devnet
+  against an x402 base demo endpoint and an MPP `solana/charge` demo endpoint on Solana Devnet

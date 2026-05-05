@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**AgentScore Pay — one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command — natively across **x402** (Base, Solana) and **MPP** (Tempo), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
+**AgentScore Pay; one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command, natively across **x402** (Base) and **MPP** (Tempo, Solana), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
 Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
@@ -220,10 +220,10 @@ The CLI never touches stdout for human chrome when `--json` is passed — every 
 | Chain | Protocol | Library | Network |
 |---|---|---|---|
 | `base` | x402 (EIP-3009) | `@x402/fetch` + `@x402/evm` | `eip155:8453` |
-| `solana` | x402 (SPL Token) | `@x402/fetch` + `@x402/svm` | `solana:5eykt...` |
-| `tempo` | MPP | `mppx/client` | chain 4217 |
+| `solana` | MPP `solana/charge` | `mppx/client` + `@solana/mpp/client` | `solana:5eykt...` |
+| `tempo` | MPP `tempo/charge` | `mppx/client` | chain 4217 |
 
-The rail set matches Stripe's x402 facilitator chains (Tempo, Base, Solana). Tempo is always MPP — pay routes Tempo through `mppx/client`; the x402-on-Tempo path is a Stripe-facilitator surface that pay does not call directly.
+Solana payments route through MPP `solana/charge` (Solana Foundation's `@solana/mpp` package) rather than x402 SPL transfers; the x402 SVM scheme had a known idempotent-ATA-create gap that the upstream maintainers won't fix. Tempo is always MPP via `mppx/client`. Base is the only x402 rail pay funds directly.
 
 ## Rail selection
 

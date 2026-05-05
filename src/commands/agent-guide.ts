@@ -34,8 +34,8 @@ interface AgentGuide {
 const GUIDE: AgentGuide = {
   for_agents: true,
   intro:
-    'agentscore-pay is the universal agent-payment CLI. It works against any 402/MPP merchant — ' +
-    'AgentScore-gated or not — across x402 USDC on Base + Solana and MPP on Tempo. Below is the ' +
+    'agentscore-pay is the universal agent-payment CLI. It works against any 402/MPP merchant, ' +
+    'AgentScore-gated or not, across x402 USDC on Base and MPP USDC on Tempo + Solana. Below is the ' +
     'minimum-friction path for an LLM tool-loop agent.',
 
   golden_path: [
