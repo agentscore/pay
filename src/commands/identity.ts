@@ -87,7 +87,7 @@ function wrapApiError(err: unknown): never {
   }
   if (err instanceof RateLimitedError) {
     throw new CliError('network_error', `AgentScore rate limit hit: ${err.message}`, {
-      nextSteps: { action: 'retry_with_backoff', suggestion: 'Retry after the Retry-After interval (typically <= 1s).' },
+      nextSteps: { action: 'retry_with_backoff', suggestion: 'Retry after the Retry-After header, or with exponential backoff if no header is present.' },
       extra: { code: err.code, status: err.status },
     });
   }

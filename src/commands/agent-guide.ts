@@ -34,8 +34,8 @@ interface AgentGuide {
 const GUIDE: AgentGuide = {
   for_agents: true,
   intro:
-    'agentscore-pay is the universal agent-payment CLI. It works against any 402/MPP merchant — ' +
-    'AgentScore-gated or not — across x402 USDC on Base + Solana and MPP on Tempo. Below is the ' +
+    'agentscore-pay is the universal agent-payment CLI. It works against any 402/MPP merchant, ' +
+    'AgentScore-gated or not, across x402 USDC on Base and MPP USDC on Tempo + Solana. Below is the ' +
     'minimum-friction path for an LLM tool-loop agent.',
 
   golden_path: [
@@ -50,7 +50,7 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '1. (First run only) Verify identity with `passport login`',
-      why: 'Required for AgentScore-gated merchants (regulated commerce: wine, age-restricted goods, jurisdiction-restricted services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `pay <url>` call auto-attaches `X-Operator-Token` — no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants — pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
+      why: 'Required for AgentScore-gated merchants (regulated commerce: age-restricted, jurisdiction-restricted, or compliance-gated services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `pay <url>` call auto-attaches `X-Operator-Token`; no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants; pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
       command_example: 'agentscore-pay passport login --json',
       notes: [
         'No API key required. ~30 seconds in browser. No money needed for this step.',
@@ -156,7 +156,7 @@ const GUIDE: AgentGuide = {
       command_example: 'agentscore-pay limits set --daily 5 --per-call 0.50 --per-merchant 2',
       notes: [
         '`agentscore-pay limits show --json` prints the current ceilings; `limits clear` removes the file (no limits = no enforcement).',
-        'Limits are local-only and advisory — they protect against runaway agent loops, not malicious merchants.',
+        'Limits are local-only and advisory; the merchant cannot read or override them.',
       ],
     },
     {

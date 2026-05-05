@@ -1,8 +1,8 @@
 import { createHash } from 'crypto';
+import { charge as solanaCharge } from '@solana/mpp/client';
 import { x402Client } from '@x402/core/client';
 import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
-import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { Mppx, tempo } from 'mppx/client';
 import { evmConfig, isKnownUSDC, svmConfig, type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
@@ -19,7 +19,6 @@ import { withRetries } from '../retry';
 import { selectRail } from '../selection';
 import { createMppAccount, createX402Signer, loadWallet, type Wallet } from '../wallets';
 import type { ClientEvmSigner } from '@x402/evm';
-import type { ClientSvmSigner } from '@x402/svm';
 
 export interface PayInput {
   chain?: Chain;
@@ -97,7 +96,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     });
   }
 
-  const protocol: Protocol = candidate.chain === 'tempo' ? 'mpp' : 'x402';
+  const protocol: Protocol = candidate.chain === 'base' ? 'x402' : 'mpp';
 
   // Resolve AgentScore Passport once (also reused on the live path below). When the
   // caller provided their own X-Operator-Token or set --no-passport, this is a no-op.
@@ -225,9 +224,9 @@ export async function pay(input: PayInput): Promise<PayResult> {
   try {
     res = await withRetries(
       () =>
-        wallet.chain === 'tempo'
-          ? payViaMpp(wallet, input, init, settled)
-          : payViaX402(wallet, input, init, network, settled),
+        wallet.chain === 'base'
+          ? payViaX402(wallet, input, init, network, settled)
+          : payViaMpp(wallet, input, init, network, settled),
       {
         retries,
         baseDelayMs: 200,
@@ -323,9 +322,9 @@ export async function pay(input: PayInput): Promise<PayResult> {
     const retrySettled: PaymentSettled = {};
     try {
       res = await (
-        wallet.chain === 'tempo'
-          ? payViaMpp(wallet, { ...input, body: retryBody }, retryInit, retrySettled)
-          : payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
+        wallet.chain === 'base'
+          ? payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
+          : payViaMpp(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
       );
     } catch (err: unknown) {
       if (retrySettled.cliError) throw retrySettled.cliError;
@@ -427,13 +426,8 @@ async function payViaX402(
     const evmClient = new ExactEvmScheme(signer as ClientEvmSigner);
     client.register(cfg.network as `${string}:${string}`, evmClient);
     client.registerV1(cfg.network as `${string}:${string}`, evmClient);
-  } else if (wallet.chain === 'solana') {
-    const cfg = svmConfig(network);
-    const svmClient = new ExactSvmScheme(signer as ClientSvmSigner);
-    client.register(cfg.network as `${string}:${string}`, svmClient);
-    client.registerV1(cfg.network as `${string}:${string}`, svmClient);
   } else {
-    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — use MPP for Tempo.`);
+    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — only Base is supported under x402; Tempo and Solana go through MPP.`);
   }
 
   const host = safeHost(input.url);
@@ -485,13 +479,24 @@ async function payViaMpp(
   wallet: Wallet,
   input: PayInput,
   init: RequestInit,
+  network: Network,
   settled: PaymentSettled,
 ): Promise<Response> {
-  const account = createMppAccount(wallet);
   const host = safeHost(input.url);
   const limits = await loadLimits();
+  let methods: unknown[];
+  if (wallet.chain === 'tempo') {
+    const account = createMppAccount(wallet);
+    methods = [tempo({ account })];
+  } else if (wallet.chain === 'solana') {
+    const cfg = svmConfig(network);
+    const signer = (await createX402Signer(wallet, network)) as Parameters<typeof solanaCharge>[0]['signer'];
+    methods = [solanaCharge({ signer, rpcUrl: cfg.rpcUrl })];
+  } else {
+    throw new CliError('unsupported_rail', `MPP path called on chain ${wallet.chain} — only Tempo and Solana are supported under MPP.`);
+  }
   const client = Mppx.create({
-    methods: [tempo({ account })],
+    methods: methods as never,
     fetch,
     onChallenge: async (challenge) => {
       const req = (challenge as { request?: { amount?: string; currency?: string; decimals?: number } }).request ?? {};

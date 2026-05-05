@@ -85,7 +85,7 @@ function withCliErrors<T>(fn: () => Promise<T>): Promise<T> {
 export function buildCli() {
   const cli = Cli.create('agentscore-pay', {
     description:
-      'CLI wallet for one-shell-command agent payments (x402 on Base + Solana, MPP on Tempo). Built by AgentScore; works with any 402-gated merchant.',
+      'CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana). Built by AgentScore; works with any 402-gated merchant.',
     version: VERSION,
     env: z.object({
       AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
@@ -782,12 +782,12 @@ export function buildCli() {
     options: z.object({
       address: z.string().optional().describe('Pre-associate session with a known wallet'),
       operatorToken: z.string().optional().describe('Refresh KYC for an existing operator credential'),
-      context: z.string().optional().describe('Free-text context (e.g., "wine purchase")'),
+      context: z.string().optional().describe('Free-text context (e.g., "checkout")'),
       productName: z.string().optional().describe('Product name shown during verification (max 200 chars)'),
       apiKey: apiKeyOpt,
     }),
     examples: [
-      { options: { context: 'wine purchase' }, description: 'Bootstrap a fresh verification session' },
+      { options: { context: 'checkout' }, description: 'Bootstrap a fresh verification session' },
       { options: { address: '0xabc...' }, description: 'Tie the session to an existing wallet' },
     ],
     run(c) {

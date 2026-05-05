@@ -1,6 +1,6 @@
 # @agent-score/pay
 
-CLI wallet for one-shell-command agent payments across x402 (Base, Solana) and MPP (Tempo). ESM-only.
+CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana). ESM-only.
 
 ## Purpose
 
@@ -19,13 +19,13 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/prompts.ts` | Passphrase input (respects `AGENTSCORE_PAY_PASSPHRASE` env) |
 | `src/constants.ts` | Chain network IDs, USDC addresses, RPC URLs |
 | `src/chains/base.ts` | EVM adapter (x402): viem Account, USDC balance, EIP-681 QR URI |
-| `src/chains/solana.ts` | SVM adapter (x402): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
+| `src/chains/solana.ts` | SVM adapter (MPP `solana/charge`): `@solana/kit` KeyPairSigner, SPL balance, `solana:` URI |
 | `src/chains/tempo.ts` | EVM adapter (MPP): viem Account on chain 4217, USDC.e balance, EIP-681 QR URI |
 | `src/commands/wallet.ts` | `wallet create/import/address/list/remove/export/show-mnemonic` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
 | `src/commands/fund.ts` | `fund` — receive QR + balance polling (Tempo testnet uses programmatic mint via tempo_fundAddress) |
-| `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base/solana) or `mppx/client` (tempo) |
+| `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base) or `mppx/client` (tempo, solana via `@solana/mpp/client`) |
 | `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
 | `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `pay <url>` settle leg |
 | `src/passport/{auth,storage,attach}.ts` | Passport login flow (mint+poll), conf-style local keystore, X-Operator-Token attach decision tree |
@@ -35,8 +35,9 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 
 ## Chain-to-protocol routing
 
-- `base` / `solana` → x402Client + ExactEvmScheme or ExactSvmScheme, via `wrapFetchWithPayment`
+- `base` → x402Client + ExactEvmScheme, via `wrapFetchWithPayment`
 - `tempo` → `Mppx.create({ methods: [tempo({ account })] })`, via mpp.fetch
+- `solana` → `Mppx.create({ methods: [solanaCharge({ signer, rpcUrl })] })` from `@solana/mpp/client`, via mpp.fetch
 
 Both paths preserve POST bodies through the 402 round-trip. The CLI's passphrase + keystore layer is chain-agnostic.
 
