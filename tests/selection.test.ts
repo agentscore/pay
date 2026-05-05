@@ -87,6 +87,34 @@ describe('selectRail', () => {
     expect(picked.chain).toBe('tempo');
   });
 
+  it('with --chain override, only queries the chosen chain (no balance fetch on others)', async () => {
+    // Tracks how many times each chain's balance() was called. The selection path
+    // used to query every held chain regardless of override, which trips the public
+    // Solana mainnet RPC's 40-req/10s limit on legitimate tempo / base settles.
+    await writeKeystore('base', '0xbase');
+    await writeKeystore('solana', 'SoLaNa1111111111111111111111111111111111111');
+    await writeKeystore('tempo', '0xtempo');
+    const calls = { base: 0, solana: 0, tempo: 0 };
+    vi.doMock('../src/chains/base', async () => {
+      const actual = await vi.importActual<typeof import('../src/chains/base')>('../src/chains/base');
+      return { ...actual, balance: async () => { calls.base++; return 100n; } };
+    });
+    vi.doMock('../src/chains/solana', async () => {
+      const actual = await vi.importActual<typeof import('../src/chains/solana')>('../src/chains/solana');
+      return { ...actual, balance: async () => { calls.solana++; return 100n; } };
+    });
+    vi.doMock('../src/chains/tempo', async () => {
+      const actual = await vi.importActual<typeof import('../src/chains/tempo')>('../src/chains/tempo');
+      return { ...actual, balance: async () => { calls.tempo++; return 100n; } };
+    });
+    const { selectRail } = await import('../src/selection');
+    const picked = await selectRail({ chainOverride: 'tempo' });
+    expect(picked.chain).toBe('tempo');
+    expect(calls.tempo).toBe(1);
+    expect(calls.base).toBe(0);
+    expect(calls.solana).toBe(0);
+  });
+
   it('errors on chain override with no wallet', async () => {
     await writeKeystore('base', '0xbase');
     await mockBalances({ base: 100n });

@@ -37,8 +37,14 @@ function formatBalance(chain: Chain, raw: bigint): string {
 export async function listHeldCandidates(
   network: Network = 'mainnet',
   name: string = DEFAULT_WALLET_NAME,
+  filterChain?: Chain,
 ): Promise<Candidate[]> {
-  const chains = [...SUPPORTED_CHAINS];
+  // When the caller already knows which chain it wants (e.g. `pay --chain tempo`),
+  // skip the balance fetch on every other chain. Without this, we hit each chain's
+  // RPC even for an explicit override — and the public Solana mainnet endpoint
+  // (40 req/10s per IP) bubbles transient 429s back as `rpc_error: solana mainnet
+  // RPC call failed` on legitimate tempo / base settles.
+  const chains = filterChain ? [filterChain] : [...SUPPORTED_CHAINS];
   const candidates = await Promise.all(
     chains.map(async (chain) => {
       if (!(await keystoreExists(chain, name))) return null;
@@ -58,7 +64,7 @@ export async function listHeldCandidates(
 
 export async function selectRail(input: SelectInput = {}): Promise<Candidate> {
   const { chainOverride, walletName = DEFAULT_WALLET_NAME, minBalanceRaw, network = 'mainnet' } = input;
-  const heldCandidates = await listHeldCandidates(network, walletName);
+  const heldCandidates = await listHeldCandidates(network, walletName, chainOverride);
 
   const walletSuffix = walletName === DEFAULT_WALLET_NAME ? '' : ` (wallet: ${walletName})`;
   const createSuggestion =
