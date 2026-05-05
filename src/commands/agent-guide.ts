@@ -156,7 +156,7 @@ const GUIDE: AgentGuide = {
       command_example: 'agentscore-pay limits set --daily 5 --per-call 0.50 --per-merchant 2',
       notes: [
         '`agentscore-pay limits show --json` prints the current ceilings; `limits clear` removes the file (no limits = no enforcement).',
-        'Limits are local-only and advisory — they protect against runaway agent loops, not malicious merchants.',
+        'Limits are local-only and advisory; the merchant cannot read or override them.',
       ],
     },
     {
