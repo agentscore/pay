@@ -50,7 +50,7 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '1. (First run only) Verify identity with `passport login`',
-      why: 'Required for AgentScore-gated merchants (regulated commerce: wine, age-restricted goods, jurisdiction-restricted services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `pay <url>` call auto-attaches `X-Operator-Token` — no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants — pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
+      why: 'Required for AgentScore-gated merchants (regulated commerce: age-restricted, jurisdiction-restricted, or compliance-gated services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `pay <url>` call auto-attaches `X-Operator-Token`; no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants; pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
       command_example: 'agentscore-pay passport login --json',
       notes: [
         'No API key required. ~30 seconds in browser. No money needed for this step.',

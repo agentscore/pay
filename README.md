@@ -457,7 +457,7 @@ agentscore-pay fund-estimate https://agents.martinestate.com/purchase \
 
 ## Security
 
-- Keystore is AES-256-GCM encrypted with a scrypt-derived key (`N=131072, r=8, p=1`), one file per chain.
+- Keystore is AES-256-GCM encrypted with a scrypt-derived key, one file per chain.
 - Files written with `0600` perms, parent dir `0700`.
 - Passphrase prompted per signing operation; override with `AGENTSCORE_PAY_PASSPHRASE` env var for non-interactive agents.
 - `wallet export` is guarded by `--danger` + "type EXPORT" prompt.
