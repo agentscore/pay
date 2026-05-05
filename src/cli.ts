@@ -782,12 +782,12 @@ export function buildCli() {
     options: z.object({
       address: z.string().optional().describe('Pre-associate session with a known wallet'),
       operatorToken: z.string().optional().describe('Refresh KYC for an existing operator credential'),
-      context: z.string().optional().describe('Free-text context (e.g., "wine purchase")'),
+      context: z.string().optional().describe('Free-text context (e.g., "checkout")'),
       productName: z.string().optional().describe('Product name shown during verification (max 200 chars)'),
       apiKey: apiKeyOpt,
     }),
     examples: [
-      { options: { context: 'wine purchase' }, description: 'Bootstrap a fresh verification session' },
+      { options: { context: 'checkout' }, description: 'Bootstrap a fresh verification session' },
       { options: { address: '0xabc...' }, description: 'Tie the session to an existing wallet' },
     ],
     run(c) {
