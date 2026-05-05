@@ -372,8 +372,28 @@ export async function pay(input: PayInput): Promise<PayResult> {
     body: parsed ?? text,
   };
   if (!res.ok) {
-    throw new CliError('merchant_error', `Merchant returned ${res.status} ${res.statusText}`, {
-      extra: { status: res.status, chain: wallet.chain, body: result.body },
+    // Lift the merchant's structured `error.code` / `error.message` (when the body is
+    // JSON-shaped per the canonical 4xx envelope) into the CLI message so an agent
+    // doesn't have to re-curl to learn whether the failure was, e.g., `codes_not_accepted`
+    // vs `product_not_found` vs `unsupported_jurisdiction`. Falls back to the bare
+    // status text when the body isn't JSON or isn't envelope-shaped.
+    const merchantErr = (parsed as Record<string, unknown> | null)?.error as
+      | Record<string, unknown>
+      | undefined;
+    const merchantCode = typeof merchantErr?.code === 'string' ? merchantErr.code : undefined;
+    const merchantMessage =
+      typeof merchantErr?.message === 'string' ? merchantErr.message : undefined;
+    const display = merchantCode
+      ? `Merchant returned ${res.status} ${merchantCode}${merchantMessage ? ': ' + merchantMessage : ''}`
+      : `Merchant returned ${res.status} ${res.statusText}`;
+    throw new CliError('merchant_error', display, {
+      extra: {
+        status: res.status,
+        chain: wallet.chain,
+        ...(merchantCode ? { merchant_code: merchantCode } : {}),
+        ...(merchantMessage ? { merchant_message: merchantMessage } : {}),
+        body: result.body,
+      },
     });
   }
   return result;
