@@ -1,3 +1,4 @@
+import { printBanner } from './banner';
 import { run } from './cli';
 import { getNoticeIfNewer, refreshCacheAwaited, refreshCacheInBackground } from './update-check';
 
@@ -13,6 +14,12 @@ async function emitUpdateNoticeIfAvailable(): Promise<void> {
       `\n  → A newer @agent-score/pay is available: ${latest} (you have ${VERSION}). Update with: npm i -g @agent-score/pay\n`,
     );
   }
+}
+
+if (process.argv.length === 2 && process.stderr.isTTY) {
+  printBanner();
+  refreshCacheInBackground();
+  process.exit(0);
 }
 
 run()
