@@ -4,7 +4,8 @@ import { renderBanner } from '../src/banner';
 describe('banner', () => {
   it('renders block-art logo when terminal is wide enough', () => {
     const out = renderBanner({ cols: 100, color: false });
-    expect(out).toContain('▄▀█');
+    expect(out).toContain('░');
+    expect(out).toContain('█');
     expect(out).toContain('Universal agent-payment CLI');
     expect(out).toContain('Quick start:');
     expect(out).toContain('agentscore-pay init');
@@ -12,7 +13,7 @@ describe('banner', () => {
 
   it('falls back to plain-text brand on narrow terminals', () => {
     const out = renderBanner({ cols: 40, color: false });
-    expect(out).not.toContain('▄▀█');
+    expect(out).not.toContain('░');
     expect(out).toContain('AgentScore Pay');
     expect(out).toContain('Universal agent-payment CLI');
     expect(out).toContain('Quick start:');
@@ -41,11 +42,11 @@ describe('banner', () => {
     expect(out).not.toContain('\x1b[');
   });
 
-  it('art width fits within 60 cols (the threshold for falling back)', () => {
+  it('plain art width fits within 70 cols (the threshold for falling back)', () => {
     const out = renderBanner({ cols: 100, color: false });
-    const artLines = out.split('\n').filter((line) => line.includes('▄') || line.includes('▀') || line.includes('█'));
+    const artLines = out.split('\n').filter((line) => line.includes('░') || line.includes('█'));
     for (const line of artLines) {
-      expect(line.length).toBeLessThanOrEqual(60);
+      expect(line.length).toBeLessThanOrEqual(70);
     }
   });
 
