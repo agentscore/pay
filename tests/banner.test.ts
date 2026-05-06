@@ -50,13 +50,12 @@ describe('banner', () => {
   it('groups commands by audience role', () => {
     const out = renderBanner({ cols: 100, color: false });
     expect(out).toContain('Pay any 402 / MPP endpoint:');
-    expect(out).toContain('Identity (AgentScore Passport):');
     expect(out).toContain('Agents (LLM tool-loop):');
     expect(out).toContain('Account management:');
     expect(out).toContain('Output formats:');
   });
 
-  it('lists real commands without the binary prefix', () => {
+  it('lists real key-free commands without the binary prefix', () => {
     const out = renderBanner({ cols: 100, color: false });
     for (const cmd of [
       'pay',
@@ -65,9 +64,6 @@ describe('banner', () => {
       'discover',
       'fund',
       'passport',
-      'reputation',
-      'assess',
-      'credentials',
       'agent-guide',
       'skills add',
       'init',
@@ -81,6 +77,17 @@ describe('banner', () => {
     const lines = out.split('\n');
     const prefixedLines = lines.filter((l) => l.startsWith('  agentscore-pay '));
     expect(prefixedLines).toHaveLength(0);
+  });
+
+  it('omits commands that require an API key', () => {
+    const out = renderBanner({ cols: 100, color: false });
+    // These all route through getClient() and throw without AGENTSCORE_API_KEY.
+    // Bare invocation should only surface commands that work out-of-the-box.
+    for (const apiKeyOnly of ['reputation', 'assess', 'credentials', 'associate-wallet', 'sessions']) {
+      const lines = out.split('\n');
+      const matches = lines.filter((l) => l.match(new RegExp(`^\\s+${apiKeyOnly}\\s`)));
+      expect(matches).toHaveLength(0);
+    }
   });
 
   it('surfaces dual-audience output flags', () => {
