@@ -7,8 +7,6 @@ describe('banner', () => {
     expect(out).toContain('░');
     expect(out).toContain('█');
     expect(out).toContain('Universal agent-payment CLI');
-    expect(out).toContain('Quick start:');
-    expect(out).toContain('agentscore-pay init');
   });
 
   it('falls back to plain-text brand on narrow terminals', () => {
@@ -16,7 +14,6 @@ describe('banner', () => {
     expect(out).not.toContain('░');
     expect(out).toContain('AgentScore Pay');
     expect(out).toContain('Universal agent-payment CLI');
-    expect(out).toContain('Quick start:');
   });
 
   it('uses full brand prefix, never bare Pay or PAY.SH', () => {
@@ -50,12 +47,52 @@ describe('banner', () => {
     }
   });
 
-  it('quick-start references the binary, not the brand', () => {
+  it('groups commands by audience role', () => {
     const out = renderBanner({ cols: 100, color: false });
-    expect(out).toContain('agentscore-pay init');
-    expect(out).toContain('agentscore-pay balance');
-    expect(out).toContain('agentscore-pay pay POST <URL>');
-    expect(out).toContain('agentscore-pay fund options');
-    expect(out).toContain('agentscore-pay agent-guide');
+    expect(out).toContain('Pay any 402 / MPP endpoint:');
+    expect(out).toContain('Identity (AgentScore Passport):');
+    expect(out).toContain('Agents (LLM tool-loop):');
+    expect(out).toContain('Account management:');
+    expect(out).toContain('Output formats:');
+  });
+
+  it('lists real commands without the binary prefix', () => {
+    const out = renderBanner({ cols: 100, color: false });
+    for (const cmd of [
+      'pay',
+      'check',
+      'balance',
+      'discover',
+      'fund',
+      'passport',
+      'reputation',
+      'assess',
+      'credentials',
+      'agent-guide',
+      'skills add',
+      'init',
+      'wallet',
+      'limits',
+      'history',
+    ]) {
+      expect(out).toContain(cmd);
+    }
+    // Lines starting with the binary prefix would be the old format; new format omits it.
+    const lines = out.split('\n');
+    const prefixedLines = lines.filter((l) => l.startsWith('  agentscore-pay '));
+    expect(prefixedLines).toHaveLength(0);
+  });
+
+  it('surfaces dual-audience output flags', () => {
+    const out = renderBanner({ cols: 100, color: false });
+    expect(out).toContain('--json');
+    expect(out).toContain('--format toon');
+    expect(out).toContain('--help');
+    expect(out).toContain('--mcp');
+  });
+
+  it('does not reference the unbuilt `fund options` subcommand', () => {
+    const out = renderBanner({ cols: 100, color: false });
+    expect(out).not.toContain('fund options');
   });
 });

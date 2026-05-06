@@ -22,15 +22,35 @@ const BANNER_ART_PLAIN = [
 
 const TAGLINE = 'Universal agent-payment CLI';
 
-const QUICK_START = [
-  'Quick start:',
-  '  agentscore-pay init                Create encrypted wallet across base, solana, tempo',
-  '  agentscore-pay balance             Check USDC across chains',
-  '  agentscore-pay pay POST <URL>      Pay any 402 / MPP merchant',
-  '  agentscore-pay fund options        List funding methods for a wallet',
-  '  agentscore-pay agent-guide         Full guide for LLM agents',
+const COMMANDS = [
+  'Pay any 402 / MPP endpoint:',
+  '  pay           Send a paid HTTP request (multi-rail x402 + MPP)',
+  '  check         Probe a URL for 402 and accepted rails (no money moves)',
+  '  balance       USDC across base, solana, tempo',
+  '  discover      Browse paid services in x402 Bazaar + MPP directory',
+  '  fund          Show receive QR and poll for deposit',
   '',
-  'Run `agentscore-pay --help` for the full command list.',
+  'Identity (AgentScore Passport):',
+  '  passport      Verify once with KYC; auto-attaches to gated merchants',
+  '  reputation    Trust-score lookup for any wallet',
+  '  assess        Compliance decision (policy gate + linked wallets)',
+  '  credentials   Operator credentials for non-wallet agents',
+  '',
+  'Agents (LLM tool-loop):',
+  '  --mcp         Expose every command as MCP tools over stdio',
+  '  agent-guide   Structured how-to-use for shell-tool agents',
+  '  skills add    Sync skill files to Claude Code / Cursor / Amp',
+  '',
+  'Account management:',
+  '  init          First-run wallet setup (base + solana + tempo)',
+  '  wallet        Manage encrypted keystore (create / import / export / list)',
+  '  limits        Persistent local spending caps',
+  '  history       Past payments',
+  '',
+  'Output formats:',
+  '  --json           JSON envelope',
+  '  --format toon    TOON envelope (default)',
+  '  --help           Full command list and flags',
 ].join('\n');
 
 const MIN_BANNER_COLS = 70;
@@ -49,10 +69,10 @@ export function renderBanner({
   color: boolean;
 }): string {
   if (cols < MIN_BANNER_COLS) {
-    return `${PLAIN_BRAND}\n${TAGLINE}\n\n${QUICK_START}\n`;
+    return `${PLAIN_BRAND}\n${TAGLINE}\n\n${COMMANDS}\n`;
   }
   const art = color ? BANNER_ART_COLORED : BANNER_ART_PLAIN;
-  return `${art}\n\n${TAGLINE}\n\n${QUICK_START}\n`;
+  return `${art}\n\n${TAGLINE}\n\n${COMMANDS}\n`;
 }
 
 export function printBanner(): void {
