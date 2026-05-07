@@ -3,7 +3,7 @@ import { CliError } from '../errors';
 import { passportLogin } from '../passport/auth';
 import { clearPassport, expiresInDays, isExpired, loadPassport } from '../passport/storage';
 
-/** `pay passport {login,status,logout}` command handlers. */
+/** `agentscore-pay passport {login,status,logout}` command handlers. */
 
 export interface PassportLoginInput {
   pollIntervalSeconds?: number;

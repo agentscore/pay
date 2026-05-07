@@ -113,7 +113,7 @@ agentscore-pay <cmd> --schema         # JSON Schema for one command's args/optio
 
 ### Idempotency on retry
 
-Every `pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-256 hash of `(url + method + body + signer)` — so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `pay` invocations).
+Every `agentscore-pay pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-256 hash of `(url + method + body + signer)` — so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `agentscore-pay pay` invocations).
 
 ### Test-mode addresses
 
@@ -208,7 +208,7 @@ async function pay(url: string, body: unknown, maxSpendUsd: number) {
     return JSON.parse(stdout);
   } catch (err: any) {
     const last = (err.stderr ?? '').split('\n').filter(Boolean).pop();
-    throw new Error(`pay exit ${err.code}: ${last}`);
+    throw new Error(`agentscore-pay exit ${err.code}: ${last}`);
   }
 }
 ```
@@ -255,6 +255,8 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 ## Commands
 
+Each row below is a subcommand of `agentscore-pay` — invoke as `agentscore-pay <command>` (e.g. `agentscore-pay init`, `agentscore-pay pay POST <url>`).
+
 | Command | Purpose |
 |---|---|
 | `init [--no-mnemonic] [--fund-tempo-testnet] [--preferred-chains <list>]` | One-shot first-run: create all 3 wallets (mnemonic by default) + optional testnet fund + preferred-chain config |
@@ -288,7 +290,7 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 
 | Command | Purpose |
 |---|---|
-| `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
+| `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `agentscore-pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
 | `passport status` | Show stored Passport — token prefix, expiry, expired flag |
 | `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |

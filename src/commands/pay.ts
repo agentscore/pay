@@ -202,7 +202,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     });
   }
   if (passportAttach.expiringSoon) {
-    process.stderr.write(`Passport expires soon — run \`pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
+    process.stderr.write(`Passport expires soon — run \`agentscore-pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
   }
   // Note: kind === 'expired' on the live path was already handled inline above.
   // Dry-run doesn't drive reauth; the user can see kind: 'expired' in the dry-run output.
