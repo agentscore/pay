@@ -292,7 +292,7 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | Command | Purpose |
 |---|---|
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `agentscore-pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--no-passport`). No API key required. |
-| `passport status` | Show stored Passport — token prefix, expiry, expired flag |
+| `passport status` | Show stored Passport — token prefix, access + refresh expiry, `silent_refresh_available`, `expired` flag |
 | `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (requires API key) |
