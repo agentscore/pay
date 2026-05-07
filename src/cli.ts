@@ -1,4 +1,4 @@
-import { Cli, Errors, z } from 'incur';
+import { Cli, Errors, Formatter, z } from 'incur';
 import { agentGuide } from './commands/agent-guide';
 import { balance } from './commands/balance';
 import { check } from './commands/check';
@@ -63,23 +63,69 @@ function parseHeaders(values: string[] | undefined): Record<string, string> | un
 }
 
 /**
+ * Single-flight stash for the originating CliError. Set by `withCliErrors`
+ * before incur's IncurError bridge would discard the structured fields
+ * (`extra`, `nextSteps`); drained by `serveCli` to enrich the wire envelope.
+ * Accessed only via `takePendingError()` to keep the read+reset atomic and
+ * to prevent TypeScript narrowing from constant-folding the type to `null`
+ * after assignments inside `serveCli`.
+ */
+let pendingError: CliError | null = null;
+
+function takePendingError(): CliError | null {
+  const captured = pendingError;
+  pendingError = null;
+  return captured;
+}
+
+export const RETRYABLE_CODES: ReadonlySet<string> = new Set([
+  'network_error',
+  'rpc_error',
+  'session_timeout',
+]);
+
+export function isRetryable(code: string): boolean {
+  return RETRYABLE_CODES.has(code);
+}
+
+/**
  * Wrap a command handler so any thrown CliError becomes incur's IncurError, which
  * carries the structured code, message, hint, retryable flag, and exit code through
- * to incur's error envelope (and the MCP / --json / human renderers).
+ * to incur's error envelope. The full CliError is also stashed in `pendingError`
+ * so `serveCli` can rewrite the wire envelope with `extra` and `next_steps`,
+ * which incur's renderer would otherwise silently drop.
+ *
+ * Implementation note: many call sites pass a non-async arrow (e.g.
+ * `withCliErrors(() => fundEstimate({headers: parseHeaders(...)}))`) where
+ * `parseHeaders` can throw a CliError synchronously while constructing the
+ * args object — *before* the inner promise is returned. A naive `fn().catch`
+ * would let that sync throw propagate uncaught, reaching incur as a raw Error
+ * and erasing the CliError.code. `Promise.resolve().then(fn)` defers the call
+ * onto the microtask queue, so any sync throw becomes a Promise rejection
+ * that `.catch` reliably intercepts. Async arrow functions already get this
+ * behavior for free; the wrapper makes the contract uniform.
  */
 function withCliErrors<T>(fn: () => Promise<T>): Promise<T> {
-  return fn().catch((err: unknown) => {
-    if (err instanceof CliError) {
-      throw new Errors.IncurError({
-        code: err.code,
-        message: err.message,
-        exitCode: exitCodeForError(err.code),
-        hint: err.nextSteps?.suggestion,
-        retryable: err.code === 'network_error' || err.code === 'rpc_error' || err.code === 'session_timeout',
-      });
-    }
-    throw err;
-  });
+  return Promise.resolve()
+    .then(fn)
+    .catch((err: unknown) => {
+      if (err instanceof CliError) {
+        pendingError = err;
+        throw new Errors.IncurError({
+          code: err.code,
+          message: err.message,
+          exitCode: exitCodeForError(err.code),
+          hint: err.nextSteps?.suggestion,
+          retryable: isRetryable(err.code),
+          // Preserve the originating CliError's stack trace via the standard
+          // Error `cause` chain. Not surfaced on the wire (incur drops it),
+          // but tools like Node's stack-trace formatter follow `cause` when
+          // logging unhandled rejections, making local debugging easier.
+          cause: err,
+        });
+      }
+      throw err;
+    });
 }
 
 export function buildCli() {
@@ -1031,7 +1077,148 @@ export function buildCli() {
   return cli;
 }
 
+export interface ServeCliOptions {
+  argv?: string[];
+  stdout?: (s: string) => void;
+  exit?: (code: number) => void;
+}
+
+/**
+ * Wraps `cli.serve` to enrich the wire envelope on CliError-driven failures.
+ *
+ * incur's error renderer surfaces only `code`, `message`, and `retryable` —
+ * `extra` and `nextSteps` from CliError are silently discarded. We capture
+ * the originating CliError in `pendingError`, let incur run, then if a
+ * CliError fired we discard incur's error output and re-emit our own
+ * enriched envelope through the same `Formatter.format(...)` incur uses, so
+ * format negotiation (toon / json / yaml / md) and `--full-output` wrapping
+ * stay consistent with the success path.
+ *
+ * Success and non-CliError errors (Parse, Validation) pass through verbatim.
+ */
+export async function serveCli(
+  cli: ReturnType<typeof buildCli>,
+  options: ServeCliOptions = {},
+): Promise<void> {
+  const argv = options.argv;
+  const writeStdout = options.stdout ?? ((s: string) => process.stdout.write(s));
+  const callExit = options.exit ?? ((c: number) => process.exit(c));
+
+  // Drain any stash from a prior aborted invocation so we never enrich an
+  // unrelated envelope (in tests, multiple serveCli calls share the module).
+  takePendingError();
+
+  // MCP stdio mode loops forever responding to per-request tool calls; the
+  // single post-serve enrichment doesn't fit that lifecycle and would emit a
+  // stale envelope to stdout after the session closes. Pass straight through
+  // to incur. (MCP errors today render only `error.message` per the upstream
+  // Mcp.callTool implementation; closing that gap requires an upstream
+  // change to incur and is out of scope for this wrapper.)
+  const effectiveArgv = argv ?? process.argv.slice(2);
+  if (effectiveArgv.includes('--mcp')) {
+    await cli.serve(argv, { stdout: writeStdout, exit: callExit });
+    return;
+  }
+
+  const chunks: string[] = [];
+  let capturedExit: number | undefined;
+
+  await cli.serve(argv, {
+    stdout: (s) => chunks.push(s),
+    exit: (code) => {
+      capturedExit = code;
+    },
+  });
+
+  const captured = takePendingError();
+
+  if (captured) {
+    const formatExplicit =
+      effectiveArgv.includes('--json') || effectiveArgv.some((a) => a === '--format');
+    const fullOutput = effectiveArgv.includes('--full-output');
+    // Token / pagination flags ask incur for a sized or truncated rendering
+    // of its own output (token count, byte slice). Enrichment would replace
+    // that rendering with a synthesized envelope, breaking the agent's
+    // expectation that `--token-count` returns a number and `--token-limit`
+    // returns a truncated slice. Pass through verbatim — incur already
+    // applied the correct treatment to its error rendering.
+    const tokenFlag =
+      effectiveArgv.includes('--token-count') ||
+      effectiveArgv.includes('--token-limit') ||
+      effectiveArgv.includes('--token-offset');
+
+    // Human-TTY context (interactive terminal, no explicit format/full-output):
+    // preserve incur's `formatHumanError` rendering — the friendly one-line
+    // `Error (code): message` shape humans expect at a terminal. Enrichment
+    // here would replace it with a multi-line TOON dump, which is a regression
+    // for humans without giving them anything they need (extras are for
+    // agents). Pipe / agent / scripted contexts (non-TTY OR explicit format)
+    // continue to get the enriched envelope below.
+    const isHumanTTY =
+      process.stdout.isTTY === true && !formatExplicit && !fullOutput;
+
+    if (isHumanTTY || tokenFlag) {
+      for (const chunk of chunks) writeStdout(chunk);
+      if (capturedExit !== undefined) callExit(capturedExit);
+      return;
+    }
+
+    const format = readFormat(effectiveArgv);
+    const errorBody = {
+      code: captured.code,
+      message: captured.message,
+      retryable: isRetryable(captured.code),
+      ...(Object.keys(captured.extra).length > 0 ? { extra: captured.extra } : {}),
+      ...(captured.nextSteps ? { next_steps: captured.nextSteps } : {}),
+    };
+
+    // Full-output JSON: parse incur's wrapped envelope from chunks and swap
+    // just the `error` body, preserving its `meta.command` / `meta.duration`
+    // / `meta.cta`. Non-JSON full-output formats can't be parsed (no public
+    // parser exposed by incur), so we fall back to a synthesized envelope
+    // there.
+    if (fullOutput && format === 'json') {
+      try {
+        const original = JSON.parse(chunks.join('')) as { error?: unknown; meta?: unknown };
+        if (original && typeof original === 'object') {
+          const merged = { ok: false, error: errorBody, ...(original.meta ? { meta: original.meta } : {}) };
+          const json = JSON.stringify(merged, null, 2);
+          writeStdout(`${json}\n`);
+          if (capturedExit !== undefined) callExit(capturedExit);
+          return;
+        }
+      } catch {
+        // Fallthrough to synthesized envelope below.
+      }
+    }
+
+    const envelope = fullOutput ? { ok: false, error: errorBody } : errorBody;
+    const formatted = Formatter.format(envelope, format);
+    writeStdout(formatted.endsWith('\n') ? formatted : `${formatted}\n`);
+  } else {
+    for (const chunk of chunks) writeStdout(chunk);
+  }
+
+  if (capturedExit !== undefined) callExit(capturedExit);
+}
+
+function readFormat(argv: readonly string[]): Formatter.Format {
+  // Mirrors incur's left-to-right last-wins precedence (see Cli.js
+  // `extractBuiltinFlags` loop): `--json` and `--format <fmt>` each set the
+  // format on encounter; whichever appears last in argv wins.
+  let format: Formatter.Format = 'toon';
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token === '--json') {
+      format = 'json';
+    } else if (token === '--format' && argv[i + 1]) {
+      format = argv[i + 1] as Formatter.Format;
+      i++;
+    }
+  }
+  return format;
+}
+
 export async function run(): Promise<void> {
-  const cli = buildCli();
-  await cli.serve();
+  await serveCli(buildCli());
 }
