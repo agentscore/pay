@@ -232,6 +232,14 @@ const GUIDE: AgentGuide = {
         'Run `agentscore-pay passport login` interactively (one-time browser click) to mint a fresh access + refresh credential pair, then re-run the original command. The new credential lasts ~90 days before another re-verify is needed. `extra.previous_token_prefix` identifies which stored Passport was rejected, when the agent juggles multiple environments.',
     },
     {
+      cli_code: 'passport_required_by_merchant',
+      thrown_when:
+        'Merchant returned a 403 with bootstrap fields (verify_url + session_id + poll_secret) and the agent has no usable stored Passport. Only thrown in non-TTY contexts; a human TTY drives the inline browser flow instead. Symmetric to passport_login_required but covers the cold-start case where the agent never logged in to begin with.',
+      next_action: 'passport_login',
+      recovery:
+        'Recommended: run `agentscore-pay passport login` first — mints a portable refresh-bearing Passport that satisfies any AgentScore-gated merchant going forward, no per-merchant re-verify. Alternative: surface `extra.verify_url` to the user verbatim; completing it issues a one-shot 24h token tied to that merchant\'s session (no refresh_token, so the next AgentScore-gated merchant will hit the same flow again).',
+    },
+    {
       cli_code: 'config_error',
       thrown_when:
         'AGENTSCORE_API_KEY missing (getClient throws directly with action=set_api_key); OR API key invalid/expired (generic 401 → action=check_api_key); OR operator_token expired/revoked (TokenExpiredError → action=reauth, exposes verify_url + session_id + poll_secret in extra); OR operator_token unrecognized (InvalidCredentialError → action=switch_token_or_restart_session).',

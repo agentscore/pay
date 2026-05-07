@@ -32,6 +32,14 @@ vi.mock('../src/passport/bootstrap', async (importOriginal) => {
   };
 });
 
+// Note: the symmetric merchant-403 cold-start path (passport_required_by_merchant)
+// applies the exact same `!process.stdout.isTTY` check immediately before
+// `bootstrapFromMerchantSession`. Unit-testing it requires mocking the entire
+// x402/MPP request flow (rail-specific clients wrapping fetch) to return a 403
+// with bootstrap fields, which is heavier than the path's structure warrants.
+// The structural symmetry with the expired-access tests below + live smoke against
+// martin-estate covers the contract.
+
 function withTTY(value: boolean, fn: () => Promise<void>): Promise<void> {
   const origDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
   Object.defineProperty(process.stdout, 'isTTY', { value, configurable: true });

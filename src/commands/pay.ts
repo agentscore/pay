@@ -303,6 +303,32 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const callerAlreadyHadIdentity = userHeaderKeysAll.includes('x-operator-token');
   const passportAlreadyAttached = passportAttach.kind === 'attached';
   if (bootstrapFields && !callerAlreadyHadIdentity && !passportAlreadyAttached && !input.noPassport) {
+    // Same UX-cliff treatment as the expired-stored-Passport path above:
+    // non-TTY agents shouldn't block ~1h on the inline browser flow. Surface
+    // a structured envelope with the merchant-supplied verify_url + session
+    // fields so the agent can either run `passport login` interactively
+    // (recommended — mints a refresh-bearing Passport that prevents this
+    // round-trip on subsequent calls) or proxy the merchant URL out-of-band.
+    if (!process.stdout.isTTY) {
+      throw new CliError(
+        'passport_required_by_merchant',
+        'Merchant requires AgentScore Passport identity verification, and this run is non-interactive so pay cannot drive the browser verify flow.',
+        {
+          nextSteps: {
+            action: 'passport_login',
+            suggestion:
+              'Recommended: run `agentscore-pay passport login` interactively to mint a fresh access + refresh credential, then re-run this command — the new credential lasts ~90 days and prevents this round-trip on subsequent merchants. Alternative: surface the merchant-supplied verify_url to the user; completing it issues a one-shot 24h token tied to this merchant\'s session.',
+          },
+          extra: {
+            verify_url: bootstrapFields.verify_url,
+            session_id: bootstrapFields.session_id,
+            poll_secret: bootstrapFields.poll_secret,
+            ...(bootstrapFields.poll_url ? { poll_url: bootstrapFields.poll_url } : {}),
+            ...(bootstrapFields.order_id ? { order_id: bootstrapFields.order_id } : {}),
+          },
+        },
+      );
+    }
     process.stderr.write('Merchant requires identity verification — bootstrapping inline...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromMerchantSession(bootstrapFields, {
