@@ -285,7 +285,7 @@ Each row below is a subcommand of `agentscore-pay` — invoke as `agentscore-pay
 
 ### Identity commands
 
-`passport login`/`status`/`logout` use the public `POST /v1/sessions/public` endpoint and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK — set `AGENTSCORE_API_KEY`.
+`passport login`/`status`/`logout` use AgentScore's buyer-side identity flow and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK — set `AGENTSCORE_API_KEY`.
 
 AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
 
