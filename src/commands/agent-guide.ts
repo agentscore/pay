@@ -64,12 +64,14 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '1. (First run only) Verify identity with `passport login`',
-      why: 'Required for AgentScore-gated merchants (regulated commerce: age-restricted, jurisdiction-restricted, or compliance-gated services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token to ~/.agentscore/passport.json. Every subsequent `agentscore-pay <url>` call auto-attaches `X-Operator-Token`; no per-call prompting. Tokens are short-lived; pay refreshes them silently and drives inline reauth on hard expiry. Skipping this step is fine for unregulated merchants; pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
+      why: 'Required for AgentScore-gated merchants (regulated commerce: age-restricted, jurisdiction-restricted, or compliance-gated services). The agent shares the verify URL with the user; the user completes KYC once in the browser; pay saves the operator_token + a long-lived refresh_token to ~/.agentscore/passport.json. Every subsequent `agentscore-pay <url>` call auto-attaches `X-Operator-Token`; no per-call prompting. Skipping this step is fine for unregulated merchants; pay will run anonymous and the merchant\'s 402 will tell you if identity is required.',
       command_example: 'agentscore-pay passport login --json',
       notes: [
         'No API key required. ~30 seconds in browser. No money needed for this step.',
-        'If you skip this and later hit an AgentScore-gated merchant, pay drives the same verify flow inline mid-purchase (cold-start bootstrap) — but the resulting Passport lacks a refresh token and re-verifies after 24h. Doing `passport login` first gets the better long-term UX.',
+        'Token lifecycle: access token = 24h (auto-rotated via the refresh_token, which is 90d). Pay refreshes silently on the next call after access expires — no agent action required. Re-verify in browser is needed only when both have expired, i.e. when the agent has been offline for ~90 days.',
+        'If you skip step 1 and let a merchant 403 trigger the bootstrap mid-purchase (cold-start), the resulting passport is sourced from the merchant-minted session and does NOT carry a refresh_token — that flow re-verifies after 24h. Doing `passport login` first gets the 90-day silent-refresh UX.',
         'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport. Use `--no-passport` for explicit-anonymous traffic.',
+        'When pay does need to re-verify, you (the agent) will see `code: passport_token_expired` or the inline `Open this URL to renew:` prompt on stderr. Surface the verify URL to the user verbatim; do not fabricate one. The flow polls until the user completes the browser step.',
       ],
     },
     {
@@ -185,9 +187,11 @@ const GUIDE: AgentGuide = {
     },
     {
       step: 'Inspect / renew the stored Passport with `passport status` / `passport login`',
-      why: 'After the initial `passport login` (golden-path step 1), most flows are zero-touch — silent refresh keeps the token fresh. Use `passport status` to inspect what\'s saved (token prefix, expiry, expired flag); re-run `passport login` if expired or to re-mint after `passport logout`.',
+      why: 'After the initial `passport login` (golden-path step 1), most flows are zero-touch — silent refresh keeps the token fresh. Use `passport status` to inspect what\'s saved; re-run `passport login` only when the agent has been offline beyond the refresh window (i.e. when `silent_refresh_available` is false).',
       command_example: 'agentscore-pay passport status --json',
       notes: [
+        '`passport status` returns `{ authenticated, operator_token_prefix, expires_at, expires_in_days, expired, silent_refresh_available, refresh_expires_at, refresh_expires_in_days }`. The access fields (`expires_*`) are short-lived (~24h) and rotate silently; do not surface "expires in 0 days" to the user as an actionable warning. The refresh fields (`refresh_expires_*`) are the meaningful re-verify horizon — that\'s when the user actually has to do something.',
+        '`silent_refresh_available: true` means pay will rotate the access token automatically on the next call when it expires; agent has nothing to do. `silent_refresh_available: false` (legacy passport, or merchant-mint cold-start without refresh_token) means the next access expiry forces a verify-URL prompt.',
         'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport, so existing scripts keep working.',
         'Non-AgentScore merchants ignore the header — auto-attach is harmless on those endpoints.',
         'Use `--no-passport` on `agentscore-pay <url>` for explicit-anonymous traffic.',

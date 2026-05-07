@@ -85,6 +85,43 @@ describe('passport/attach', () => {
     expect(result.expiringSoon).toBe(false);
   });
 
+  it('expiringSoon=false even with short-lived access when refresh_token is comfortably valid', async () => {
+    // Post-silent-refresh-fix: access tokens get rotated to 24h on every
+    // refresh. If the user-actionable warning fired on every pay call
+    // (because 24h < 5d), it would be misleading — the user does NOT
+    // need to re-verify; pay refreshes silently. expiringSoon should
+    // reflect "user action needed", not just access remaining life.
+    const now = Date.now();
+    await savePassport({
+      version: 1,
+      operator_token: 'opc_short_access_long_refresh',
+      expires_at: now + 24 * 60 * 60 * 1000, // 24h, well inside 5d window
+      saved_at: now,
+      refresh_token: 'prt_test',
+      refresh_expires_at: now + 90 * 24 * 60 * 60 * 1000, // 90d
+    });
+    const result = await attachPassport({ now });
+    expect(result.kind).toBe('attached');
+    expect(result.expiringSoon).toBe(false);
+  });
+
+  it('expiringSoon=true when access AND refresh both near expiry (user must re-verify)', async () => {
+    // The case where the warning is genuinely useful: refresh is about
+    // to expire too, so the user actually needs to passport login again.
+    const now = Date.now();
+    await savePassport({
+      version: 1,
+      operator_token: 'opc_access_near_end',
+      expires_at: now + 4 * 24 * 60 * 60 * 1000, // 4d
+      saved_at: now,
+      refresh_token: 'prt_also_near_end',
+      refresh_expires_at: now + 3 * 24 * 60 * 60 * 1000, // 3d — within 5d window
+    });
+    const result = await attachPassport({ now });
+    expect(result.kind).toBe('attached');
+    expect(result.expiringSoon).toBe(true);
+  });
+
   describe('silent refresh', () => {
     function withRefresh(overrides: Partial<Passport> = {}): Passport {
       const now = Date.now();

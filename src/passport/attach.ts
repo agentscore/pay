@@ -22,7 +22,12 @@ export interface AttachResult {
   passport?: Passport;
   /** Header value to set as `X-Operator-Token`, when kind === 'attached'. */
   operatorToken?: string;
-  /** True when expires_at - now < 5 days (informational warning, not a block). */
+  /**
+   * Informational warning that the *user* needs to re-verify in browser
+   * soon. False when a refresh_token is still comfortably valid (pay
+   * will rotate silently — no user action). True only when access is
+   * near expiry AND refresh is unavailable or also near expiry.
+   */
   expiringSoon?: boolean;
 }
 
@@ -84,7 +89,17 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
     return { kind: 'expired', passport };
   }
 
-  const expiringSoon = passport.expires_at - now < SOFT_EXPIRY_WINDOW_MS;
+  // `expiringSoon` is the signal that the *user* needs to take action
+  // (re-verify in browser). With a refresh_token still comfortably valid,
+  // pay rotates silently and the user has nothing to do — don't print the
+  // misleading "run passport login" warning. Only set it when access is
+  // near expiry AND refresh is unavailable / also near expiry.
+  const refreshWillSaveUs =
+    !!passport.refresh_token
+    && (passport.refresh_expires_at == null
+      || passport.refresh_expires_at - now > SOFT_EXPIRY_WINDOW_MS);
+  const expiringSoon =
+    !refreshWillSaveUs && passport.expires_at - now < SOFT_EXPIRY_WINDOW_MS;
   return {
     kind: 'attached',
     passport,
