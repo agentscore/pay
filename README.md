@@ -314,6 +314,15 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | `quota_exceeded` | `QuotaExceededError` — account-level cap hit | Do NOT retry; surface to the user with https://agentscore.sh/pricing. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
 | `network_error` | `RateLimitedError` (per-second cap), `TimeoutError`, or any other transient failure | Retry with backoff per `next_steps.suggestion` |
 
+The `pay <url>` command additionally throws two non-TTY-only codes when an agent (`--json` / MCP / scripted) hits a Passport-required state — instead of blocking up to an hour on the inline browser-redirect flow, pay surfaces a structured envelope so the agent can route to `passport login`:
+
+| `code` | Thrown when | Extra | Recovery |
+|---|---|---|---|
+| `passport_login_required` | Stored Passport's access token expired AND silent refresh did not succeed (revoked, network failure, rate-limited, or no refresh_token because the Passport was minted via cold-start bootstrap) | `previous_token_prefix` | Run `agentscore-pay passport login` interactively (one-time browser click) — mints a fresh 24h access + 90d refresh pair; subsequent calls rotate silently for ~90 days |
+| `passport_required_by_merchant` | Merchant returned 403 with bootstrap fields (`verify_url` + `session_id` + `poll_secret`) and the agent has no usable stored Passport | `verify_url`, `session_id`, `poll_secret`, `poll_url`, `order_id` | Recommended: `agentscore-pay passport login` first (mints a portable refresh-bearing Passport that satisfies any AgentScore-gated merchant). Alternative: surface `extra.verify_url` to the user; completing it issues a one-shot 24h token tied to that merchant's session (no refresh_token) |
+
+Both codes only fire on non-TTY runs. In a human terminal pay continues to drive the inline browser-redirect flow itself.
+
 #### Quota observability
 
 `assess` (and the other identity commands when the account has a per-period quota) emits the response's `X-Quota-Limit` / `X-Quota-Used` / `X-Quota-Reset` headers as a `quota: { limit, used, reset }` block on the success envelope. Agents monitoring approach-to-cap should warn at 80% and alert at 95%.
