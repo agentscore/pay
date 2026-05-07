@@ -146,7 +146,7 @@ async function pollAndStore(input: {
 
     if (poll.status === 'denied' || poll.status === 'failed') {
       throw new CliError('passport_verification_failed', `Passport verification ${poll.status}.`, {
-        nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again.' },
+        nextSteps: { action: 'retry_login', suggestion: 'Run `agentscore-pay passport login` again.' },
         extra: { session_id: input.sessionId, status: poll.status },
       });
     }
@@ -155,7 +155,7 @@ async function pollAndStore(input: {
   }
 
   throw new CliError('passport_verification_timeout', 'Passport verification timed out.', {
-    nextSteps: { action: 'retry_login', suggestion: 'Run `pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
+    nextSteps: { action: 'retry_login', suggestion: 'Run `agentscore-pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
     extra: { session_id: input.sessionId, verify_url: input.verifyUrl },
   });
 }

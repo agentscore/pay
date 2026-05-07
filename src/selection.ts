@@ -39,7 +39,7 @@ export async function listHeldCandidates(
   name: string = DEFAULT_WALLET_NAME,
   filterChain?: Chain,
 ): Promise<Candidate[]> {
-  // When the caller already knows which chain it wants (e.g. `pay --chain tempo`),
+  // When the caller already knows which chain it wants (e.g. `agentscore-pay pay --chain tempo`),
   // skip the balance fetch on every other chain. Without this, we hit each chain's
   // RPC even for an explicit override — and the public Solana mainnet endpoint
   // (40 req/10s per IP) bubbles transient 429s back as `rpc_error: solana mainnet
