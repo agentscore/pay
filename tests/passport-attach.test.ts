@@ -91,7 +91,10 @@ describe('passport/attach', () => {
       return {
         version: 1,
         operator_token: 'opc_about_to_expire',
-        expires_at: now + 30 * 1000, // 30s left — within REFRESH_THRESHOLD_MS (60s)
+        // Default: access token within the proactive refresh window
+        // (REFRESH_THRESHOLD_MS = 5 min). Override per-test to exercise
+        // the reactive path (negative remaining life) or far-from-expiry.
+        expires_at: now + 30 * 1000,
         saved_at: now,
         refresh_token: 'prt_test_refresh_token',
         refresh_expires_at: now + 90 * 24 * 60 * 60 * 1000,
@@ -99,9 +102,8 @@ describe('passport/attach', () => {
       };
     }
 
-    it('silently refreshes when access token is within 60s of expiry and saves the new pair', async () => {
-      const calls: string[] = [];
-      const fetchMock = vi.fn(async (url: string | URL) => {
+    function refreshSuccessFetch(calls: string[]): typeof globalThis.fetch {
+      return vi.fn(async (url: string | URL) => {
         calls.push(url.toString());
         return new Response(
           JSON.stringify({
@@ -113,14 +115,20 @@ describe('passport/attach', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }) as unknown as typeof globalThis.fetch;
+    }
 
-      const stored = withRefresh();
-      await savePassport(stored);
+    // ── Proactive: access still valid but within REFRESH_THRESHOLD_MS ──
+
+    it('proactively refreshes when access is within the threshold of expiry', async () => {
+      const calls: string[] = [];
+      const fetchMock = refreshSuccessFetch(calls);
+
+      // 30s remaining is well inside REFRESH_THRESHOLD_MS (5 min).
+      await savePassport(withRefresh());
 
       const result = await attachPassport({ fetch: fetchMock });
       expect(result.kind).toBe('attached');
       expect(result.operatorToken).toBe('opc_freshly_minted');
-      // Hit /v1/sessions/refresh once.
       expect(calls.filter((c) => c.endsWith('/v1/sessions/refresh'))).toHaveLength(1);
 
       // Disk got the new pair.
@@ -129,7 +137,33 @@ describe('passport/attach', () => {
       expect(reloaded?.refresh_token).toBe('prt_freshly_rotated');
     });
 
-    it('does NOT refresh when access token is comfortably away from expiry', async () => {
+    // ── Reactive: access has already expired but refresh_token is valid ──
+    // This is the dominant real-world case — agent comes back after the 24h
+    // access TTL but well within the 90d refresh TTL. Pre-fix, this path
+    // short-circuited to 'expired' and forced bootstrap reauth.
+
+    it('reactively refreshes when access already expired but refresh_token still valid', async () => {
+      const calls: string[] = [];
+      const fetchMock = refreshSuccessFetch(calls);
+      const now = Date.now();
+
+      // Access expired 1 hour ago; refresh_token still valid for 90 days.
+      await savePassport(
+        withRefresh({
+          expires_at: now - 60 * 60 * 1000,
+          refresh_expires_at: now + 90 * 24 * 60 * 60 * 1000,
+        }),
+      );
+
+      const result = await attachPassport({ fetch: fetchMock, now });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_freshly_minted');
+      expect(calls.filter((c) => c.endsWith('/v1/sessions/refresh'))).toHaveLength(1);
+    });
+
+    // ── No refresh attempted ──
+
+    it('does NOT refresh when access is comfortably away from expiry', async () => {
       const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
       const now = Date.now();
       await savePassport(withRefresh({ expires_at: now + 24 * 60 * 60 * 1000 }));
@@ -155,33 +189,66 @@ describe('passport/attach', () => {
       expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
     });
 
-    it('does NOT refresh when the refresh_token itself has expired — surfaces as expired', async () => {
+    it('does NOT refresh when refresh_token itself has expired (access still nominally valid)', async () => {
       const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
       const now = Date.now();
-      await savePassport(withRefresh({
-        expires_at: now + 30 * 1000,
-        refresh_expires_at: now - 1000,
-      }));
+      await savePassport(
+        withRefresh({
+          expires_at: now + 30 * 1000,
+          refresh_expires_at: now - 1000,
+        }),
+      );
 
       const result = await attachPassport({ fetch: fetchMock, now });
-      // Access token is still nominally valid, but refresh window has closed —
-      // we still attach (access_expires_at hasn't hit zero yet) without a refresh.
-      // On the next call when access fully expires, we'll fall through to reauth.
+      // Access still has 30s — attach uses it. When access expires next
+      // time, this same hasUsableRefresh=false path falls through to expired.
       expect(result.kind).toBe('attached');
       expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
     });
 
-    it('falls through to expired when refresh fails (revoked / network)', async () => {
-      const fetchMock = vi.fn(async () => new Response(
-        JSON.stringify({ error: { code: 'refresh_token_revoked', message: 'Revoked' } }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      )) as unknown as typeof globalThis.fetch;
+    // ── Refresh failure paths ──
 
-      await savePassport(withRefresh());
+    it('proactive refresh failure with still-valid access → uses the existing access (graceful)', async () => {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { code: 'refresh_token_revoked', message: 'Revoked' } }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ) as unknown as typeof globalThis.fetch;
+      const now = Date.now();
 
-      const result = await attachPassport({ fetch: fetchMock });
+      // Access has 30s of life, refresh attempt fails. Better to use the
+      // still-valid access than to drive bootstrap eagerly on a transient
+      // refresh failure.
+      await savePassport(withRefresh({ expires_at: now + 30 * 1000 }));
+
+      const result = await attachPassport({ fetch: fetchMock, now });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_about_to_expire');
+    });
+
+    it('reactive refresh failure with already-expired access → returns expired', async () => {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { code: 'refresh_token_revoked', message: 'Revoked' } }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ) as unknown as typeof globalThis.fetch;
+      const now = Date.now();
+
+      // Access expired AND refresh fails — caller (pay.ts) now drives
+      // inline bootstrap reauth via the verify-URL flow.
+      await savePassport(
+        withRefresh({
+          expires_at: now - 60 * 60 * 1000,
+          refresh_expires_at: now + 90 * 24 * 60 * 60 * 1000,
+        }),
+      );
+
+      const result = await attachPassport({ fetch: fetchMock, now });
       expect(result.kind).toBe('expired');
-      // Caller (pay.ts) should now drive inline reauth.
     });
 
     it('honors skipRefresh flag (testing surface)', async () => {
