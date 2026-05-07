@@ -71,7 +71,7 @@ const GUIDE: AgentGuide = {
         'Token lifecycle: access token = 24h (auto-rotated via the refresh_token, which is 90d). Pay refreshes silently on the next call after access expires — no agent action required. Re-verify in browser is needed only when both have expired, i.e. when the agent has been offline for ~90 days.',
 'If you skip step 1 and a merchant 403 mid-purchase forces inline bootstrap from a merchant-supplied session (verify_url + session_id + poll_secret in the 403 body), the resulting Passport carries an access token but no refresh_token — that path re-verifies after 24h. Bootstrap-from-stored-expiry (pay falling through to `passport login` after a fully-expired stored Passport) still mints a refresh-bearing pair. Doing `passport login` first up front avoids both edge cases and gets the 90-day silent-refresh UX.',
         'Caller-supplied `-H "X-Operator-Token: ..."` always wins over the stored Passport. Use `--no-passport` for explicit-anonymous traffic.',
-        'When pay does need to re-verify, you (the agent) will see `code: passport_token_expired` or the inline `Open this URL to renew:` prompt on stderr. Surface the verify URL to the user verbatim; do not fabricate one. The flow polls until the user completes the browser step.',
+        'When pay needs to re-verify (refresh failed AND access expired): in a non-TTY context (agent, --json, MCP, scripted) pay throws `code: passport_login_required` with `next_steps.action: passport_login` immediately rather than blocking on a browser flow. Run `agentscore-pay passport login` interactively to mint a fresh pair, then re-run the original command. In a human TTY, pay drives the inline browser-redirect flow itself and prints `Open this URL to renew:` on stderr — surface the URL verbatim if you proxy it; do not fabricate one.',
       ],
     },
     {
@@ -223,6 +223,14 @@ const GUIDE: AgentGuide = {
   ],
 
   identity_error_recovery: [
+    {
+      cli_code: 'passport_login_required',
+      thrown_when:
+        'Stored AgentScore Passport access token has expired AND silent refresh did not succeed (refresh_token revoked, network failure, rate-limited, or no refresh_token at all because the Passport was minted via a merchant 403 cold-start). Only thrown in non-TTY contexts (--json, MCP, scripted, piped); a human TTY drives the inline browser flow instead.',
+      next_action: 'passport_login',
+      recovery:
+        'Run `agentscore-pay passport login` interactively (one-time browser click) to mint a fresh access + refresh credential pair, then re-run the original command. The new credential lasts ~90 days before another re-verify is needed. `extra.previous_token_prefix` identifies which stored Passport was rejected, when the agent juggles multiple environments.',
+    },
     {
       cli_code: 'config_error',
       thrown_when:

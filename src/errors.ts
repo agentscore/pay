@@ -25,6 +25,7 @@ export type ErrorCode =
   | 'passport_verification_failed'
   | 'passport_verification_timeout'
   | 'passport_token_expired'
+  | 'passport_login_required'
   | 'unknown';
 
 export const EXIT_CODES = {

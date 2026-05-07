@@ -112,6 +112,29 @@ export async function pay(input: PayInput): Promise<PayResult> {
   // Live path only: drive inline reauth on expired Passport. Dry-run leaves
   // `kind: 'expired'` visible so the user sees what would have happened.
   if (passportAttach.kind === 'expired' && !input.dryRun) {
+    // Non-TTY callers (agents in --json mode, MCP, scripted contexts) shouldn't
+    // block up to an hour waiting for a human to click a verify URL. Surface a
+    // structured envelope so the agent can route to `passport login`
+    // interactively, prompt the user out-of-band, or surface the error to the
+    // operator. Humans at a terminal still get the inline browser-redirect.
+    if (!process.stdout.isTTY) {
+      throw new CliError(
+        'passport_login_required',
+        'Stored AgentScore Passport access expired and silent refresh did not succeed; this run is non-interactive so pay cannot drive the browser verify flow.',
+        {
+          nextSteps: {
+            action: 'passport_login',
+            suggestion:
+              'Run `agentscore-pay passport login` interactively (one-time browser click) to mint a fresh access + refresh credential, then re-run this command. The new credential lasts ~90 days before another re-verify.',
+          },
+          extra: {
+            previous_token_prefix: passportAttach.passport
+              ? passportAttach.passport.operator_token.slice(0, 8) + '…'
+              : undefined,
+          },
+        },
+      );
+    }
     process.stderr.write('Stored Passport has expired — re-verifying (KYC stays valid, this is a one-click renewal)...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromExpiry({
