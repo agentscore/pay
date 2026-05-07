@@ -18,6 +18,19 @@ interface IdentityErrorPattern {
   recovery: string;
 }
 
+interface ErrorEnvelopeContract {
+  channel: 'stdout';
+  shape: {
+    code: 'machine-readable error code (e.g. config_error, no_wallet, multi_rail_candidates)';
+    message: 'human-readable error message';
+    retryable: 'boolean — true for transient codes (network_error, rpc_error, session_timeout)';
+    extra: 'optional object with structured recovery context per error code (e.g. valid_keys, chain, held_chains, balance_usdc, verify_url, session_id, poll_secret)';
+    next_steps: 'optional { action: string, suggestion?: string } — deterministic recovery action slug + optional human-readable suggestion';
+  };
+  full_output_shape: 'with --full-output, the wire envelope is { ok: false, error: {...}, meta: { command, duration } } — fields above nest under `error`';
+  human_tty_shape: 'when stdout is a TTY and no --format/--json/--full-output is set, errors render as a friendly one-liner: `Error (code): message` (no extras, no next_steps). Pass --json or pipe to get the structured envelope.';
+}
+
 interface AgentGuide {
   for_agents: true;
   intro: string;
@@ -26,6 +39,7 @@ interface AgentGuide {
   funding: GuideStep[];
   auxiliary: GuideStep[];
   pitfalls: GuideStep[];
+  error_envelope: ErrorEnvelopeContract;
   identity_error_recovery: IdentityErrorPattern[];
   exit_codes: Record<string, string>;
   json_mode: string;
@@ -244,6 +258,21 @@ const GUIDE: AgentGuide = {
     },
   ],
 
+  error_envelope: {
+    channel: 'stdout',
+    shape: {
+      code: 'machine-readable error code (e.g. config_error, no_wallet, multi_rail_candidates)',
+      message: 'human-readable error message',
+      retryable: 'boolean — true for transient codes (network_error, rpc_error, session_timeout)',
+      extra: 'optional object with structured recovery context per error code (e.g. valid_keys, chain, held_chains, balance_usdc, verify_url, session_id, poll_secret)',
+      next_steps: 'optional { action: string, suggestion?: string } — deterministic recovery action slug + optional human-readable suggestion',
+    },
+    full_output_shape:
+      'with --full-output, the wire envelope is { ok: false, error: {...}, meta: { command, duration } } — fields above nest under `error`',
+    human_tty_shape:
+      'when stdout is a TTY and no --format/--json/--full-output is set, errors render as a friendly one-liner: `Error (code): message` (no extras, no next_steps). Pass --json or pipe to get the structured envelope.',
+  },
+
   exit_codes: {
     '0': 'success',
     '1': 'user error (bad args, missing wallet, wrong passphrase, account quota)',
@@ -255,9 +284,9 @@ const GUIDE: AgentGuide = {
 
   json_mode:
     'Every command emits structured data. Pass --json (or --format json/yaml/md/jsonl) to lock the format; ' +
-    'TOON is the default in agent contexts (token-efficient). Errors emit `{code, message, retryable, hint?}` on stderr ' +
-    'with stable exit codes. Use --filter-output for dot-path pruning, --token-limit/--token-offset for paginated output, ' +
-    '--full-output for the full envelope, and `agentscore-pay --mcp` to expose every command as MCP tools over stdio.',
+    'TOON is the default in non-TTY (agent) contexts (token-efficient). Errors emit `{code, message, retryable, extra?, next_steps?}` ' +
+    'on stdout (same channel as success — branch on `code` presence). Use --filter-output for dot-path pruning, ' +
+    '--token-limit/--token-offset for paginated output, --full-output for the full envelope, and `agentscore-pay --mcp` to expose every command as MCP tools over stdio.',
 };
 
 

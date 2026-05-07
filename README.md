@@ -70,7 +70,7 @@ When stdout is a TTY (humans), output goes pretty-printed. When piped/agent-cons
 
 ### Errors and exit codes
 
-Errors emit `{ code, message, retryable, hint? }` on stderr. Exit codes are stable:
+Errors emit `{ code, message, retryable, extra?, next_steps? }` on **stdout** (same channel as success — agents branch on `code` presence). `extra` carries error-specific structured context (e.g. `valid_keys`, `chain`, `held_chains`, `balance_usdc`, `verify_url`/`session_id`/`poll_secret` for identity flows); `next_steps` carries an `action` slug + optional `suggestion` string for deterministic recovery. Pass `--full-output` for the wrapped envelope `{ ok: false, error: {...}, meta: { command, duration } }`. Exit codes are stable:
 
 | Code | Meaning |
 |---|---|
@@ -181,8 +181,8 @@ def pay(url: str, body: dict, max_spend_usd: float) -> dict:
     )
     if proc.returncode == 0:
         return json.loads(proc.stdout)
-    err = json.loads(proc.stderr.splitlines()[-1])
-    raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['error']['code']} — {err['error']['message']}")
+    err = json.loads(proc.stdout)
+    raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['code']} — {err['message']}")
 
 result = pay("https://agents.martinestate.com/purchase",
              {"product_id": "cab-2021", "quantity": 1, "email": "a@b.co", "shipping": {}}, 250)
@@ -207,13 +207,14 @@ async function pay(url: string, body: unknown, maxSpendUsd: number) {
     ]);
     return JSON.parse(stdout);
   } catch (err: any) {
-    const last = (err.stderr ?? '').split('\n').filter(Boolean).pop();
-    throw new Error(`agentscore-pay exit ${err.code}: ${last}`);
+    // execFile rejects on non-zero exit; the error envelope JSON is in err.stdout.
+    const envelope = err.stdout ? JSON.parse(err.stdout) : { code: 'unknown', message: err.message };
+    throw new Error(`agentscore-pay exit ${err.code}: ${envelope.code} — ${envelope.message}`);
   }
 }
 ```
 
-The CLI never touches stdout for human chrome when `--json` is passed — every byte on stdout is parseable JSON, every error on stderr is one JSON object per line.
+The CLI never touches stdout for human chrome when `--json` is passed — every byte on stdout is parseable JSON, success and error alike. stderr is reserved for human-only chrome (banner, deprecation warnings, `-v` rail-selection logs, soft expiry warnings).
 
 ## Rails
 

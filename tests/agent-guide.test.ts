@@ -31,4 +31,26 @@ describe('agent-guide', () => {
       expect(pattern.recovery).toBeTruthy();
     }
   });
+
+  it('error_envelope contract documents stdout channel + structured fields', async () => {
+    const guide = await agentGuide();
+    expect(guide.error_envelope.channel).toBe('stdout');
+    expect(guide.error_envelope.shape.code).toBeTruthy();
+    expect(guide.error_envelope.shape.message).toBeTruthy();
+    expect(guide.error_envelope.shape.retryable).toBeTruthy();
+    expect(guide.error_envelope.shape.extra).toMatch(/structured recovery context/);
+    expect(guide.error_envelope.shape.next_steps).toMatch(/action/);
+    expect(guide.error_envelope.full_output_shape).toMatch(/--full-output/);
+    expect(guide.error_envelope.human_tty_shape).toMatch(/Error \(code\)/);
+  });
+
+  it('json_mode says stdout (not stderr) and references extra + next_steps', async () => {
+    const guide = await agentGuide();
+    expect(guide.json_mode).toMatch(/stdout/);
+    expect(guide.json_mode).not.toMatch(/stderr/);
+    expect(guide.json_mode).toMatch(/extra/);
+    expect(guide.json_mode).toMatch(/next_steps/);
+    // Don't reference the dead `hint` field — it never reached the wire.
+    expect(guide.json_mode).not.toMatch(/\bhint\?/);
+  });
 });
