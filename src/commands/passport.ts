@@ -21,8 +21,37 @@ export interface PassportLoginInput {
 export interface PassportLoginOutput {
   ok: true;
   operator_token_prefix: string;
+  /** Access-token expiry (24h). Pay rotates this silently via the refresh_token. */
   expires_at: string;
+  /** Days until the access token expires. After it expires, pay refreshes silently. */
   expires_in_days: number;
+  /** Whether the passport has a refresh_token (i.e. silent refresh is available). */
+  silent_refresh_available: boolean;
+  /** Refresh-token expiry — when the user actually has to re-verify in browser. Absent for legacy / merchant-mint passports. */
+  refresh_expires_at?: string;
+  /** Days until the user has to re-verify in browser. Absent when refresh isn't available. */
+  refresh_expires_in_days?: number;
+}
+
+function buildPassportSummary(passport: import('../passport/storage').Passport) {
+  const now = Date.now();
+  const hasRefresh = !!passport.refresh_token && passport.refresh_expires_at != null;
+  const refreshAlive = hasRefresh && (passport.refresh_expires_at as number) > now;
+  return {
+    operator_token_prefix: passport.operator_token.slice(0, 8) + '…',
+    expires_at: new Date(passport.expires_at).toISOString(),
+    expires_in_days: expiresInDays(passport, now),
+    silent_refresh_available: refreshAlive,
+    ...(hasRefresh
+      ? {
+          refresh_expires_at: new Date(passport.refresh_expires_at as number).toISOString(),
+          refresh_expires_in_days: Math.max(
+            0,
+            Math.floor(((passport.refresh_expires_at as number) - now) / (24 * 60 * 60 * 1000)),
+          ),
+        }
+      : {}),
+  };
 }
 
 export async function passportLoginCommand(input: PassportLoginInput = {}): Promise<PassportLoginOutput> {
@@ -36,20 +65,15 @@ export async function passportLoginCommand(input: PassportLoginInput = {}): Prom
   });
   return {
     ok: true,
-    operator_token_prefix: passport.operator_token.slice(0, 8) + '…',
-    expires_at: new Date(passport.expires_at).toISOString(),
-    expires_in_days: expiresInDays(passport),
+    ...buildPassportSummary(passport),
   };
 }
 
 export type PassportStatusOutput =
-  | {
+  | ({
       authenticated: true;
-      operator_token_prefix: string;
-      expires_at: string;
-      expires_in_days: number;
       expired: boolean;
-    }
+    } & ReturnType<typeof buildPassportSummary>)
   | { authenticated: false };
 
 export async function passportStatusCommand(): Promise<PassportStatusOutput> {
@@ -57,10 +81,8 @@ export async function passportStatusCommand(): Promise<PassportStatusOutput> {
   if (!passport) return { authenticated: false };
   return {
     authenticated: true,
-    operator_token_prefix: passport.operator_token.slice(0, 8) + '…',
-    expires_at: new Date(passport.expires_at).toISOString(),
-    expires_in_days: expiresInDays(passport),
     expired: isExpired(passport),
+    ...buildPassportSummary(passport),
   };
 }
 

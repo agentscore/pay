@@ -7,14 +7,27 @@ import { isExpired, loadPassport, type Passport } from './storage';
  * X-Operator-Token always wins.
  */
 
-const REFRESH_THRESHOLD_MS = 60 * 1000;
+/**
+ * Proactive-refresh trigger window. Fire silent refresh when the access
+ * token is within this window of expiry, even if it hasn't expired yet —
+ * gives clock-skew + on-the-wire-latency headroom so a token doesn't
+ * expire between attach and merchant validation. Distinct from the
+ * reactive case (access already expired), which always attempts refresh
+ * when the refresh_token is still valid.
+ */
+const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 
 export interface AttachResult {
   kind: 'attached' | 'expired' | 'absent' | 'opted_out';
   passport?: Passport;
   /** Header value to set as `X-Operator-Token`, when kind === 'attached'. */
   operatorToken?: string;
-  /** True when expires_at - now < 5 days (informational warning, not a block). */
+  /**
+   * Informational warning that the *user* needs to re-verify in browser
+   * soon. False when a refresh_token is still comfortably valid (pay
+   * will rotate silently — no user action). True only when access is
+   * near expiry AND refresh is unavailable or also near expiry.
+   */
   expiringSoon?: boolean;
 }
 
@@ -46,15 +59,19 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
   if (!passport) return { kind: 'absent' };
 
   const now = input.now ?? Date.now();
-  if (isExpired(passport, now)) {
-    return { kind: 'expired', passport };
-  }
-
-  const accessNearExpiry = passport.expires_at - now < REFRESH_THRESHOLD_MS;
+  const accessExpired = isExpired(passport, now);
+  const accessNearExpiry = !accessExpired && passport.expires_at - now < REFRESH_THRESHOLD_MS;
   const hasUsableRefresh =
     !!passport.refresh_token
     && (passport.refresh_expires_at == null || passport.refresh_expires_at > now);
-  if (accessNearExpiry && hasUsableRefresh && !input.skipRefresh) {
+
+  // Try silent refresh in two cases:
+  //   - Reactive: access has already expired but refresh_token is still
+  //     valid (the dominant real-world case — agent comes back after the
+  //     24h access TTL but well within the 90d refresh TTL).
+  //   - Proactive: access within REFRESH_THRESHOLD_MS of expiry; rotates
+  //     before the merchant sees a near-expired token.
+  if ((accessExpired || accessNearExpiry) && hasUsableRefresh && !input.skipRefresh) {
     try {
       passport = await refreshAccessToken({
         refreshToken: passport.refresh_token!,
@@ -62,11 +79,27 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
         fetch: input.fetch,
       });
     } catch {
-      return { kind: 'expired', passport };
+      // Refresh failed (e.g., refresh_token was revoked or already
+      // rotated by another process). Fall through; if access is still
+      // expired below, the caller drives bootstrap reauth.
     }
   }
 
-  const expiringSoon = passport.expires_at - now < SOFT_EXPIRY_WINDOW_MS;
+  if (isExpired(passport, now)) {
+    return { kind: 'expired', passport };
+  }
+
+  // `expiringSoon` is the signal that the *user* needs to take action
+  // (re-verify in browser). With a refresh_token still comfortably valid,
+  // pay rotates silently and the user has nothing to do — don't print the
+  // misleading "run passport login" warning. Only set it when access is
+  // near expiry AND refresh is unavailable / also near expiry.
+  const refreshWillSaveUs =
+    !!passport.refresh_token
+    && (passport.refresh_expires_at == null
+      || passport.refresh_expires_at - now > SOFT_EXPIRY_WINDOW_MS);
+  const expiringSoon =
+    !refreshWillSaveUs && passport.expires_at - now < SOFT_EXPIRY_WINDOW_MS;
   return {
     kind: 'attached',
     passport,

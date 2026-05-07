@@ -112,6 +112,29 @@ export async function pay(input: PayInput): Promise<PayResult> {
   // Live path only: drive inline reauth on expired Passport. Dry-run leaves
   // `kind: 'expired'` visible so the user sees what would have happened.
   if (passportAttach.kind === 'expired' && !input.dryRun) {
+    // Non-TTY callers (agents in --json mode, MCP, scripted contexts) shouldn't
+    // block up to an hour waiting for a human to click a verify URL. Surface a
+    // structured envelope so the agent can route to `passport login`
+    // interactively, prompt the user out-of-band, or surface the error to the
+    // operator. Humans at a terminal still get the inline browser-redirect.
+    if (!process.stdout.isTTY) {
+      throw new CliError(
+        'passport_login_required',
+        'Stored AgentScore Passport access expired and silent refresh did not succeed; this run is non-interactive so pay cannot drive the browser verify flow.',
+        {
+          nextSteps: {
+            action: 'passport_login',
+            suggestion:
+              'Run `agentscore-pay passport login` interactively (one-time browser click) to mint a fresh access + refresh credential, then re-run this command. The new credential lasts ~90 days before another re-verify.',
+          },
+          extra: {
+            previous_token_prefix: passportAttach.passport
+              ? passportAttach.passport.operator_token.slice(0, 8) + '…'
+              : undefined,
+          },
+        },
+      );
+    }
     process.stderr.write('Stored Passport has expired — re-verifying (KYC stays valid, this is a one-click renewal)...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromExpiry({
@@ -280,6 +303,32 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const callerAlreadyHadIdentity = userHeaderKeysAll.includes('x-operator-token');
   const passportAlreadyAttached = passportAttach.kind === 'attached';
   if (bootstrapFields && !callerAlreadyHadIdentity && !passportAlreadyAttached && !input.noPassport) {
+    // Same UX-cliff treatment as the expired-stored-Passport path above:
+    // non-TTY agents shouldn't block ~1h on the inline browser flow. Surface
+    // a structured envelope with the merchant-supplied verify_url + session
+    // fields so the agent can either run `passport login` interactively
+    // (recommended — mints a refresh-bearing Passport that prevents this
+    // round-trip on subsequent calls) or proxy the merchant URL out-of-band.
+    if (!process.stdout.isTTY) {
+      throw new CliError(
+        'passport_required_by_merchant',
+        'Merchant requires AgentScore Passport identity verification, and this run is non-interactive so pay cannot drive the browser verify flow.',
+        {
+          nextSteps: {
+            action: 'passport_login',
+            suggestion:
+              'Recommended: run `agentscore-pay passport login` interactively to mint a fresh access + refresh credential, then re-run this command — the new credential lasts ~90 days and prevents this round-trip on subsequent merchants. Alternative: surface the merchant-supplied verify_url to the user; completing it issues a one-shot 24h token tied to this merchant\'s session.',
+          },
+          extra: {
+            verify_url: bootstrapFields.verify_url,
+            session_id: bootstrapFields.session_id,
+            poll_secret: bootstrapFields.poll_secret,
+            ...(bootstrapFields.poll_url ? { poll_url: bootstrapFields.poll_url } : {}),
+            ...(bootstrapFields.order_id ? { order_id: bootstrapFields.order_id } : {}),
+          },
+        },
+      );
+    }
     process.stderr.write('Merchant requires identity verification — bootstrapping inline...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromMerchantSession(bootstrapFields, {

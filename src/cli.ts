@@ -691,7 +691,7 @@ export function buildCli() {
 
   // ── pay ─────────────────────────────────────────────────────────────────────
   cli.command('pay', {
-    description: 'Send an HTTP request and auto-handle the 402 payment round-trip',
+    description: 'Send an HTTP request and auto-handle the 402 payment round-trip; auto-attaches the stored AgentScore Passport (silently rotated from the 90-day refresh credential)',
     hint: 'ALWAYS pass --max-spend with a USD ceiling. Run with --dry-run first to confirm rail + cost.',
     args: z.object({
       method: z.string().describe('HTTP method'),
@@ -955,11 +955,11 @@ export function buildCli() {
   // ── passport group (AgentScore identity, browser-redirect login) ────────────
   const passport = Cli.create('passport', {
     description:
-      'AgentScore Passport — buyer-side identity (KYC + verified facts). Stores an operator_token locally; auto-attached to merchant requests on settle.',
+      'AgentScore Passport — buyer-side identity (KYC + verified facts). Stores a 24h access token + 90d refresh credential locally; auto-attached to merchant requests on settle. Pay rotates the access token silently in the background — the user re-verifies in browser only when the refresh credential also expires (~90 days).',
   });
   passport.command('login', {
     description:
-      'Verify identity in your browser and save the resulting operator_token to ~/.agentscore/passport.json.',
+      'Verify identity in your browser and save the resulting credential pair (24h access + 90d refresh) to ~/.agentscore/passport.json. Pay rotates the access token silently for ~90 days before another re-verify is needed.',
     hint: 'No API key required. Opens a verify URL; pay polls until your KYC completes in browser.',
     options: z.object({
       pollIntervalSeconds: z.coerce.number().optional().describe('Poll cadence (default 5s)'),
@@ -994,7 +994,7 @@ export function buildCli() {
     },
   });
   passport.command('status', {
-    description: 'Show stored AgentScore Passport — token prefix, expiry, expired flag.',
+    description: 'Show stored AgentScore Passport — token prefix, access-token expiry, refresh availability, and days until the user has to re-verify in browser.',
     options: z.object({}),
     run(c) {
       return withCliErrors(async () => {
