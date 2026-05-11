@@ -794,11 +794,14 @@ export function buildCli() {
       blockedJurisdictions: z.array(z.string()).optional().describe('ISO country codes to block (repeatable)'),
       allowedJurisdictions: z.array(z.string()).optional().describe('ISO country codes to allow (repeatable)'),
       refresh: z.boolean().optional().describe('Force on-the-fly assessment instead of cached'),
+      signerAddress: z.string().optional().describe('Payment signer wallet address for server-side signer-match. Response carries signer_match + signer_sanctions verdicts when set.'),
+      signerNetwork: z.enum(['evm', 'solana']).optional().describe('Signer network family (required when --signer-address is set).'),
       apiKey: apiKeyOpt,
     }),
     examples: [
       { options: { address: '0xabc...', requireKyc: true, minAge: 21 }, description: 'Wallet assessment with KYC + age 21+ policy' },
       { options: { operatorToken: 'opc_...' }, description: 'Operator-credential assessment' },
+      { options: { address: '0xclaimed...', signerAddress: '0xsigner...', signerNetwork: 'evm' }, description: 'Assess with server-side signer-match (response includes signer_match + signer_sanctions)' },
     ],
     run(c) {
       return withCliErrors(async () => {
@@ -812,6 +815,8 @@ export function buildCli() {
           blockedJurisdictions: c.options.blockedJurisdictions,
           allowedJurisdictions: c.options.allowedJurisdictions,
           refresh: c.options.refresh,
+          signerAddress: c.options.signerAddress,
+          signerNetwork: c.options.signerNetwork,
           apiKey: c.options.apiKey,
         });
         return c.ok(result);

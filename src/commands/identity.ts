@@ -149,12 +149,17 @@ export interface AssessInput {
   blockedJurisdictions?: string[];
   allowedJurisdictions?: string[];
   refresh?: boolean;
+  signerAddress?: string;
+  signerNetwork?: 'evm' | 'solana';
   apiKey?: string;
 }
 
 export async function assess(input: AssessInput): Promise<AssessResponse> {
   if (!input.address && !input.operatorToken) {
     throw new CliError('invalid_input', 'Either --address or --operator-token must be provided.');
+  }
+  if (input.signerAddress && !input.signerNetwork) {
+    throw new CliError('invalid_input', '--signer-network is required when --signer-address is set.');
   }
   const policy: Record<string, unknown> = {};
   if (input.requireKyc !== undefined) policy.require_kyc = input.requireKyc;
@@ -168,6 +173,9 @@ export async function assess(input: AssessInput): Promise<AssessResponse> {
     ...(input.chain ? { chain: input.chain } : {}),
     ...(input.refresh !== undefined ? { refresh: input.refresh } : {}),
     ...(Object.keys(policy).length > 0 ? { policy } : {}),
+    ...(input.signerAddress
+      ? { signer: { address: input.signerAddress, network: input.signerNetwork! } }
+      : {}),
   };
 
   const client = getClient(input.apiKey);
