@@ -115,7 +115,7 @@ describe('parseBody', () => {
     expect(supported[0]).toMatchObject({ chain: 'tempo', price_usd: 12.5, protocol: 'mpp', pay_to: '0xABC2' });
   });
 
-  it('handles a merchant that advertises both x402 + MPP (like martin-estate)', () => {
+  it('handles a merchant that advertises both x402 + MPP', () => {
     const body = {
       amount_usd: '250',
       accepts: [
