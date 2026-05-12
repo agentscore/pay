@@ -25,10 +25,14 @@ const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const EVM_ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+export type SendAsset = 'usdc' | 'native';
+
 export interface SendInput {
   chain: Chain;
   to: string;
-  amountUsd: number;
+  /** USDC (when asset='usdc') or native-gas (when asset='native') amount. */
+  amount: number;
+  asset?: SendAsset;
   network?: Network;
   name?: string;
 }
@@ -37,9 +41,12 @@ export interface SendResult {
   ok: true;
   chain: Chain;
   network: Network;
+  asset: SendAsset;
   from: string;
   to: string;
-  amount_usdc: string;
+  amount_usdc?: string;
+  amount_native?: string;
+  native_symbol?: string;
   tx_hash: string;
 }
 
@@ -76,42 +83,57 @@ function mapGasError(err: unknown, chain: Chain, signer: string): never {
   throw err;
 }
 
+const nativeAdapter = (chain: Chain) =>
+  chain === 'base' ? baseChain : chain === 'tempo' ? tempoChain : solanaChain;
+
 export async function send(input: SendInput): Promise<SendResult> {
   const network: Network = input.network ?? 'mainnet';
+  const asset: SendAsset = input.asset ?? 'usdc';
   validateRecipient(input.chain, input.to);
-  if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) {
-    throw new CliError('invalid_amount', '--amount must be a positive number (USDC).');
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new CliError('invalid_amount', '--amount must be a positive number.');
   }
 
   const passphrase = await promptPassphrase();
   const wallet = await loadWallet(input.chain, passphrase, input.name ?? DEFAULT_WALLET_NAME);
 
   try {
+    if (asset === 'native') {
+      const adapter = nativeAdapter(input.chain);
+      const result = await adapter.transferNative({
+        key: wallet.secret as Buffer,
+        to: input.to,
+        amountNative: input.amount,
+        network,
+      });
+      return { ok: true, chain: input.chain, network, asset, native_symbol: adapter.NATIVE_SYMBOL, ...result };
+    }
+    // asset = 'usdc'
     if (input.chain === 'base') {
       const result = await baseChain.transfer({
         key: wallet.secret as Buffer,
         to: input.to as Hex,
-        amountUsd: input.amountUsd,
+        amountUsd: input.amount,
         network,
       });
-      return { ok: true, chain: 'base', network, ...result };
+      return { ok: true, chain: 'base', network, asset, ...result };
     }
     if (input.chain === 'tempo') {
       const result = await tempoChain.transfer({
         key: wallet.secret as Buffer,
         to: input.to as Hex,
-        amountUsd: input.amountUsd,
+        amountUsd: input.amount,
         network,
       });
-      return { ok: true, chain: 'tempo', network, ...result };
+      return { ok: true, chain: 'tempo', network, asset, ...result };
     }
     const result = await solanaChain.transfer({
       key: wallet.secret as Buffer,
       to: input.to,
-      amountUsd: input.amountUsd,
+      amountUsd: input.amount,
       network,
     });
-    return { ok: true, chain: 'solana', network, ...result };
+    return { ok: true, chain: 'solana', network, asset, ...result };
   } catch (err: unknown) {
     mapGasError(err, input.chain, wallet.address);
   }

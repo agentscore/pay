@@ -488,18 +488,21 @@ export function buildCli() {
 
   // ── send ────────────────────────────────────────────────────────────────────
   cli.command('send', {
-    description: 'Raw USDC transfer to an arbitrary address on Base, Tempo, or Solana. No merchant, no 402 handshake — just on-chain.',
-    hint: 'Requires native gas in the signer wallet (ETH on Base, the Tempo native token on Tempo, SOL on Solana). 402/MPP payments are gasless; raw transfers are not.',
+    description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake — just on-chain.',
+    hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). 402/MPP payments are gasless; raw transfers are not.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
       name: walletNameSchema,
       to: z.string().describe('Recipient address (0x... on Base/Tempo, base58 on Solana)'),
-      amount: z.coerce.number().describe('USDC amount to send'),
+      amount: z.coerce.number().describe('Amount to send (USDC when --asset usdc; native units like ETH/SOL when --asset native)'),
+      asset: z.enum(['usdc', 'native']).default('usdc').describe('Asset to transfer. Default usdc (ERC20 / SPL). Use native for ETH/TEMPO/SOL gas-token transfers.'),
     }),
     examples: [
       { options: { chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 1 }, description: 'Send 1 USDC on Base to the given EVM address' },
+      { options: { chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 0.005, asset: 'native' }, description: 'Send 0.005 ETH (native gas) on Base' },
       { options: { chain: 'solana', to: 'EXAMPLE...solana-address...', amount: 5 }, description: 'Send 5 USDC on Solana (auto-creates the recipient ATA via idempotent instruction)' },
+      { options: { chain: 'solana', to: 'EXAMPLE...solana-address...', amount: 0.01, asset: 'native' }, description: 'Send 0.01 SOL (native gas) on Solana' },
       { options: { chain: 'tempo', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 10 }, description: 'Send 10 USDC on Tempo' },
     ],
     run({ options }) {
@@ -508,7 +511,8 @@ export function buildCli() {
           chain: options.chain,
           network: options.network,
           to: options.to,
-          amountUsd: options.amount,
+          amount: options.amount,
+          asset: options.asset,
           name: options.name,
         }),
       );

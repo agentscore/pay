@@ -75,6 +75,38 @@ export function formatNative(raw: bigint): string {
 
 export const NATIVE_SYMBOL = 'TEMPO';
 
+export async function transferNative(input: {
+  key: Buffer;
+  to: string;
+  amountNative: number;
+  network?: Network;
+}): Promise<{ tx_hash: string; from: string; to: string; amount_native: string }> {
+  const network = input.network ?? 'mainnet';
+  const cfg = evmConfig('tempo', network);
+  const hex = ('0x' + input.key.toString('hex')) as Hex;
+  const account = privateKeyToAccount(hex);
+  const wallet = createWalletClient({
+    account,
+    chain: chainFor(network),
+    transport: http(cfg.rpcUrl),
+  });
+  const amount = BigInt(Math.round(input.amountNative * 10 ** 18));
+  try {
+    const txHash = await wallet.sendTransaction({
+      to: input.to as Hex,
+      value: amount,
+    });
+    return {
+      tx_hash: txHash,
+      from: account.address,
+      to: input.to,
+      amount_native: formatNative(amount),
+    };
+  } catch (err: unknown) {
+    throw wrapRpcError('tempo', network, err);
+  }
+}
+
 export async function transfer(input: {
   key: Buffer;
   to: string;

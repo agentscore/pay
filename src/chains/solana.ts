@@ -12,6 +12,7 @@ import {
   signature as toSignature,
   address as solAddress,
 } from '@solana/kit';
+import { getTransferSolInstruction } from '@solana-program/system';
 import {
   fetchToken,
   findAssociatedTokenPda,
@@ -110,6 +111,52 @@ async function pollConfirm(rpc: ReturnType<typeof createSolanaRpc>, sig: string,
     await new Promise((r) => setTimeout(r, 2_000));
   }
   throw new CliError('session_timeout', 'Solana transaction confirmation timed out (30s).', { extra: { signature: sig } });
+}
+
+export async function transferNative(input: {
+  key: Buffer;
+  to: string;
+  amountNative: number;
+  network?: Network;
+}): Promise<{ tx_hash: string; from: string; to: string; amount_native: string }> {
+  const network = input.network ?? 'mainnet';
+  if (!SOLANA_ADDRESS_RE.test(input.to)) {
+    throw new CliError('invalid_wallet_address', `--to must be a base58 Solana address. Got: ${input.to}`);
+  }
+  const cfg = svmConfig(network);
+  const rpc = createSolanaRpc(cfg.rpcUrl);
+  const signer = await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(input.key));
+  const recipient = solAddress(input.to);
+  const lamports = BigInt(Math.round(input.amountNative * 10 ** 9));
+
+  try {
+    const ix = getTransferSolInstruction({
+      source: signer,
+      destination: recipient,
+      amount: lamports,
+    });
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const txMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (m) => setTransactionMessageFeePayerSigner(signer, m),
+      (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+      (m) => appendTransactionMessageInstructions([ix], m),
+    );
+    const signed = await signTransactionMessageWithSigners(txMessage);
+    const encoded = getBase64EncodedWireTransaction(signed);
+    const sig = await rpc.sendTransaction(encoded, { encoding: 'base64', skipPreflight: false }).send();
+    await pollConfirm(rpc, sig);
+    const signatureStr = getSignatureFromTransaction(signed);
+    return {
+      tx_hash: signatureStr,
+      from: signer.address,
+      to: input.to,
+      amount_native: formatNative(lamports),
+    };
+  } catch (err: unknown) {
+    if (err instanceof CliError) throw err;
+    throw wrapRpcError('solana', network, err);
+  }
 }
 
 export async function transfer(input: {
