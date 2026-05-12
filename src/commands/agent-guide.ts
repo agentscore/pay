@@ -85,11 +85,12 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '3. Confirm funds with `balance`',
-      why: 'Pay rejects with exit code 3 when the chosen chain has insufficient USDC. Check first to avoid wasted round-trips.',
+      why: 'Pay rejects with exit code 3 when the chosen chain has insufficient USDC. Check first to avoid wasted round-trips. Each row also surfaces the wallet\'s native-gas balance (ETH on Base, the Tempo native token on Tempo, SOL on Solana) — needed for raw on-chain operations like `send` and `revoke`.',
       command_example: 'agentscore-pay balance --json',
       notes: [
         'Pass --network testnet to check testnet balances (Base Sepolia, Solana devnet, Tempo testnet).',
         'If a chain is empty, run `agentscore-pay fund --chain <chain>` for a receive QR (mainnet) or testnet faucet/programmatic mint.',
+        'Each row includes `usdc`, `native` (gas balance), and `native_symbol`. 402/MPP payments are gasless from the agent perspective; `send` and `revoke` are not — they need a non-zero `native` balance to write on-chain.',
       ],
     },
     {

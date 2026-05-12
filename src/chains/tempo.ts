@@ -55,6 +55,26 @@ export function formatBalance(raw: bigint): string {
   return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
 }
 
+export async function nativeBalance(address: string, network: Network = 'mainnet'): Promise<bigint> {
+  const cfg = evmConfig('tempo', network);
+  const publicClient = createPublicClient({ chain: chainFor(network), transport: http(cfg.rpcUrl) });
+  try {
+    return await publicClient.getBalance({ address: address as Hex });
+  } catch (err: unknown) {
+    throw wrapRpcError('tempo', network, err);
+  }
+}
+
+export function formatNative(raw: bigint): string {
+  // Tempo native token (TEMPO) is 18-decimal. Match base.formatNative.
+  const whole = raw / 10n ** 18n;
+  const frac = raw % 10n ** 18n;
+  const fracPadded = frac.toString().padStart(18, '0').slice(0, 6);
+  return `${whole.toString()}.${fracPadded}`;
+}
+
+export const NATIVE_SYMBOL = 'TEMPO';
+
 export async function transfer(input: {
   key: Buffer;
   to: string;

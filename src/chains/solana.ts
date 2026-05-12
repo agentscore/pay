@@ -72,6 +72,28 @@ export function formatBalance(raw: bigint): string {
 
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
+export async function nativeBalance(ownerBase58: string, network: Network = 'mainnet'): Promise<bigint> {
+  const cfg = svmConfig(network);
+  const rpc = createSolanaRpc(cfg.rpcUrl);
+  try {
+    const { value } = await rpc.getBalance(solAddress(ownerBase58)).send();
+    return BigInt(value);
+  } catch (err: unknown) {
+    throw wrapRpcError('solana', network, err);
+  }
+}
+
+export function formatNative(raw: bigint): string {
+  // SOL has 9 decimals (lamports). Show 4 fractional digits — enough for
+  // typical fee-balance reads.
+  const whole = raw / 10n ** 9n;
+  const frac = raw % 10n ** 9n;
+  const fracPadded = frac.toString().padStart(9, '0').slice(0, 4);
+  return `${whole.toString()}.${fracPadded}`;
+}
+
+export const NATIVE_SYMBOL = 'SOL';
+
 async function pollConfirm(rpc: ReturnType<typeof createSolanaRpc>, sig: string, timeoutMs = 30_000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
