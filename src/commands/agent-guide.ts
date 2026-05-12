@@ -145,13 +145,25 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: 'Get MAINNET USDC with `fund`',
-      why: '`fund` prints a receive QR for the wallet address and polls balance until USDC lands. The user funds from any source they prefer (CEX withdrawal, another wallet, fiat onramp).',
+      step: 'Get MAINNET USDC with `fund` (external wallet — default)',
+      why: '`fund` prints a receive QR for the wallet address and polls balance until USDC lands. The user funds from any source they prefer (CEX withdrawal, another wallet, fiat onramp). Works on every chain.',
       command_example: 'agentscore-pay fund --chain base --json',
       notes: [
         'Tempo TESTNET via `fund` calls the same programmatic mint as `faucet` — free, immediate, no browser. `fund --chain tempo --network testnet` works without prompts.',
         'All mainnet networks behave the same: receive QR + balance poll. The user picks the funding source — CEX, another wallet, or any third-party onramp that supports the destination chain.',
         'Use `fund-estimate <URL>` to compute "how many calls does my current balance cover for this merchant" — useful before deciding whether to top up.',
+      ],
+    },
+    {
+      step: 'Buy MAINNET USDC with a card via Stripe Crypto Onramp (--via stripe-onramp)',
+      why: '`fund --via stripe-onramp --amount <USD>` mints a Stripe-hosted onramp session bound to the wallet. Stripe handles KYC + card payment and delivers USDC to the wallet. Useful when the user has no existing crypto and no exchange account.',
+      command_example: 'agentscore-pay fund --chain base --via stripe-onramp --amount 25 --json',
+      notes: [
+        'BASE + SOLANA mainnet only (Stripe Crypto Onramp coverage). Tempo + all testnets fall back to the default external-wallet flow.',
+        'US + EU buyers only. Outside those regions, the API returns `region_not_supported` with `agent_instructions.action: use_alternative_funding_method` — switch to default `fund` (no --via).',
+        'pay NEVER auto-opens a browser. The CLI emits `onramp_session_created` on stderr with the hosted `crypto.link.com` URL; the user clicks/scans it. Agents must NOT pick this method on the user\'s behalf without consent — surface the option, let the user choose.',
+        'Stripe collects KYC fresh per session for first-time users; Stripe Link short-circuits for returning buyers (opaque to pay).',
+        'Requires a prior `agentscore-pay passport login` — the API resolves the session to the agent\'s account via the stored operator_token.',
       ],
     },
   ],
