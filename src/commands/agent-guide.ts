@@ -85,11 +85,12 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '3. Confirm funds with `balance`',
-      why: 'Pay rejects with exit code 3 when the chosen chain has insufficient USDC. Check first to avoid wasted round-trips.',
+      why: 'Pay rejects with exit code 3 when the chosen chain has insufficient USDC. Check first to avoid wasted round-trips. Each row also surfaces the wallet\'s native-gas balance (ETH on Base, the Tempo native token on Tempo, SOL on Solana) — needed for raw on-chain operations like `send` and `revoke`.',
       command_example: 'agentscore-pay balance --json',
       notes: [
         'Pass --network testnet to check testnet balances (Base Sepolia, Solana devnet, Tempo testnet).',
         'If a chain is empty, run `agentscore-pay fund --chain <chain>` for a receive QR (mainnet) or testnet faucet/programmatic mint.',
+        'Each row includes `usdc`, `native` (gas balance), and `native_symbol`. 402/MPP payments are gasless from the agent perspective; `send` and `revoke` are not — they need a non-zero `native` balance to write on-chain.',
       ],
     },
     {
@@ -145,8 +146,8 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: 'Get MAINNET USDC with `fund`',
-      why: '`fund` prints a receive QR for the wallet address and polls balance until USDC lands. The user funds from any source they prefer (CEX withdrawal, another wallet, fiat onramp).',
+      step: 'Get MAINNET USDC with `fund` (external wallet — default)',
+      why: '`fund` prints a receive QR for the wallet address and polls balance until USDC lands. The user funds from any source they prefer (CEX withdrawal, another wallet, fiat onramp). Works on every chain.',
       command_example: 'agentscore-pay fund --chain base --json',
       notes: [
         'Tempo TESTNET via `fund` calls the same programmatic mint as `faucet` — free, immediate, no browser. `fund --chain tempo --network testnet` works without prompts.',
@@ -154,9 +155,44 @@ const GUIDE: AgentGuide = {
         'Use `fund-estimate <URL>` to compute "how many calls does my current balance cover for this merchant" — useful before deciding whether to top up.',
       ],
     },
+    {
+      step: 'Preview Stripe Crypto Onramp price BEFORE committing (--quote-only)',
+      why: '`fund --via stripe-onramp --quote-only --amount <USD>` returns the destination USDC amount + network/transaction fees + source-total (USD inclusive of fees) WITHOUT minting a session. Use to show the user the real cost before they decide.',
+      command_example: 'agentscore-pay fund --chain base --via stripe-onramp --amount 25 --quote-only --json',
+      notes: [
+        'Read-only call — no Stripe session is minted, no wallet binding occurs. Safe to call repeatedly.',
+        'No passport login required (quotes are public Stripe pricing). Returns `status: "quote_only"` + a `quote` object containing destination_amount, source_total_amount, network_fee_monetary, transaction_fee_monetary.',
+        'Then run the same command WITHOUT --quote-only to mint the session and start the onramp flow.',
+      ],
+    },
+    {
+      step: 'Buy MAINNET USDC with a card via Stripe Crypto Onramp (--via stripe-onramp)',
+      why: '`fund --via stripe-onramp --amount <USD>` mints a Stripe-hosted onramp session bound to the wallet. Stripe handles KYC + card payment and delivers USDC to the wallet. Useful when the user has no existing crypto and no exchange account. Use `--destination-amount <USDC>` instead of `--amount` to fix the USDC received instead of the USD paid.',
+      command_example: 'agentscore-pay fund --chain base --via stripe-onramp --amount 25 --json',
+      notes: [
+        'BASE + SOLANA mainnet only (Stripe Crypto Onramp coverage). Tempo + all testnets fall back to the default external-wallet flow.',
+        'US + EU buyers only. Outside those regions, the API returns `region_not_supported` with `agent_instructions.action: use_alternative_funding_method` — switch to default `fund` (no --via).',
+        'pay NEVER auto-opens a browser. The CLI emits `onramp_session_created` on stderr with the hosted `crypto.link.com` URL; the user clicks/scans it. Agents must NOT pick this method on the user\'s behalf without consent — surface the option (ideally after `--quote-only`), let the user choose.',
+        'Stripe collects KYC fresh per session for first-time users; Stripe Link short-circuits for returning buyers (opaque to pay).',
+        'Requires a prior `agentscore-pay passport login` — the API resolves the session to the agent\'s account via the stored operator_token.',
+      ],
+    },
   ],
 
   auxiliary: [
+    {
+      step: 'Raw transfer to an arbitrary address with `send`',
+      why: 'Different from `pay <url>` — no merchant, no 402 handshake, just an on-chain transfer from the local wallet to the destination. Default `--asset usdc` sends USDC (ERC20 on Base/Tempo, SPL on Solana). `--asset native` sends gas tokens (ETH on Base, TEMPO on Tempo, SOL on Solana). Works on mainnet AND testnets (pass `--network testnet`).',
+      command_example: 'agentscore-pay send --chain base --to 0xRecipient --amount 5 --json',
+      notes: [
+        'Requires native gas in the signer wallet for BOTH flavors: gas pays the on-chain write itself, regardless of which asset is being transferred. 402/MPP payments are gasless from the agent perspective; raw transfers are not.',
+        '`--asset usdc` (default): ERC20 `transfer(to, amount)` on EVM; SPL `TransferChecked` + idempotent ATA creation on Solana. The fee payer is the sender; sender needs SOL for the ATA-creation rent on Solana if the recipient doesn\'t already have one.',
+        '`--asset native`: viem `sendTransaction({to, value})` on EVM; `getTransferSolInstruction` on Solana. No token-contract interaction.',
+        'Validation: --to must be a valid address for the chain (0x-prefixed 40-hex for EVM, base58 32-44 chars for Solana). EVM zero address is rejected.',
+        'Returns `{tx_hash, from, to, amount_usdc | amount_native, asset, native_symbol?, chain, network}` on success. Insufficient-gas errors surface as code=insufficient_balance with action=fund_native_gas.',
+        'Network: pass `--network testnet` to operate on Base Sepolia / Solana devnet / Tempo Moderato. Same code path, different RPC + token mint.',
+      ],
+    },
     {
       step: 'Skip the passphrase prompt with `unlock` (when env var is not an option)',
       why: 'Each pay/wallet call decrypts the keystore and normally prompts for the passphrase. Agents can either set AGENTSCORE_PAY_PASSPHRASE in the env, or — when env vars are not controllable — run `unlock --for <ttl>` once to cache the passphrase to ~/.agentscore/.unlock for a bounded duration (max 8h).',

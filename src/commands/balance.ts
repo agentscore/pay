@@ -11,25 +11,32 @@ export interface BalanceRow {
   address?: string;
   usdc?: string;
   raw?: string;
+  /** Native-gas balance: ETH on Base, native token on Tempo, SOL on Solana. */
+  native?: string;
+  native_symbol?: string;
+  native_raw?: string;
   has_wallet: boolean;
 }
 
 async function readChain(chain: Chain, network: Network, name: string): Promise<BalanceRow> {
   if (!(await keystoreExists(chain, name))) return { chain, name, has_wallet: false };
   const ks = await loadKeystore(chain, name);
-  const raw =
-    chain === 'base'
-      ? await baseChain.balance(ks.address, network)
-      : chain === 'solana'
-        ? await solanaChain.balance(ks.address, network)
-        : await tempoChain.balance(ks.address, network);
-  const formatted =
-    chain === 'base'
-      ? baseChain.formatBalance(raw)
-      : chain === 'solana'
-        ? solanaChain.formatBalance(raw)
-        : tempoChain.formatBalance(raw);
-  return { chain, name, address: ks.address, usdc: formatted, raw: raw.toString(), has_wallet: true };
+  const adapter = chain === 'base' ? baseChain : chain === 'solana' ? solanaChain : tempoChain;
+  const [usdcRaw, nativeRaw] = await Promise.all([
+    adapter.balance(ks.address, network),
+    adapter.nativeBalance(ks.address, network),
+  ]);
+  return {
+    chain,
+    name,
+    address: ks.address,
+    usdc: adapter.formatBalance(usdcRaw),
+    raw: usdcRaw.toString(),
+    native: adapter.formatNative(nativeRaw),
+    native_symbol: adapter.NATIVE_SYMBOL,
+    native_raw: nativeRaw.toString(),
+    has_wallet: true,
+  };
 }
 
 export interface BalanceInput {

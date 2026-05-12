@@ -76,6 +76,68 @@ describe('chains balance() error paths', () => {
       (err) => err instanceof CliError && err.code === 'rpc_error',
     );
   });
+
+  it('base nativeBalance() throws rpc_error when RPC unreachable', async () => {
+    await expect(base.nativeBalance('0x1111111111111111111111111111111111111111')).rejects.toSatisfy(
+      (err) => err instanceof CliError && err.code === 'rpc_error',
+    );
+  });
+
+  it('tempo nativeBalance() throws rpc_error when RPC unreachable', async () => {
+    await expect(tempo.nativeBalance('0x1111111111111111111111111111111111111111')).rejects.toSatisfy(
+      (err) => err instanceof CliError && err.code === 'rpc_error',
+    );
+  });
+
+  it('solana nativeBalance() throws rpc_error when RPC unreachable', async () => {
+    await expect(solana.nativeBalance('4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T')).rejects.toSatisfy(
+      (err) => err instanceof CliError && err.code === 'rpc_error',
+    );
+  }, 15_000);
+
+  it('base transfer() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      base.transfer({ key: EVM_SEED, to: '0x' + '2'.repeat(40), amountUsd: 1 }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
+
+  it('tempo transfer() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      tempo.transfer({ key: EVM_SEED, to: '0x' + '2'.repeat(40), amountUsd: 1 }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
+
+  it('solana transfer() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      solana.transfer({
+        key: SOLANA_SEED,
+        to: '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T',
+        amountUsd: 1,
+      }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
+
+  it('base transferNative() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      base.transferNative({ key: EVM_SEED, to: '0x' + '2'.repeat(40), amountNative: 0.001 }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
+
+  it('tempo transferNative() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      tempo.transferNative({ key: EVM_SEED, to: '0x' + '2'.repeat(40), amountNative: 0.001 }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
+
+  it('solana transferNative() throws rpc_error when RPC unreachable', async () => {
+    await expect(
+      solana.transferNative({
+        key: SOLANA_SEED,
+        to: '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T',
+        amountNative: 0.001,
+      }),
+    ).rejects.toSatisfy((err) => err instanceof CliError && err.code === 'rpc_error');
+  }, 15_000);
 });
 
 describe('chains/solana', () => {
