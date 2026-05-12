@@ -384,25 +384,30 @@ export function buildCli() {
   // ── fund ────────────────────────────────────────────────────────────────────
   cli.command('fund', {
     description:
-      'Fund the wallet. Mainnet networks: receive QR + balance polling. Tempo testnet: programmatic mint via tempo_fundAddress (free, no signup). Base/Solana testnets: see the `faucet` command.',
-    hint: 'Tempo testnet funds instantly via JSON-RPC. Mainnet networks print a receive QR — send USDC from another wallet, exchange, or fiat onramp; pay polls until it lands.',
+      'Fund the wallet. Default: print receive QR + poll balance (works for any chain via external wallet/exchange). With --via stripe-onramp: mint a Stripe Crypto Onramp session for card-funding (base + solana mainnet only). Tempo testnet uses programmatic mint via tempo_fundAddress.',
+    hint: 'Default flow works on any chain (receive QR + poll). For Stripe Crypto Onramp, pass --via stripe-onramp --amount <USD>; pay never auto-opens a browser — click the printed hosted URL yourself.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
       name: walletNameSchema,
-      amount: z.coerce.number().optional().describe('Target amount in USD (default 10)'),
+      amount: z.coerce.number().optional().describe('Target amount in USD (default 10; required when --via stripe-onramp)'),
+      via: z.enum(['stripe-onramp']).optional().describe('Funding method. Omit for the default external-wallet flow.'),
+      sourceCurrency: z.enum(['usd', 'eur']).optional().describe('Stripe Crypto Onramp source currency (default usd). Only used when --via stripe-onramp.'),
     }),
     examples: [
       { options: { chain: 'base', amount: 10 }, description: 'Print receive QR for $10 USDC on Base and poll for the deposit' },
       { options: { chain: 'tempo', network: 'testnet' }, description: 'Programmatically mint Tempo testnet stablecoins (free)' },
+      { options: { chain: 'base', via: 'stripe-onramp', amount: 25 }, description: 'Mint a Stripe Crypto Onramp session to buy $25 USDC with a card (Base, mainnet only)' },
     ],
     run(c) {
       return withCliErrors(async () => {
         const result = await fund({
           chain: c.options.chain,
-          amountUsd: c.options.amount ?? 10,
+          amountUsd: c.options.amount ?? (c.options.via === 'stripe-onramp' ? undefined : 10),
           network: c.options.network,
           name: c.options.name,
+          via: c.options.via,
+          sourceCurrency: c.options.sourceCurrency,
         });
         return c.ok(result, {
           cta: {

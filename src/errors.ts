@@ -27,6 +27,13 @@ export type ErrorCode =
   | 'passport_token_expired'
   | 'passport_login_required'
   | 'passport_required_by_merchant'
+  | 'invalid_chain'
+  | 'invalid_network'
+  | 'invalid_amount'
+  | 'invalid_wallet_address'
+  | 'region_not_supported'
+  | 'stripe_api_error'
+  | 'onramp_api_error'
   | 'unknown';
 
 export const EXIT_CODES = {
