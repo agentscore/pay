@@ -180,6 +180,17 @@ const GUIDE: AgentGuide = {
 
   auxiliary: [
     {
+      step: 'Raw USDC transfer to an arbitrary address with `send`',
+      why: 'Different from `pay <url>` — no merchant, no 402 handshake, just an on-chain transfer of USDC from the local wallet to the destination. Works on Base, Tempo (EVM), and Solana (SPL transferChecked with idempotent ATA creation for the recipient).',
+      command_example: 'agentscore-pay send --chain base --to 0xRecipient --amount 5 --json',
+      notes: [
+        'Requires native gas in the signer wallet: ETH on Base, the Tempo native token on Tempo, SOL on Solana. 402/MPP payments are gasless from the agent perspective; raw transfers are not.',
+        'Solana: pay auto-creates the recipient ATA via `getCreateAssociatedTokenIdempotentInstruction` (no-op when the ATA already exists). The fee payer is the sender; sender needs SOL for the ATA-creation rent if the recipient doesn\'t already have one.',
+        'Validation: --to must be a valid address for the chain (0x-prefixed 40-hex for EVM, base58 32-44 chars for Solana). EVM zero address is rejected.',
+        'Returns `{tx_hash, from, to, amount_usdc, chain, network}` on success. Insufficient-gas errors surface as code=insufficient_balance with action=fund_native_gas.',
+      ],
+    },
+    {
       step: 'Skip the passphrase prompt with `unlock` (when env var is not an option)',
       why: 'Each pay/wallet call decrypts the keystore and normally prompts for the passphrase. Agents can either set AGENTSCORE_PAY_PASSPHRASE in the env, or — when env vars are not controllable — run `unlock --for <ttl>` once to cache the passphrase to ~/.agentscore/.unlock for a bounded duration (max 8h).',
       command_example: 'agentscore-pay unlock --for 1h',

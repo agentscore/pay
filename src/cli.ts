@@ -28,6 +28,7 @@ import {
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { revoke } from './commands/revoke';
+import { send } from './commands/send';
 import { unlock } from './commands/unlock';
 import {
   walletAddress,
@@ -480,6 +481,35 @@ export function buildCli() {
           headers: parseHeaders(options.header),
           chain: options.chain,
           network: options.network,
+        }),
+      );
+    },
+  });
+
+  // ── send ────────────────────────────────────────────────────────────────────
+  cli.command('send', {
+    description: 'Raw USDC transfer to an arbitrary address on Base, Tempo, or Solana. No merchant, no 402 handshake — just on-chain.',
+    hint: 'Requires native gas in the signer wallet (ETH on Base, the Tempo native token on Tempo, SOL on Solana). 402/MPP payments are gasless; raw transfers are not.',
+    options: z.object({
+      chain: chainSchema,
+      network: networkSchema,
+      name: walletNameSchema,
+      to: z.string().describe('Recipient address (0x... on Base/Tempo, base58 on Solana)'),
+      amount: z.coerce.number().describe('USDC amount to send'),
+    }),
+    examples: [
+      { options: { chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 1 }, description: 'Send 1 USDC on Base to the given EVM address' },
+      { options: { chain: 'solana', to: 'EXAMPLE...solana-address...', amount: 5 }, description: 'Send 5 USDC on Solana (auto-creates the recipient ATA via idempotent instruction)' },
+      { options: { chain: 'tempo', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 10 }, description: 'Send 10 USDC on Tempo' },
+    ],
+    run({ options }) {
+      return withCliErrors(() =>
+        send({
+          chain: options.chain,
+          network: options.network,
+          to: options.to,
+          amountUsd: options.amount,
+          name: options.name,
         }),
       );
     },

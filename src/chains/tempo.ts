@@ -1,4 +1,4 @@
-import { createPublicClient, erc20Abi, http } from 'viem';
+import { createPublicClient, createWalletClient, erc20Abi, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { tempo, tempoModerato } from 'viem/chains';
 import { evmConfig, type Network } from '../constants';
@@ -53,6 +53,40 @@ export function formatBalance(raw: bigint): string {
   const whole = raw / 1_000_000n;
   const frac = raw % 1_000_000n;
   return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+}
+
+export async function transfer(input: {
+  key: Buffer;
+  to: string;
+  amountUsd: number;
+  network?: Network;
+}): Promise<{ tx_hash: string; from: string; to: string; amount_usdc: string }> {
+  const network = input.network ?? 'mainnet';
+  const cfg = evmConfig('tempo', network);
+  const hex = ('0x' + input.key.toString('hex')) as Hex;
+  const account = privateKeyToAccount(hex);
+  const wallet = createWalletClient({
+    account,
+    chain: chainFor(network),
+    transport: http(cfg.rpcUrl),
+  });
+  const amount = BigInt(Math.round(input.amountUsd * 10 ** cfg.decimals));
+  try {
+    const txHash = await wallet.writeContract({
+      address: cfg.address,
+      abi: erc20Abi,
+      functionName: 'transfer',
+      args: [input.to as Hex, amount],
+    });
+    return {
+      tx_hash: txHash,
+      from: account.address,
+      to: input.to,
+      amount_usdc: formatBalance(amount),
+    };
+  } catch (err: unknown) {
+    throw wrapRpcError('tempo', network, err);
+  }
 }
 
 /**
