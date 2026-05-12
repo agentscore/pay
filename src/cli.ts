@@ -390,24 +390,30 @@ export function buildCli() {
       chain: chainSchema,
       network: networkSchema,
       name: walletNameSchema,
-      amount: z.coerce.number().optional().describe('Target amount in USD (default 10; required when --via stripe-onramp)'),
+      amount: z.coerce.number().optional().describe('Target amount in USD (default 10; required when --via stripe-onramp unless --destination-amount is set)'),
+      destinationAmount: z.coerce.number().optional().describe('USDC amount the user receives (mutually exclusive with --amount). Only used when --via stripe-onramp.'),
       via: z.enum(['stripe-onramp']).optional().describe('Funding method. Omit for the default external-wallet flow.'),
       sourceCurrency: z.enum(['usd', 'eur']).optional().describe('Stripe Crypto Onramp source currency (default usd). Only used when --via stripe-onramp.'),
+      quoteOnly: z.boolean().optional().describe('Return the Stripe Crypto Onramp price preview (fees + USDC amount) without minting a session. Use to show the user the cost before they commit.'),
     }),
     examples: [
       { options: { chain: 'base', amount: 10 }, description: 'Print receive QR for $10 USDC on Base and poll for the deposit' },
       { options: { chain: 'tempo', network: 'testnet' }, description: 'Programmatically mint Tempo testnet stablecoins (free)' },
       { options: { chain: 'base', via: 'stripe-onramp', amount: 25 }, description: 'Mint a Stripe Crypto Onramp session to buy $25 USDC with a card (Base, mainnet only)' },
+      { options: { chain: 'base', via: 'stripe-onramp', amount: 25, quoteOnly: true }, description: 'Preview the Stripe Crypto Onramp price (fees + final USDC) WITHOUT minting a session' },
+      { options: { chain: 'solana', via: 'stripe-onramp', destinationAmount: 50 }, description: 'Mint a session for exactly $50 USDC out on Solana (instead of fixing the USD-in amount)' },
     ],
     run(c) {
       return withCliErrors(async () => {
         const result = await fund({
           chain: c.options.chain,
           amountUsd: c.options.amount ?? (c.options.via === 'stripe-onramp' ? undefined : 10),
+          destinationAmount: c.options.destinationAmount,
           network: c.options.network,
           name: c.options.name,
           via: c.options.via,
           sourceCurrency: c.options.sourceCurrency,
+          quoteOnly: c.options.quoteOnly,
         });
         return c.ok(result, {
           cta: {

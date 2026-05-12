@@ -155,13 +155,23 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
+      step: 'Preview Stripe Crypto Onramp price BEFORE committing (--quote-only)',
+      why: '`fund --via stripe-onramp --quote-only --amount <USD>` returns the destination USDC amount + network/transaction fees + source-total (USD inclusive of fees) WITHOUT minting a session. Use to show the user the real cost before they decide.',
+      command_example: 'agentscore-pay fund --chain base --via stripe-onramp --amount 25 --quote-only --json',
+      notes: [
+        'Read-only call — no Stripe session is minted, no wallet binding occurs. Safe to call repeatedly.',
+        'No passport login required (quotes are public Stripe pricing). Returns `status: "quote_only"` + a `quote` object containing destination_amount, source_total_amount, network_fee_monetary, transaction_fee_monetary.',
+        'Then run the same command WITHOUT --quote-only to mint the session and start the onramp flow.',
+      ],
+    },
+    {
       step: 'Buy MAINNET USDC with a card via Stripe Crypto Onramp (--via stripe-onramp)',
-      why: '`fund --via stripe-onramp --amount <USD>` mints a Stripe-hosted onramp session bound to the wallet. Stripe handles KYC + card payment and delivers USDC to the wallet. Useful when the user has no existing crypto and no exchange account.',
+      why: '`fund --via stripe-onramp --amount <USD>` mints a Stripe-hosted onramp session bound to the wallet. Stripe handles KYC + card payment and delivers USDC to the wallet. Useful when the user has no existing crypto and no exchange account. Use `--destination-amount <USDC>` instead of `--amount` to fix the USDC received instead of the USD paid.',
       command_example: 'agentscore-pay fund --chain base --via stripe-onramp --amount 25 --json',
       notes: [
         'BASE + SOLANA mainnet only (Stripe Crypto Onramp coverage). Tempo + all testnets fall back to the default external-wallet flow.',
         'US + EU buyers only. Outside those regions, the API returns `region_not_supported` with `agent_instructions.action: use_alternative_funding_method` — switch to default `fund` (no --via).',
-        'pay NEVER auto-opens a browser. The CLI emits `onramp_session_created` on stderr with the hosted `crypto.link.com` URL; the user clicks/scans it. Agents must NOT pick this method on the user\'s behalf without consent — surface the option, let the user choose.',
+        'pay NEVER auto-opens a browser. The CLI emits `onramp_session_created` on stderr with the hosted `crypto.link.com` URL; the user clicks/scans it. Agents must NOT pick this method on the user\'s behalf without consent — surface the option (ideally after `--quote-only`), let the user choose.',
         'Stripe collects KYC fresh per session for first-time users; Stripe Link short-circuits for returning buyers (opaque to pay).',
         'Requires a prior `agentscore-pay passport login` — the API resolves the session to the agent\'s account via the stored operator_token.',
       ],

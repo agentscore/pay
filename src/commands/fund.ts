@@ -6,7 +6,7 @@ import * as tempoChain from '../chains/tempo';
 import { type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
 import { loadKeystore } from '../keystore';
-import { createOnrampSession, OnrampApiError, type OnrampChain } from '../onramp';
+import { createOnrampSession, getOnrampQuote, OnrampApiError, type OnrampChain } from '../onramp';
 import { DEFAULT_WALLET_NAME } from '../paths';
 import { emitProgress } from '../progress';
 
@@ -20,10 +20,12 @@ export type FundVia = 'stripe-onramp';
 export interface FundInput {
   chain: Chain;
   amountUsd?: number;
+  destinationAmount?: number;
   network?: Network;
   name?: string;
   via?: FundVia;
   sourceCurrency?: 'usd' | 'eur';
+  quoteOnly?: boolean;
 }
 
 export interface FundResult {
@@ -31,7 +33,7 @@ export interface FundResult {
   network: Network;
   address: string;
   amount_usd: number | null;
-  status: 'deposit_detected' | 'tempo_testnet_minted' | 'tempo_testnet_mint_pending' | 'timeout';
+  status: 'deposit_detected' | 'quote_only' | 'tempo_testnet_minted' | 'tempo_testnet_mint_pending' | 'timeout';
   qr_uri?: string;
   initial_usdc?: string;
   final_usdc?: string;
@@ -42,6 +44,17 @@ export interface FundResult {
   via?: FundVia;
   onramp_session_id?: string;
   onramp_hosted_url?: string;
+  quote?: {
+    source_amount: string;
+    source_currency: string;
+    destination_amount: string;
+    destination_currency: 'usdc';
+    destination_network: string;
+    source_total_amount: string;
+    network_fee_monetary: string;
+    transaction_fee_monetary: string;
+    rate_fetched_at: number;
+  };
 }
 
 const isOnrampChain = (chain: Chain): chain is OnrampChain => chain === 'base' || chain === 'solana';
@@ -94,11 +107,45 @@ export async function fund(input: FundInput): Promise<FundResult> {
         'Stripe Crypto Onramp only supports mainnet. For testnets, use `agentscore-pay fund --chain <chain> --network testnet` (faucet / programmatic mint).',
       );
     }
-    if (!input.amountUsd || input.amountUsd <= 0) {
+    if (input.amountUsd !== undefined && input.destinationAmount !== undefined) {
       throw new CliError(
         'invalid_amount',
-        '--amount is required when --via stripe-onramp (USD amount to onramp).',
+        '--amount and --destination-amount are mutually exclusive. Pass one or the other (USD-in vs USDC-out).',
       );
+    }
+    if (!input.amountUsd && !input.destinationAmount) {
+      throw new CliError(
+        'invalid_amount',
+        '--amount (USD) or --destination-amount (USDC) is required when --via stripe-onramp.',
+      );
+    }
+
+    if (input.quoteOnly) {
+      try {
+        const quote = await getOnrampQuote({
+          chain: input.chain,
+          amountUsd: input.amountUsd,
+          destinationAmount: input.destinationAmount,
+          sourceCurrency: input.sourceCurrency,
+        });
+        return {
+          chain: input.chain,
+          network,
+          address: ks.address,
+          amount_usd: input.amountUsd ?? null,
+          status: 'quote_only',
+          via: 'stripe-onramp',
+          quote,
+        };
+      } catch (err) {
+        if (err instanceof OnrampApiError) {
+          throw new CliError(err.code as never, err.message, {
+            nextSteps: err.agentInstructions ?? undefined,
+            extra: err.stripeRequestId ? { stripe_request_id: err.stripeRequestId } : undefined,
+          });
+        }
+        throw err;
+      }
     }
 
     let session;
@@ -107,6 +154,7 @@ export async function fund(input: FundInput): Promise<FundResult> {
         walletAddress: ks.address,
         chain: input.chain,
         amountUsd: input.amountUsd,
+        destinationAmount: input.destinationAmount,
         sourceCurrency: input.sourceCurrency,
       });
     } catch (err) {
@@ -155,7 +203,7 @@ export async function fund(input: FundInput): Promise<FundResult> {
           chain: input.chain,
           network,
           address: ks.address,
-          amount_usd: input.amountUsd,
+          amount_usd: input.amountUsd ?? null,
           status: 'deposit_detected',
           initial_usdc: formatBalance(input.chain, initial),
           final_usdc: formatBalance(input.chain, current),
@@ -171,7 +219,7 @@ export async function fund(input: FundInput): Promise<FundResult> {
       chain: input.chain,
       network,
       address: ks.address,
-      amount_usd: input.amountUsd,
+      amount_usd: input.amountUsd ?? null,
       status: 'timeout',
       initial_usdc: formatBalance(input.chain, initial),
       final_usdc: formatBalance(input.chain, current),
