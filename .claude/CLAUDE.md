@@ -24,7 +24,8 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/commands/wallet.ts` | `wallet create/import/address/list/remove/export/show-mnemonic` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
-| `src/commands/fund.ts` | `fund` — receive QR + balance polling (Tempo testnet uses programmatic mint via tempo_fundAddress) |
+| `src/commands/fund.ts` | `fund` — receive QR + balance polling (default); `--via stripe-onramp` mints a Stripe Crypto Onramp session (base/solana mainnet only); `--quote-only` returns the Stripe price preview without minting. Tempo testnet uses programmatic mint via tempo_fundAddress. |
+| `src/onramp.ts` | API client for the AgentScore Crypto Onramp endpoints (POST /v1/onramp/sessions + POST /v1/onramp/quotes). Sends X-Client-Id + the stored passport operator_token in the body — no merchant API key required. |
 | `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base) or `mppx/client` (tempo, solana via `@solana/mpp/client`) |
 | `src/commands/identity.ts` | `reputation`, `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
 | `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `agentscore-pay <url>` settle leg |
