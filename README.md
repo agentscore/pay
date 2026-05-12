@@ -36,7 +36,7 @@ agentscore-pay init
 agentscore-pay fund --chain base --amount 10
 
 # 3. Pay — rail auto-selected from the single funded wallet
-agentscore-pay pay POST https://agents.martinestate.com/purchase \
+agentscore-pay pay POST https://agents.example.com/purchase \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"cabernet-sauvignon-2021","quantity":1,"email":"a@b.co","shipping":{...}}' \
   --max-spend 250
@@ -135,7 +135,7 @@ A typical autonomous agent flow: probe the endpoint, decide whether to pay, pay,
 ```bash
 #!/usr/bin/env bash
 set -eu
-URL="https://agents.martinestate.com/purchase"
+URL="https://agents.example.com/purchase"
 BODY='{"product_id":"cab-2021","quantity":1,"email":"agent@example.com","shipping":{...}}'
 MAX_SPEND=250
 
@@ -184,7 +184,7 @@ def pay(url: str, body: dict, max_spend_usd: float) -> dict:
     err = json.loads(proc.stdout)
     raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['code']} — {err['message']}")
 
-result = pay("https://agents.martinestate.com/purchase",
+result = pay("https://agents.example.com/purchase",
              {"product_id": "cab-2021", "quantity": 1, "email": "a@b.co", "shipping": {}}, 250)
 print(result["tx_hash"], result["body"])
 ```
@@ -463,7 +463,7 @@ Use `fund --chain tempo --network testnet` in CI/agent setup scripts — it's th
 
 ```bash
 # Before making a purchase, check what you can afford
-agentscore-pay fund-estimate https://agents.martinestate.com/purchase \
+agentscore-pay fund-estimate https://agents.example.com/purchase \
   -X POST -d '{"product_id":"cab-2021","quantity":1,...}'
 # → shows price, your balance, calls affordable, and suggested top-up
 ```
