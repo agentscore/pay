@@ -497,18 +497,17 @@ If the wallet keystore *and* the passphrase store are both compromised, the wall
 
 ### Verifying release binaries (sigstore / cosign)
 
-Native binaries attached to each [GitHub Release](https://github.com/agentscore/pay/releases) are signed with [sigstore/cosign](https://docs.sigstore.dev/cosign/overview/) keyless OIDC. To verify a downloaded binary:
+Native binaries attached to each [GitHub Release](https://github.com/agentscore/pay/releases) are signed with [sigstore/cosign](https://docs.sigstore.dev/cosign/overview/) keyless OIDC. To verify a downloaded binary (requires cosign v2.4+ or cosign v3):
 
 ```sh
 cosign verify-blob \
-  --signature agentscore-pay-darwin-arm64.sig \
-  --certificate agentscore-pay-darwin-arm64.pem \
+  --bundle agentscore-pay-darwin-arm64.bundle \
   --certificate-identity-regexp 'https://github.com/agentscore/.+' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   agentscore-pay-darwin-arm64
 ```
 
-A successful verification (`Verified OK`) confirms the binary was built by a workflow in the `agentscore` GitHub org against the published source — not tampered post-build. The `.sig` and `.pem` files are uploaded next to each binary in the release.
+A successful verification (`Verified OK`) confirms the binary was built by a workflow in the `agentscore` GitHub org against the published source — not tampered post-build. The `.bundle` file is uploaded next to each binary in the release.
 
 The npm package itself is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (also sigstore-backed) — `npm install @agent-score/pay` inherits the same trust chain automatically.
 

@@ -49,17 +49,12 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v4
-        with:
-          cosign-release: "v2.6.3"
 
       - name: Sign native binaries with cosign (keyless, OIDC)
-        env:
-          COSIGN_EXPERIMENTAL: "true"
         run: |
           for f in dist/bin/agentscore-pay-*; do
             cosign sign-blob --yes \
-              --output-signature "$f.sig" \
-              --output-certificate "$f.pem" \
+              --bundle "$f.bundle" \
               "$f"
           done
 
@@ -67,20 +62,15 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --generate-notes \
             dist/bin/agentscore-pay-darwin-arm64 \
-            dist/bin/agentscore-pay-darwin-arm64.sig \
-            dist/bin/agentscore-pay-darwin-arm64.pem \
+            dist/bin/agentscore-pay-darwin-arm64.bundle \
             dist/bin/agentscore-pay-darwin-x64 \
-            dist/bin/agentscore-pay-darwin-x64.sig \
-            dist/bin/agentscore-pay-darwin-x64.pem \
+            dist/bin/agentscore-pay-darwin-x64.bundle \
             dist/bin/agentscore-pay-linux-arm64 \
-            dist/bin/agentscore-pay-linux-arm64.sig \
-            dist/bin/agentscore-pay-linux-arm64.pem \
+            dist/bin/agentscore-pay-linux-arm64.bundle \
             dist/bin/agentscore-pay-linux-x64 \
-            dist/bin/agentscore-pay-linux-x64.sig \
-            dist/bin/agentscore-pay-linux-x64.pem \
+            dist/bin/agentscore-pay-linux-x64.bundle \
             dist/bin/agentscore-pay-windows-x64.exe \
-            dist/bin/agentscore-pay-windows-x64.exe.sig \
-            dist/bin/agentscore-pay-windows-x64.exe.pem
+            dist/bin/agentscore-pay-windows-x64.exe.bundle
         env:
           GH_TOKEN: ${{ github.token }}
 
