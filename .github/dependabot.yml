@@ -16,6 +16,8 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    cooldown:
+      default-days: 1
     labels: ["dependencies", "ci"]
     schedule:
       interval: "weekly"
