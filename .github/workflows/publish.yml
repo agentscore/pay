@@ -48,7 +48,9 @@ jobs:
         run: bun run build:binary:all
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: "v2.6.3"
 
       - name: Sign native binaries with cosign (keyless, OIDC)
         env:
