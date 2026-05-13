@@ -36,7 +36,7 @@ agentscore-pay init
 agentscore-pay fund --chain base --amount 10
 
 # 3. Pay — rail auto-selected from the single funded wallet
-agentscore-pay pay POST https://agents.martinestate.com/purchase \
+agentscore-pay pay POST https://agents.example.com/purchase \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"cabernet-sauvignon-2021","quantity":1,"email":"a@b.co","shipping":{...}}' \
   --max-spend 250
@@ -135,7 +135,7 @@ A typical autonomous agent flow: probe the endpoint, decide whether to pay, pay,
 ```bash
 #!/usr/bin/env bash
 set -eu
-URL="https://agents.martinestate.com/purchase"
+URL="https://agents.example.com/purchase"
 BODY='{"product_id":"cab-2021","quantity":1,"email":"agent@example.com","shipping":{...}}'
 MAX_SPEND=250
 
@@ -184,7 +184,7 @@ def pay(url: str, body: dict, max_spend_usd: float) -> dict:
     err = json.loads(proc.stdout)
     raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['code']} — {err['message']}")
 
-result = pay("https://agents.martinestate.com/purchase",
+result = pay("https://agents.example.com/purchase",
              {"product_id": "cab-2021", "quantity": 1, "email": "a@b.co", "shipping": {}}, 250)
 print(result["tx_hash"], result["body"])
 ```
@@ -268,9 +268,10 @@ Each row below is a subcommand of `agentscore-pay` — invoke as `agentscore-pay
 | `wallet export --chain c [--name name] --danger [--skip-confirm]` | Decrypt + print the private key |
 | `wallet remove --chain c [--name name] --danger [--skip-confirm]` | Irrecoverably delete a keystore |
 | `wallet show-mnemonic --danger [--skip-confirm]` | Decrypt + print the stored BIP-39 mnemonic |
-| `balance [--chain c] [--network n]` | USDC balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet) |
+| `balance [--chain c] [--network n]` | USDC + native-gas balance across chains (mainnet default; `--network testnet` for Base Sepolia / Solana Devnet / Tempo testnet). Native gas (ETH on Base, TEMPO on Tempo, SOL on Solana) is needed for raw on-chain ops like `send` and `revoke`. |
 | `qr --chain c [--amount N] [--network n]` | ASCII QR or EIP-681 / `solana:` URI |
-| `fund --chain c [--amount N] [--network n]` | Receive QR + balance poll. Default amount is `10` USD (~50-200 typical agent calls). Send USDC from any wallet, exchange, or fiat onramp; `fund` polls until it lands. |
+| `fund --chain c [--amount N] [--network n] [--via stripe-onramp] [--destination-amount N] [--quote-only] [--source-currency usd\|eur]` | Default: receive QR + balance poll (any chain, send USDC from any wallet/exchange/onramp). `--via stripe-onramp`: mints a Stripe Crypto Onramp session for card→USDC (base + solana mainnet only). `--quote-only` returns the price preview without minting. `--destination-amount` fixes the USDC received instead of the USD paid. |
+| `send --chain c --to <addr> --amount N [--asset usdc\|native] [--network n]` | Raw transfer to an arbitrary address. Default `--asset usdc` (ERC20 / SPL); `--asset native` sends gas (ETH / TEMPO / SOL). Requires native gas in the signer wallet for the on-chain write. No merchant, no 402 handshake. |
 | `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
 | `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
@@ -462,7 +463,7 @@ Use `fund --chain tempo --network testnet` in CI/agent setup scripts — it's th
 
 ```bash
 # Before making a purchase, check what you can afford
-agentscore-pay fund-estimate https://agents.martinestate.com/purchase \
+agentscore-pay fund-estimate https://agents.example.com/purchase \
   -X POST -d '{"product_id":"cab-2021","quantity":1,...}'
 # → shows price, your balance, calls affordable, and suggested top-up
 ```

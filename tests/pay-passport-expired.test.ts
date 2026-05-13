@@ -38,7 +38,7 @@ vi.mock('../src/passport/bootstrap', async (importOriginal) => {
 // x402/MPP request flow (rail-specific clients wrapping fetch) to return a 403
 // with bootstrap fields, which is heavier than the path's structure warrants.
 // The structural symmetry with the expired-access tests below + live smoke against
-// martin-estate covers the contract.
+// a real merchant integration covers the contract.
 
 function withTTY(value: boolean, fn: () => Promise<void>): Promise<void> {
   const origDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');

@@ -28,6 +28,7 @@ import {
 import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { revoke } from './commands/revoke';
+import { send } from './commands/send';
 import { unlock } from './commands/unlock';
 import {
   walletAddress,
@@ -384,25 +385,36 @@ export function buildCli() {
   // ── fund ────────────────────────────────────────────────────────────────────
   cli.command('fund', {
     description:
-      'Fund the wallet. Mainnet networks: receive QR + balance polling. Tempo testnet: programmatic mint via tempo_fundAddress (free, no signup). Base/Solana testnets: see the `faucet` command.',
-    hint: 'Tempo testnet funds instantly via JSON-RPC. Mainnet networks print a receive QR — send USDC from another wallet, exchange, or fiat onramp; pay polls until it lands.',
+      'Fund the wallet. Default: print receive QR + poll balance (works for any chain via external wallet/exchange). With --via stripe-onramp: mint a Stripe Crypto Onramp session for card-funding (base + solana mainnet only). Tempo testnet uses programmatic mint via tempo_fundAddress.',
+    hint: 'Default flow works on any chain (receive QR + poll). For Stripe Crypto Onramp, pass --via stripe-onramp --amount <USD>; pay never auto-opens a browser — click the printed hosted URL yourself.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
       name: walletNameSchema,
-      amount: z.coerce.number().optional().describe('Target amount in USD (default 10)'),
+      amount: z.coerce.number().optional().describe('Target amount in USD (default 10; required when --via stripe-onramp unless --destination-amount is set)'),
+      destinationAmount: z.coerce.number().optional().describe('USDC amount the user receives (mutually exclusive with --amount). Only used when --via stripe-onramp.'),
+      via: z.enum(['stripe-onramp']).optional().describe('Funding method. Omit for the default external-wallet flow.'),
+      sourceCurrency: z.enum(['usd', 'eur']).optional().describe('Stripe Crypto Onramp source currency (default usd). Only used when --via stripe-onramp.'),
+      quoteOnly: z.boolean().optional().describe('Return the Stripe Crypto Onramp price preview (fees + USDC amount) without minting a session. Use to show the user the cost before they commit.'),
     }),
     examples: [
       { options: { chain: 'base', amount: 10 }, description: 'Print receive QR for $10 USDC on Base and poll for the deposit' },
       { options: { chain: 'tempo', network: 'testnet' }, description: 'Programmatically mint Tempo testnet stablecoins (free)' },
+      { options: { chain: 'base', via: 'stripe-onramp', amount: 25 }, description: 'Mint a Stripe Crypto Onramp session to buy $25 USDC with a card (Base, mainnet only)' },
+      { options: { chain: 'base', via: 'stripe-onramp', amount: 25, quoteOnly: true }, description: 'Preview the Stripe Crypto Onramp price (fees + final USDC) WITHOUT minting a session' },
+      { options: { chain: 'solana', via: 'stripe-onramp', destinationAmount: 50 }, description: 'Mint a session for exactly $50 USDC out on Solana (instead of fixing the USD-in amount)' },
     ],
     run(c) {
       return withCliErrors(async () => {
         const result = await fund({
           chain: c.options.chain,
-          amountUsd: c.options.amount ?? 10,
+          amountUsd: c.options.amount ?? (c.options.via === 'stripe-onramp' ? undefined : 10),
+          destinationAmount: c.options.destinationAmount,
           network: c.options.network,
           name: c.options.name,
+          via: c.options.via,
+          sourceCurrency: c.options.sourceCurrency,
+          quoteOnly: c.options.quoteOnly,
         });
         return c.ok(result, {
           cta: {
@@ -469,6 +481,39 @@ export function buildCli() {
           headers: parseHeaders(options.header),
           chain: options.chain,
           network: options.network,
+        }),
+      );
+    },
+  });
+
+  // ── send ────────────────────────────────────────────────────────────────────
+  cli.command('send', {
+    description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake — just on-chain.',
+    hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). 402/MPP payments are gasless; raw transfers are not.',
+    options: z.object({
+      chain: chainSchema,
+      network: networkSchema,
+      name: walletNameSchema,
+      to: z.string().describe('Recipient address (0x... on Base/Tempo, base58 on Solana)'),
+      amount: z.coerce.number().describe('Amount to send (USDC when --asset usdc; native units like ETH/SOL when --asset native)'),
+      asset: z.enum(['usdc', 'native']).default('usdc').describe('Asset to transfer. Default usdc (ERC20 / SPL). Use native for ETH/TEMPO/SOL gas-token transfers.'),
+    }),
+    examples: [
+      { options: { chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 1 }, description: 'Send 1 USDC on Base to the given EVM address' },
+      { options: { chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 0.005, asset: 'native' }, description: 'Send 0.005 ETH (native gas) on Base' },
+      { options: { chain: 'solana', to: 'EXAMPLE...solana-address...', amount: 5 }, description: 'Send 5 USDC on Solana (auto-creates the recipient ATA via idempotent instruction)' },
+      { options: { chain: 'solana', to: 'EXAMPLE...solana-address...', amount: 0.01, asset: 'native' }, description: 'Send 0.01 SOL (native gas) on Solana' },
+      { options: { chain: 'tempo', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', amount: 10 }, description: 'Send 10 USDC on Tempo' },
+    ],
+    run({ options }) {
+      return withCliErrors(() =>
+        send({
+          chain: options.chain,
+          network: options.network,
+          to: options.to,
+          amount: options.amount,
+          asset: options.asset,
+          name: options.name,
         }),
       );
     },
