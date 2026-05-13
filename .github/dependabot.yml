@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: "bun"
     directory: "/"
+    cooldown:
+      default-days: 1
     labels: ["dependencies", "javascript"]
     schedule:
       interval: "weekly"
@@ -14,6 +16,8 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    cooldown:
+      default-days: 1
     labels: ["dependencies", "ci"]
     schedule:
       interval: "weekly"
