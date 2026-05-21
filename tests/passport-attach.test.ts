@@ -37,9 +37,9 @@ describe('passport/attach', () => {
     expect(attachResultToHeaders(result)).toEqual({});
   });
 
-  it('returns kind: opted_out when noPassport=true even if a passport is stored', async () => {
+  it('returns kind: opted_out when skipPassport=true even if a passport is stored', async () => {
     await savePassport(makePassport());
-    const result = await attachPassport({ noPassport: true });
+    const result = await attachPassport({ skipPassport: true });
     expect(result.kind).toBe('opted_out');
     expect(attachResultToHeaders(result)).toEqual({});
   });

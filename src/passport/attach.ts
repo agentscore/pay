@@ -33,7 +33,7 @@ export interface AttachResult {
 
 export interface AttachInput {
   /** Set to true to skip attach entirely (caller is doing explicit-anonymous). */
-  noPassport?: boolean;
+  skipPassport?: boolean;
   /** Caller-supplied X-Operator-Token already present on the request — don't override. */
   callerSuppliedOperatorToken?: string;
   /** Override "now" for testing. */
@@ -49,7 +49,7 @@ export interface AttachInput {
 const SOFT_EXPIRY_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
 
 export async function attachPassport(input: AttachInput = {}): Promise<AttachResult> {
-  if (input.noPassport) return { kind: 'opted_out' };
+  if (input.skipPassport) return { kind: 'opted_out' };
   if (input.callerSuppliedOperatorToken) {
     // Caller is providing their own token; respect it, don't read or attach passport.
     return { kind: 'opted_out' };

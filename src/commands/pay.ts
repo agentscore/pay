@@ -34,7 +34,7 @@ export interface PayInput {
   retries?: number;
   name?: string;
   /** When true, do not auto-attach the stored AgentScore Passport. Default false. */
-  noPassport?: boolean;
+  skipPassport?: boolean;
 }
 
 export type Protocol = 'x402' | 'mpp';
@@ -99,13 +99,13 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const protocol: Protocol = candidate.chain === 'base' ? 'x402' : 'mpp';
 
   // Resolve AgentScore Passport once (also reused on the live path below). When the
-  // caller provided their own X-Operator-Token or set --no-passport, this is a no-op.
+  // caller provided their own X-Operator-Token or set --skip-passport, this is a no-op.
   const userHeaderKeysAll = Object.keys(input.headers ?? {}).map((k) => k.toLowerCase());
   const callerOperatorToken = userHeaderKeysAll.includes('x-operator-token')
     ? Object.entries(input.headers ?? {}).find(([k]) => k.toLowerCase() === 'x-operator-token')?.[1]
     : undefined;
   let passportAttach = await attachPassport({
-    noPassport: input.noPassport,
+    skipPassport: input.skipPassport,
     callerSuppliedOperatorToken: callerOperatorToken,
   });
 
@@ -302,7 +302,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const bootstrapFields = res.status === 403 ? detectMerchantBootstrap(parsed) : null;
   const callerAlreadyHadIdentity = userHeaderKeysAll.includes('x-operator-token');
   const passportAlreadyAttached = passportAttach.kind === 'attached';
-  if (bootstrapFields && !callerAlreadyHadIdentity && !passportAlreadyAttached && !input.noPassport) {
+  if (bootstrapFields && !callerAlreadyHadIdentity && !passportAlreadyAttached && !input.skipPassport) {
     // Same UX-cliff treatment as the expired-stored-Passport path above:
     // non-TTY agents shouldn't block ~1h on the inline browser flow. Surface
     // a structured envelope with the merchant-supplied verify_url + session

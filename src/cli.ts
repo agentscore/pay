@@ -753,7 +753,7 @@ export function buildCli() {
       retries: z.coerce.number().optional().describe('Retry transient network errors up to N times'),
       dryRun: z.boolean().optional().describe('Print the payment plan without signing or sending'),
       verbose: z.boolean().optional().describe('Log rail selection + balances to stderr'),
-      noPassport: z.boolean().optional().describe('Skip auto-attach of stored AgentScore Passport (X-Operator-Token)'),
+      skipPassport: z.boolean().optional().describe('Skip auto-attach of stored AgentScore Passport (X-Operator-Token)'),
     }),
     alias: { data: 'd', header: 'H', verbose: 'v' },
     examples: [
@@ -788,7 +788,7 @@ export function buildCli() {
           retries: c.options.retries,
           dryRun: c.options.dryRun,
           verbose: c.options.verbose,
-          noPassport: c.options.noPassport,
+          skipPassport: c.options.skipPassport,
         });
         return c.ok(result, {
           cta: {
