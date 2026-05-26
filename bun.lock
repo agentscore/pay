@@ -5,7 +5,7 @@
     "": {
       "name": "@agent-score/pay",
       "dependencies": {
-        "@agent-score/sdk": "^2.4.2",
+        "@agent-score/sdk": "^2.4.3",
         "@clack/prompts": "^1.4.0",
         "@scure/bip39": "^2.2.0",
         "@solana-program/system": "^0.12.0",
