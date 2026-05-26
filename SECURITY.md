@@ -19,8 +19,7 @@ We will acknowledge receipt within 48 hours and aim to release a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
-| 1.x     | ✅        |
-| < 1.0   | ❌        |
+| 0.x     | ✅        |
 
 ## Scope
 

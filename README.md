@@ -5,7 +5,7 @@
 
 **AgentScore Pay; one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command, natively across **x402** (Base) and **MPP** (Tempo, Solana), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
-Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. Mirrors the ergonomics of `tempo request` for MPP — one shell command, body preserved, agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
+Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. One shell command per payment — the request body is preserved through the 402 round-trip and the agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## Install
 
@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/agentscore/pay/main/install.sh | sh
 brew install agentscore/tap/agentscore-pay
 ```
 
-Requires Node 20+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release.
+Requires Node 22+ for the npm path. Native single-file binaries (no Node required) are attached to every GitHub Release.
 
 ## Quick start
 
@@ -117,7 +117,7 @@ Every `agentscore-pay pay` invocation generates a stable `X-Idempotency-Key` hea
 
 ### Test-mode addresses
 
-AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. Pay exports `isAgentScoreTestAddress(addr)` from `@agent-score/pay/test-mode` and `AGENTSCORE_TEST_ADDRESSES` for completion / fixtures.
+AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. `agentscore-pay` recognizes them automatically. To use the recognizer in your own dev/test fixtures, import `isAgentScoreTestAddress(addr)` and `AGENTSCORE_TEST_ADDRESSES` from `@agent-score/sdk` (the canonical home; `agentscore-pay` re-uses the same list).
 
 ### Decimals handling
 
@@ -141,7 +141,7 @@ MAX_SPEND=250
 
 # 1. Probe — what does this endpoint cost and which rails does it accept?
 PROBE=$(agentscore-pay check "$URL" -X POST -d "$BODY" --json)
-PRICE=$(printf '%s' "$PROBE" | jq -r '.accepts[0].max_amount_usd // empty')
+PRICE=$(printf '%s' "$PROBE" | jq -r '.rails[0].price_usd // empty')
 echo "Endpoint asks for \$${PRICE} USDC"
 
 # 2. Pay — capture stdout (success body) and exit code separately.

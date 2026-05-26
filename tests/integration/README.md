@@ -24,6 +24,6 @@ can run them on a best-effort basis.
 
 ## What's covered
 
-- `tests/integration/balance.test.ts` — reads balance against each testnet
+- `tests/integration/balance.test.ts` — reads USDC balance on Base Sepolia and Solana Devnet
 - (future) `tests/integration/pay.test.ts` — completes a real 402 payment round-trip
   against an x402 base demo endpoint and an MPP `solana/charge` demo endpoint on Solana Devnet
