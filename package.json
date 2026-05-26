@@ -53,8 +53,8 @@
     "url": "https://github.com/agentscore/pay/issues"
   },
   "engines": {
-    "node": ">=22",
-    "bun": ">=1.3.0"
+    "node": ">=22 <25",
+    "bun": ">=1.3.0 <2"
   },
   "dependencies": {
     "@agent-score/sdk": "^2.4.3",
