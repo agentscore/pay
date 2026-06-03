@@ -44,8 +44,8 @@ describe('passport commands', () => {
             JSON.stringify({
               session_id: 'sess_abc',
               poll_secret: 'poll_xyz',
-              verify_url: 'https://agentscore.sh/verify?session=sess_abc',
-              poll_url: 'https://api.agentscore.sh/v1/sessions/sess_abc',
+              verify_url: 'https://agentscore.com/verify?session=sess_abc',
+              poll_url: 'https://api.agentscore.com/v1/sessions/sess_abc',
               expires_at: new Date(Date.now() + 3600_000).toISOString(),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -83,7 +83,7 @@ describe('passport commands', () => {
       expect(result.ok).toBe(true);
       expect(result.operator_token_prefix).toBe('opc_real…');
       expect(result.expires_in_days).toBeGreaterThanOrEqual(29);
-      expect(verifyUrls).toEqual(['https://agentscore.sh/verify?session=sess_abc']);
+      expect(verifyUrls).toEqual(['https://agentscore.com/verify?session=sess_abc']);
       expect(pollCount).toBe(2);
     });
 
@@ -96,8 +96,8 @@ describe('passport commands', () => {
             JSON.stringify({
               session_id: 'sess_deny',
               poll_secret: 'poll_x',
-              verify_url: 'https://agentscore.sh/verify?session=sess_deny',
-              poll_url: 'https://api.agentscore.sh/v1/sessions/sess_deny',
+              verify_url: 'https://agentscore.com/verify?session=sess_deny',
+              poll_url: 'https://api.agentscore.com/v1/sessions/sess_deny',
               expires_at: new Date(Date.now() + 3600_000).toISOString(),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -156,8 +156,8 @@ describe('passport commands', () => {
             JSON.stringify({
               session_id: 'sess_timeout',
               poll_secret: 'poll_x',
-              verify_url: 'https://agentscore.sh/verify?session=sess_timeout',
-              poll_url: 'https://api.agentscore.sh/v1/sessions/sess_timeout',
+              verify_url: 'https://agentscore.com/verify?session=sess_timeout',
+              poll_url: 'https://api.agentscore.com/v1/sessions/sess_timeout',
               expires_at: new Date(Date.now() + 3600_000).toISOString(),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },

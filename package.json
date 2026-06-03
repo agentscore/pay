@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,7 +48,7 @@
     "type": "git",
     "url": "https://github.com/agentscore/pay"
   },
-  "homepage": "https://agentscore.sh",
+  "homepage": "https://agentscore.com",
   "bugs": {
     "url": "https://github.com/agentscore/pay/issues"
   },

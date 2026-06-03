@@ -7,7 +7,7 @@ import { type Passport, savePassport } from './storage';
  * user completes KYC in the browser, persist the resulting operator_token.
  */
 
-const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.sh';
+const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.com';
 
 const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
 

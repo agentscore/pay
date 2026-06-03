@@ -102,7 +102,7 @@ describe('identity commands — SDK typed-error mapping', () => {
   it('TokenExpiredError → config_error exposing verify_url + session_id + poll_secret in extra', async () => {
     vi.spyOn(AgentScore.prototype, 'assess').mockRejectedValueOnce(
       new TokenExpiredError('Token expired', {
-        verify_url: 'https://agentscore.sh/verify/abc',
+        verify_url: 'https://agentscore.com/verify/abc',
         session_id: 'sess_123',
         poll_secret: 'ps_456',
       }),
@@ -111,7 +111,7 @@ describe('identity commands — SDK typed-error mapping', () => {
       code: 'config_error',
       nextSteps: { action: 'reauth' },
       extra: {
-        verify_url: 'https://agentscore.sh/verify/abc',
+        verify_url: 'https://agentscore.com/verify/abc',
         session_id: 'sess_123',
         poll_secret: 'ps_456',
       },

@@ -312,7 +312,7 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 |---|---|---|
 | `config_error` | API-key missing/invalid, OR `TokenExpiredError` (extra carries `verify_url`/`session_id`/`poll_secret`), OR `InvalidCredentialError` | Run `passport login` to mint a fresh `operator_token` (no API key needed); for API-key issues, fix `AGENTSCORE_API_KEY` |
 | `insufficient_balance` | `PaymentRequiredError` — endpoint not enabled for this account | Surface `next_steps.suggestion` to the user; agent retry won't help |
-| `quota_exceeded` | `QuotaExceededError` — account-level cap hit | Do NOT retry; surface to the user with https://agentscore.sh/pricing. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
+| `quota_exceeded` | `QuotaExceededError` — account-level cap hit | Do NOT retry; surface to the user with https://agentscore.com/pricing. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
 | `network_error` | `RateLimitedError` (per-second cap), `TimeoutError`, or any other transient failure | Retry with backoff per `next_steps.suggestion` |
 
 The `pay <url>` command additionally throws two non-TTY-only codes when an agent (`--json` / MCP / scripted) hits a Passport-required state — instead of blocking up to an hour on the inline browser-redirect flow, pay surfaces a structured envelope so the agent can route to `passport login`:

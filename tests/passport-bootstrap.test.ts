@@ -29,12 +29,12 @@ describe('passport/bootstrap', () => {
         detectMerchantBootstrap({
           session_id: 'sess_abc',
           poll_secret: 'poll_xyz',
-          verify_url: 'https://agentscore.sh/verify?session=sess_abc',
+          verify_url: 'https://agentscore.com/verify?session=sess_abc',
         }),
       ).toEqual({
         session_id: 'sess_abc',
         poll_secret: 'poll_xyz',
-        verify_url: 'https://agentscore.sh/verify?session=sess_abc',
+        verify_url: 'https://agentscore.com/verify?session=sess_abc',
         poll_url: undefined,
         order_id: undefined,
       });
@@ -104,7 +104,7 @@ describe('passport/bootstrap', () => {
         {
           session_id: 'sess_merchant',
           poll_secret: 'poll_merchant',
-          verify_url: 'https://agentscore.sh/verify?session=sess_merchant',
+          verify_url: 'https://agentscore.com/verify?session=sess_merchant',
           poll_url: 'https://api.example/v1/sessions/sess_merchant',
         },
         {
@@ -118,7 +118,7 @@ describe('passport/bootstrap', () => {
       // Importantly: no POST to /v1/sessions/public — we're using the merchant's mint.
       expect(calls.some((c) => c.includes('/v1/sessions/public'))).toBe(false);
       expect(calls.some((c) => c.includes('/v1/sessions/sess_merchant'))).toBe(true);
-      expect(verifyUrls).toEqual(['https://agentscore.sh/verify?session=sess_merchant']);
+      expect(verifyUrls).toEqual(['https://agentscore.com/verify?session=sess_merchant']);
 
       const stored = await loadPassport();
       expect(stored?.operator_token).toBe('opc_from_merchant_session');
@@ -143,7 +143,7 @@ describe('passport/bootstrap', () => {
         {
           session_id: 'sess_alt',
           poll_secret: 'poll_alt',
-          verify_url: 'https://agentscore.sh/verify?session=sess_alt',
+          verify_url: 'https://agentscore.com/verify?session=sess_alt',
           poll_url: 'https://api.alt-host.example/v1/sessions/sess_alt',
         },
         { fetch: fetchMock, pollIntervalSeconds: 0 },
@@ -180,8 +180,8 @@ describe('passport/bootstrap', () => {
             JSON.stringify({
               session_id: 'sess_renewal',
               poll_secret: 'poll_renewal',
-              verify_url: 'https://agentscore.sh/verify?session=sess_renewal',
-              poll_url: 'https://api.agentscore.sh/v1/sessions/sess_renewal',
+              verify_url: 'https://agentscore.com/verify?session=sess_renewal',
+              poll_url: 'https://api.agentscore.com/v1/sessions/sess_renewal',
               expires_at: new Date(Date.now() + 3600_000).toISOString(),
             }),
             { status: 201, headers: { 'Content-Type': 'application/json' } },

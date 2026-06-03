@@ -287,14 +287,14 @@ const GUIDE: AgentGuide = {
       cli_code: 'insufficient_balance',
       thrown_when: 'PaymentRequiredError — the requested endpoint is not enabled for the API key\'s account (HTTP 402).',
       next_action: 'upgrade_plan',
-      recovery: 'Surface the suggestion to the user. See https://agentscore.sh/pricing — agent retry will not fix this.',
+      recovery: 'Surface the suggestion to the user. See https://agentscore.com/pricing — agent retry will not fix this.',
     },
     {
       cli_code: 'quota_exceeded',
       thrown_when: 'QuotaExceededError — account-level cap hit (HTTP 429 quota_exceeded).',
       next_action: 'upgrade_plan',
       recovery:
-        'Do NOT retry — agent retry will not fix this. Surface to the user with https://agentscore.sh/pricing. Use AssessResponse.quota on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
+        'Do NOT retry — agent retry will not fix this. Surface to the user with https://agentscore.com/pricing. Use AssessResponse.quota on success responses to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before hitting this state.',
     },
     {
       cli_code: 'network_error',
@@ -302,7 +302,7 @@ const GUIDE: AgentGuide = {
         'RateLimitedError (per-second cap, HTTP 429 rate_limited), SdkTimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
       next_action: 'retry_with_backoff',
       recovery:
-        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with AgentScore\'s status page or support contact — pay calls api.agentscore.sh directly, no merchant in the loop here.',
+        'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with AgentScore\'s status page or support contact — pay calls api.agentscore.com directly, no merchant in the loop here.',
     },
     {
       cli_code: 'merchant_error',

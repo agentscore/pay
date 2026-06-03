@@ -35,7 +35,7 @@ function getClient(apiKey?: string): AgentScore {
     throw new CliError('config_error', 'AgentScore API key required.', {
       nextSteps: {
         action: 'set_api_key',
-        suggestion: 'Set AGENTSCORE_API_KEY in your environment, or pass --api-key. Get a key at https://agentscore.sh/sign-up.',
+        suggestion: 'Set AGENTSCORE_API_KEY in your environment, or pass --api-key. Get a key at https://agentscore.com/sign-up.',
       },
     });
   }
@@ -54,7 +54,7 @@ function wrapApiError(err: unknown): never {
   // runtime, not an after-the-fact guess from .status / .code.
   if (err instanceof PaymentRequiredError) {
     throw new CliError('insufficient_balance', 'This endpoint is not enabled for your AgentScore account.', {
-      nextSteps: { action: 'upgrade_plan', suggestion: 'See https://agentscore.sh/pricing.' },
+      nextSteps: { action: 'upgrade_plan', suggestion: 'See https://agentscore.com/pricing.' },
       extra: { code: err.code, status: err.status },
     });
   }
@@ -80,7 +80,7 @@ function wrapApiError(err: unknown): never {
     throw new CliError('quota_exceeded', 'AgentScore account quota exceeded.', {
       nextSteps: {
         action: 'upgrade_plan',
-        suggestion: 'Your account has reached its cap. Surface to the user — agent retry will not fix this. See https://agentscore.sh/pricing.',
+        suggestion: 'Your account has reached its cap. Surface to the user — agent retry will not fix this. See https://agentscore.com/pricing.',
       },
       extra: { code: err.code, status: err.status },
     });
