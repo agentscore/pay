@@ -265,7 +265,7 @@
 
     "@solana-program/compute-budget": ["@solana-program/compute-budget@0.15.0", "", { "peerDependencies": { "@solana/kit": "^6.3.0" } }, "sha512-toejNdIkzpUTqLSIzP0Nofr/EFel8QpPWuTtIKzfCcjn+mXpkThHxPJaNesk251rSTiWaxDZ3WxG7RxYwTWTqA=="],
 
-    "@solana-program/system": ["@solana-program/system@0.12.0", "", { "peerDependencies": { "@solana/kit": "^6.1.0" } }, "sha512-ZnAAWeGVMWNtJhw3GdifI2HnhZ0A0H0qs8tBkcFvxp/8wIavvO+GOM4Jd0N22u2+Lni2zcwvcrxrsxj6Mjphng=="],
+    "@solana-program/system": ["@solana-program/system@0.12.2", "", { "peerDependencies": { "@solana/kit": "^6.4.0" } }, "sha512-MaBeOxlvTruQhA7UYkOb3hVTEHPPagOtd+PvTm6a8rGgvEAP0kD4BbC37NceOaR4ABNqdaCmD5OMVRKgrE6KAg=="],
 
     "@solana-program/token": ["@solana-program/token@0.13.0", "", { "dependencies": { "@solana-program/system": "^0.12.0" }, "peerDependencies": { "@solana/kit": "^6.5.0" } }, "sha512-/Apjrd5lwOJGrPB0J5Rv7EBeclvyEBQPAGA85Scm7wBH+GpkbdLDM9uK3TNg8jjFKyWQYai/JtPHbrx7VgFLSg=="],
 
@@ -1015,9 +1015,13 @@
 
     "@scure/bip32/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
+    "@solana-program/token/@solana-program/system": ["@solana-program/system@0.12.0", "", { "peerDependencies": { "@solana/kit": "^6.1.0" } }, "sha512-ZnAAWeGVMWNtJhw3GdifI2HnhZ0A0H0qs8tBkcFvxp/8wIavvO+GOM4Jd0N22u2+Lni2zcwvcrxrsxj6Mjphng=="],
+
     "@solana/errors/chalk": ["chalk@5.6.2", "", {}, "sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA=="],
 
     "@solana/errors/commander": ["commander@14.0.3", "", {}, "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw=="],
+
+    "@solana/mpp/@solana-program/system": ["@solana-program/system@0.12.0", "", { "peerDependencies": { "@solana/kit": "^6.1.0" } }, "sha512-ZnAAWeGVMWNtJhw3GdifI2HnhZ0A0H0qs8tBkcFvxp/8wIavvO+GOM4Jd0N22u2+Lni2zcwvcrxrsxj6Mjphng=="],
 
     "@solana/mpp/@solana-program/token": ["@solana-program/token@0.11.0", "", { "dependencies": { "@solana-program/system": "^0.12.0" }, "peerDependencies": { "@solana/kit": "^6.1.0" } }, "sha512-/lB72Pcmkn5kjUfP1Vd8F86HBlhN9RN4hJYgUG5csc23w9LCdYom2CiRdGsK25KkR9UFf6ndCCAMh83hMo+ftw=="],
 
