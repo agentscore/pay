@@ -45,7 +45,7 @@
   "packages": {
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
-    "@agent-score/sdk": ["@agent-score/sdk@2.4.3", "", {}, "sha512-3OvMB/GI015APqeb/j3sWuA+L8fhb4R8FVjhvY4hYa2Nj6BWSXwbPfssHi23GEweEyoX6objD+AelALCsMJI/g=="],
+    "@agent-score/sdk": ["@agent-score/sdk@2.5.0", "", {}, "sha512-xY4u0zIN9HdJwWZr92Ik4hJLW1aVrz9723WwInv3qPNM8BsJwlfU/cUoheYjEDvt45hdrjvGkdD30eK15/VBWA=="],
 
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
 
