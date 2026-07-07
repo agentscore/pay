@@ -58,6 +58,49 @@ describe('passport/attach', () => {
     expect(attachResultToHeaders(result)).toEqual({ 'X-Operator-Token': 'opc_valid_token' });
   });
 
+  describe('credential-transport guard (targetUrl)', () => {
+    it('returns kind: insecure_target and withholds the token for a cleartext http target', async () => {
+      await savePassport(makePassport({ operator_token: 'opc_should_not_leak' }));
+      const result = await attachPassport({ targetUrl: 'http://merchant.example/api' });
+      expect(result.kind).toBe('insecure_target');
+      expect(result.operatorToken).toBeUndefined();
+      expect(attachResultToHeaders(result)).toEqual({});
+    });
+
+    it('refuses an http target BEFORE reading/refreshing the passport (no fetch call)', async () => {
+      const fetchMock = vi.fn() as unknown as typeof globalThis.fetch;
+      await savePassport(makePassport());
+      const result = await attachPassport({ targetUrl: 'http://merchant.example/api', fetch: fetchMock });
+      expect(result.kind).toBe('insecure_target');
+      expect((fetchMock as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+    });
+
+    it('attaches normally for an https target', async () => {
+      await savePassport(makePassport({ operator_token: 'opc_https_ok' }));
+      const result = await attachPassport({ targetUrl: 'https://merchant.example/api' });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_https_ok');
+    });
+
+    it('allows http for loopback (dev carve-out)', async () => {
+      await savePassport(makePassport({ operator_token: 'opc_local' }));
+      const result = await attachPassport({ targetUrl: 'http://localhost:3000/api' });
+      expect(result.kind).toBe('attached');
+      expect(result.operatorToken).toBe('opc_local');
+    });
+
+    it('attachResultToHeaders withholds the token when given a non-https targetUrl', async () => {
+      await savePassport(makePassport({ operator_token: 'opc_valid_token' }));
+      const result = await attachPassport();
+      expect(result.kind).toBe('attached');
+      // Even on an attached result, an unsafe targetUrl at the attach point withholds the header.
+      expect(attachResultToHeaders(result, 'http://merchant.example/api')).toEqual({});
+      expect(attachResultToHeaders(result, 'https://merchant.example/api')).toEqual({
+        'X-Operator-Token': 'opc_valid_token',
+      });
+    });
+  });
+
   it('returns kind: expired when stored passport past expiry', async () => {
     const past = Date.now() - 1000;
     await savePassport(makePassport({ expires_at: past }));

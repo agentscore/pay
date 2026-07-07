@@ -122,7 +122,7 @@ function resolveApiKey(supplied?: string): string {
     throw new CliError('config_error', 'AgentScore API key required.', {
       nextSteps: {
         action: 'set_api_key',
-        suggestion: 'Set AGENTSCORE_API_KEY in your environment, or pass --api-key. Get a key at https://agentscore.sh/sign-up.',
+        suggestion: 'Set AGENTSCORE_API_KEY in your environment, or pass --api-key. Get a key at https://www.agentscore.com/sign-up.',
       },
     });
   }

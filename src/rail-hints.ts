@@ -31,7 +31,7 @@ const HINTS: Record<string, RailHint> = {
     docs_url: 'https://x402.org',
   },
   // Single canonical entry for Stripe SPT — the lookup function below maps any rail name
-  // starting with `stripe` (`stripe`, `stripe-spt`, `stripe/charge`, future Stripe-flavored
+  // starting with `stripe` (`stripe`, `stripe-spt`, `stripe/charge`, Stripe-flavored
   // schemes) to this hint, so we don't need duplicate entries per spelling variant.
   stripe: {
     name: 'Stripe (Shared Payment Token)',

@@ -134,6 +134,11 @@ export function buildCli() {
     description:
       'CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana). Built by AgentScore; works with any 402-gated merchant.',
     version: VERSION,
+    // Explicit so `mcp add` registers the scoped package. incur's auto-detection
+    // emits `npx agentscore-pay`, which fails to resolve (the package is `@agent-score/pay`).
+    mcp: {
+      command: 'npx -y @agent-score/pay --mcp',
+    },
     env: z.object({
       AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
@@ -754,6 +759,12 @@ export function buildCli() {
       dryRun: z.boolean().optional().describe('Print the payment plan without signing or sending'),
       verbose: z.boolean().optional().describe('Log rail selection + balances to stderr'),
       skipPassport: z.boolean().optional().describe('Skip auto-attach of stored AgentScore Passport (X-Operator-Token)'),
+      identity: z
+        .enum(['auto', 'operator', 'wallet'])
+        .optional()
+        .describe(
+          "Identity to present: 'operator' uses the stored passport operator_token; 'wallet' uses the wallet address; 'auto' (default) uses the passport/wallet path.",
+        ),
     }),
     alias: { data: 'd', header: 'H', verbose: 'v' },
     examples: [
@@ -789,6 +800,7 @@ export function buildCli() {
           dryRun: c.options.dryRun,
           verbose: c.options.verbose,
           skipPassport: c.options.skipPassport,
+          ...(c.options.identity !== undefined && { identity: c.options.identity }),
         });
         return c.ok(result, {
           cta: {

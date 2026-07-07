@@ -6,7 +6,7 @@ If you discover a security vulnerability, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, email us at **security@agentscore.sh** with:
+Instead, email us at **security@agentscore.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce

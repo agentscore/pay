@@ -5,7 +5,7 @@
 
 **AgentScore Pay; one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command, natively across **x402** (Base) and **MPP** (Tempo, Solana), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
-Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. One shell command per payment — the request body is preserved through the 402 round-trip and the agent never sees a private key on the wire. Built and maintained by AgentScore — works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
+Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. One shell command per payment: the request body is preserved through the 402 round-trip and the agent never sees a private key on the wire. Built and maintained by AgentScore. It works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## Install
 
@@ -29,13 +29,13 @@ Requires Node 22+ for the npm path. Native single-file binaries (no Node require
 ## Quick start
 
 ```bash
-# 1. One-shot init — encrypted keystores on every chain, derived from a single BIP-39 mnemonic
+# 1. One-shot init, encrypted keystores on every chain, derived from a single BIP-39 mnemonic
 agentscore-pay init
 
 # 2. Fund one of them (prints receive QR + polls balance)
 agentscore-pay fund --chain base --amount 10
 
-# 3. Pay — rail auto-selected from the single funded wallet
+# 3. Pay, rail auto-selected from the single funded wallet
 agentscore-pay pay POST https://agents.example.com/purchase \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"cabernet-sauvignon-2021","quantity":1,"email":"a@b.co","shipping":{...}}' \
@@ -50,7 +50,7 @@ agentscore-pay pay POST https://merchant.example/api --chain tempo -d '...' --ma
 
 ## Agents (scripting)
 
-For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output) — it prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`unlock`, `limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
+For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output). It prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`unlock`, `limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
 
 ### Output formats
 
@@ -61,7 +61,7 @@ Every command emits structured data. Choose your format:
 | _(default in pipes/agents)_ | TOON | token-efficient, ~40% fewer tokens than JSON |
 | `--json` / `--format json` | JSON | `JSON.parse()`-safe |
 | `--format yaml` | YAML | human-readable |
-| `--format md` | Markdown | tables — paste into PRs / issues / docs |
+| `--format md` | Markdown | tables, paste into PRs / issues / docs |
 | `--format jsonl` | JSON Lines | one record per line, streamable |
 
 Other useful global flags: `--filter-output <keys>` (prune to dot-paths), `--token-count` / `--token-limit n` / `--token-offset n` (manage large outputs), `--full-output` (full envelope with `meta.command` / `meta.duration`).
@@ -70,7 +70,7 @@ When stdout is a TTY (humans), output goes pretty-printed. When piped/agent-cons
 
 ### Errors and exit codes
 
-Errors emit `{ code, message, retryable, extra?, next_steps? }` on **stdout** (same channel as success — agents branch on `code` presence). `extra` carries error-specific structured context (e.g. `valid_keys`, `chain`, `held_chains`, `balance_usdc`, `verify_url`/`session_id`/`poll_secret` for identity flows); `next_steps` carries an `action` slug + optional `suggestion` string for deterministic recovery. Pass `--full-output` for the wrapped envelope `{ ok: false, error: {...}, meta: { command, duration } }`. Exit codes are stable:
+Errors emit `{ code, message, retryable, extra?, next_steps? }` on **stdout** (same channel as success, agents branch on `code` presence). `extra` carries error-specific structured context (e.g. `valid_keys`, `chain`, `held_chains`, `balance_usdc`, `verify_url`/`session_id`/`poll_secret` for identity flows); `next_steps` carries an `action` slug + optional `suggestion` string for deterministic recovery. Pass `--full-output` for the wrapped envelope `{ ok: false, error: {...}, meta: { command, duration } }`. Exit codes are stable:
 
 | Code | Meaning |
 |---|---|
@@ -99,7 +99,7 @@ agentscore-pay pay POST https://merchant.example/api \
 
 ### MCP server (one binary, every tool)
 
-Every command — wallet, payment, identity — is exposed as an MCP tool:
+Every command (wallet, payment, identity) is exposed as an MCP tool:
 
 ```bash
 agentscore-pay --mcp                  # start as a stdio JSON-RPC MCP server
@@ -113,20 +113,20 @@ agentscore-pay <cmd> --schema         # JSON Schema for one command's args/optio
 
 ### Idempotency on retry
 
-Every `agentscore-pay pay` invocation generates a stable `X-Idempotency-Key` header — a SHA-256 hash of `(url + method + body + signer)` — so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `agentscore-pay pay` invocations).
+Every `agentscore-pay pay` invocation generates a stable `X-Idempotency-Key` header, a SHA-256 hash of `(url + method + body + signer)`, so retries within a single invocation reuse the same key. Merchants that honor Stripe-pattern dedup won't double-charge if a payment settles but the network response is lost mid-flight. Pass your own `-H 'X-Idempotency-Key: <value>'` to override (useful for cross-process idempotency: same logical purchase across multiple `agentscore-pay pay` invocations).
 
 ### Test-mode addresses
 
-AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures — KYC verified, sanctions clear, age gates passing — so dev/test merchants don't burn real KYC credits. `agentscore-pay` recognizes them automatically. To use the recognizer in your own dev/test fixtures, import `isAgentScoreTestAddress(addr)` and `AGENTSCORE_TEST_ADDRESSES` from `@agent-score/sdk` (the canonical home; `agentscore-pay` re-uses the same list).
+AgentScore reserves seven EVM addresses (`0x0000…0001` through `0x0000…0007`) as deterministic test fixtures (KYC verified, sanctions clear, age gates passing) so dev/test merchants don't burn real KYC credits. `agentscore-pay` recognizes them automatically. To use the recognizer in your own dev/test fixtures, import `isAgentScoreTestAddress(addr)` and `AGENTSCORE_TEST_ADDRESSES` from `@agent-score/sdk` (the canonical home; `agentscore-pay` re-uses the same list).
 
 ### Decimals handling
 
 Spec-compliant 402 responses carry `decimals` in the rail requirements. When a merchant omits it, pay applies a strict policy to avoid silent mis-billing:
 
-- **Asset is canonical USDC** (matched against the per-chain Circle USDC registry pinned in pay) — silently use 6 decimals.
-- **Asset is anything else** — abort with `merchant_spec_violation`. Guessing decimals risks orders-of-magnitude mis-billing on tokens with non-6-decimal precision, so pay refuses to pay rather than continuing on partial info.
+- **Asset is canonical USDC** (matched against the per-chain Circle USDC registry pinned in pay): silently use 6 decimals.
+- **Asset is anything else**: abort with `merchant_spec_violation`. Guessing decimals risks orders-of-magnitude mis-billing on tokens with non-6-decimal precision, so pay refuses to pay rather than continuing on partial info.
 
-### Use from an agent — complete recipe
+### Use from an agent: a complete recipe
 
 A typical autonomous agent flow: probe the endpoint, decide whether to pay, pay, branch on the structured outcome.
 
@@ -139,12 +139,12 @@ URL="https://agents.example.com/purchase"
 BODY='{"product_id":"cab-2021","quantity":1,"email":"agent@example.com","shipping":{...}}'
 MAX_SPEND=250
 
-# 1. Probe — what does this endpoint cost and which rails does it accept?
+# 1. Probe, what does this endpoint cost and which rails does it accept?
 PROBE=$(agentscore-pay check "$URL" -X POST -d "$BODY" --json)
 PRICE=$(printf '%s' "$PROBE" | jq -r '.rails[0].price_usd // empty')
 echo "Endpoint asks for \$${PRICE} USDC"
 
-# 2. Pay — capture stdout (success body) and exit code separately.
+# 2. Pay, capture stdout (success body) and exit code separately.
 RESPONSE=$(agentscore-pay pay POST "$URL" \
   -H 'Content-Type: application/json' \
   -d "$BODY" \
@@ -157,10 +157,10 @@ EXIT=${EXIT:-0}
 # 3. Branch on the standard exit codes.
 case "$EXIT" in
   0) echo "Paid. tx=$(printf '%s' "$RESPONSE" | jq -r '.tx_hash // .body.tx_hash // "?"')" ;;
-  2) echo "Network/RPC error — retry later." >&2; exit 2 ;;
-  3) echo "Insufficient funds — top up:"; agentscore-pay fund-estimate "$URL" -X POST -d "$BODY"; exit 3 ;;
+  2) echo "Network/RPC error, retry later." >&2; exit 2 ;;
+  3) echo "Insufficient funds, top up:"; agentscore-pay fund-estimate "$URL" -X POST -d "$BODY"; exit 3 ;;
   4) echo "Rejected (price exceeded --max-spend or local limit)." >&2; exit 4 ;;
-  5) echo "Multi-rail ambiguity — set --chain or config preferred_chains." >&2; exit 5 ;;
+  5) echo "Multi-rail ambiguity, set --chain or config preferred_chains." >&2; exit 5 ;;
   *) echo "User error: $RESPONSE" >&2; exit 1 ;;
 esac
 ```
@@ -182,7 +182,7 @@ def pay(url: str, body: dict, max_spend_usd: float) -> dict:
     if proc.returncode == 0:
         return json.loads(proc.stdout)
     err = json.loads(proc.stdout)
-    raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['code']} — {err['message']}")
+    raise RuntimeError(f"pay failed (exit {proc.returncode}): {err['code']}, {err['message']}")
 
 result = pay("https://agents.example.com/purchase",
              {"product_id": "cab-2021", "quantity": 1, "email": "a@b.co", "shipping": {}}, 250)
@@ -209,12 +209,12 @@ async function pay(url: string, body: unknown, maxSpendUsd: number) {
   } catch (err: any) {
     // execFile rejects on non-zero exit; the error envelope JSON is in err.stdout.
     const envelope = err.stdout ? JSON.parse(err.stdout) : { code: 'unknown', message: err.message };
-    throw new Error(`agentscore-pay exit ${err.code}: ${envelope.code} — ${envelope.message}`);
+    throw new Error(`agentscore-pay exit ${err.code}: ${envelope.code}, ${envelope.message}`);
   }
 }
 ```
 
-The CLI never touches stdout for human chrome when `--json` is passed — every byte on stdout is parseable JSON, success and error alike. stderr is reserved for human-only chrome (banner, deprecation warnings, `-v` rail-selection logs, soft expiry warnings).
+The CLI never touches stdout for human chrome when `--json` is passed: every byte on stdout is parseable JSON, success and error alike. stderr is reserved for human-only chrome (banner, deprecation warnings, `-v` rail-selection logs, soft expiry warnings).
 
 ## Rails
 
@@ -256,7 +256,7 @@ Verbose mode (`-v`) logs rail selection + balances to stderr.
 
 ## Commands
 
-Each row below is a subcommand of `agentscore-pay` — invoke as `agentscore-pay <command>` (e.g. `agentscore-pay init`, `agentscore-pay pay POST <url>`).
+Each row below is a subcommand of `agentscore-pay`, invoke as `agentscore-pay <command>` (e.g. `agentscore-pay init`, `agentscore-pay pay POST <url>`).
 
 | Command | Purpose |
 |---|---|
@@ -275,30 +275,30 @@ Each row below is a subcommand of `agentscore-pay` — invoke as `agentscore-pay
 | `faucet --chain c` | Print testnet faucet URL(s) for the chain + copy your address to clipboard |
 | `fund-estimate <url> [-X method] [-d body] [-H header]...` | Probe a 402-gated URL and report how many calls your balance covers + top-up suggestion |
 | `check <url> [-X method] [-d body] [-H header]...` | Probe 402 response; show accepted rails without paying |
-| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--timeout N] [--retries N] [--dry-run] [-v]` | HTTP request + auto 402 handling. `--timeout` defaults to 60s and applies to the merchant request only — facilitator settlement may exceed it. `--retries` only retries pre-flight connection errors (per-scheme nonces prevent double-spend). |
+| `pay <method> <url> [-d body] [-H header]... [--chain c] [--network n] [--max-spend N] [--timeout N] [--retries N] [--dry-run] [-v]` | HTTP request + auto 402 handling. `--timeout` defaults to 60s and applies to the merchant request only, facilitator settlement may exceed it. `--retries` only retries pre-flight connection errors (per-scheme nonces prevent double-spend). |
 | `whoami [--network n]` | Wallet + balance summary + active config |
 | `history [--limit N]` | Past payments from `~/.agentscore/history.jsonl` |
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
 | `config get [key] \| set <k> <v> \| unset <k> \| path` | Read/write `~/.agentscore/config.json` (e.g. `config set preferred_chains tempo,base`) |
 | `discover [--search q] [--chain c] [--max-price N] [--limit N] [--protocol x402\|mpp\|both]` | List paid services from the x402 Bazaar (Coinbase) and MPP services directory (Tempo). Both queried in parallel by default. |
-| `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL — skip per-call prompts during a session |
+| `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL, skip per-call prompts during a session |
 | `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
 ### Identity commands
 
-`passport login`/`status`/`logout` use AgentScore's buyer-side identity flow and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK — set `AGENTSCORE_API_KEY`.
+`passport login`/`status`/`logout` use AgentScore's buyer-side identity flow and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK, set `AGENTSCORE_API_KEY`.
 
-AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants — buyers and agents-as-buyers never pay us.
+AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants, buyers and agents-as-buyers never pay us.
 
 | Command | Purpose |
 |---|---|
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `agentscore-pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--skip-passport`). No API key required. |
-| `passport status` | Show stored Passport — token prefix, access + refresh expiry, `silent_refresh_available`, `expired` flag |
+| `passport status` | Show stored Passport, token prefix, access + refresh expiry, `silent_refresh_available`, `expired` flag |
 | `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (requires API key) |
-| `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session — returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
-| `sessions get <id> [--poll-secret s]` | Poll a session — returns `operator_token` once status is `verified` |
+| `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session, returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
+| `sessions get <id> [--poll-secret s]` | Poll a session, returns `operator_token` once status is `verified` |
 | `credentials create [--label s] [--ttl-days N]` | Mint an operator credential (`opc_...`) |
 | `credentials list` | List active (non-expired) credentials |
 | `credentials revoke <id>` | Revoke a credential by ID |
@@ -311,15 +311,15 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | `code` | Source | Recovery |
 |---|---|---|
 | `config_error` | API-key missing/invalid, OR `TokenExpiredError` (extra carries `verify_url`/`session_id`/`poll_secret`), OR `InvalidCredentialError` | Run `passport login` to mint a fresh `operator_token` (no API key needed); for API-key issues, fix `AGENTSCORE_API_KEY` |
-| `insufficient_balance` | `PaymentRequiredError` — endpoint not enabled for this account | Surface `next_steps.suggestion` to the user; agent retry won't help |
-| `quota_exceeded` | `QuotaExceededError` — account-level cap hit | Do NOT retry; surface to the user with https://agentscore.sh/pricing. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
+| `insufficient_balance` | `PaymentRequiredError`, endpoint not enabled for this account | Surface `next_steps.suggestion` to the user; agent retry won't help |
+| `quota_exceeded` | `QuotaExceededError`, account-level cap hit | Do NOT retry; surface to the user with https://www.agentscore.com/pricing. Use `assess` response's `quota` field to monitor approach-to-cap proactively |
 | `network_error` | `RateLimitedError` (per-second cap), `TimeoutError`, or any other transient failure | Retry with backoff per `next_steps.suggestion` |
 
-The `pay <url>` command additionally throws two non-TTY-only codes when an agent (`--json` / MCP / scripted) hits a Passport-required state — instead of blocking up to an hour on the inline browser-redirect flow, pay surfaces a structured envelope so the agent can route to `passport login`:
+The `pay <url>` command additionally throws two non-TTY-only codes when an agent (`--json` / MCP / scripted) hits a Passport-required state, instead of blocking up to an hour on the inline browser-redirect flow, pay surfaces a structured envelope so the agent can route to `passport login`:
 
 | `code` | Thrown when | Extra | Recovery |
 |---|---|---|---|
-| `passport_login_required` | Stored Passport's access token expired AND silent refresh did not succeed (revoked, network failure, rate-limited, or no refresh_token because the Passport was minted via cold-start bootstrap) | `previous_token_prefix` | Run `agentscore-pay passport login` interactively (one-time browser click) — mints a fresh 24h access + 90d refresh pair; subsequent calls rotate silently for ~90 days |
+| `passport_login_required` | Stored Passport's access token expired AND silent refresh did not succeed (revoked, network failure, rate-limited, or no refresh_token because the Passport was minted via cold-start bootstrap) | `previous_token_prefix` | Run `agentscore-pay passport login` interactively (one-time browser click), mints a fresh 24h access + 90d refresh pair; subsequent calls rotate silently for ~90 days |
 | `passport_required_by_merchant` | Merchant returned 403 with bootstrap fields (`verify_url` + `session_id` + `poll_secret`) and the agent has no usable stored Passport | `verify_url`, `session_id`, `poll_secret`, `poll_url`, `order_id` | Recommended: `agentscore-pay passport login` first (mints a portable refresh-bearing Passport that satisfies any AgentScore-gated merchant). Alternative: surface `extra.verify_url` to the user; completing it issues a one-shot 24h token tied to that merchant's session (no refresh_token) |
 
 Both codes only fire on non-TTY runs. In a human terminal pay continues to drive the inline browser-redirect flow itself.
@@ -354,8 +354,8 @@ Derivation paths: EVM uses `m/44'/60'/0'/0/0` (standard), Solana uses `m/44'/501
 
 EVM and Solana use **different curves**: EVM uses secp256k1 (BIP-32 hardened+non-hardened paths), Solana uses Ed25519 (which only supports hardened derivation). The standards differ accordingly:
 
-- **EVM (BIP-44, secp256k1)** — `m/44'/60'/0'/0/0`. The trailing `/0/0` is non-hardened. MetaMask, Rabby, and Coinbase Wallet all use this path; importing a phrase into any of them yields the same address you see in `wallet address --chain base`.
-- **Solana (SLIP-10, Ed25519)** — `m/44'/501'/0'/0'`. All four levels are hardened (note the trailing `'`). Phantom and Solflare use this path for "Account 0"; importing the same phrase yields the address you see in `wallet address --chain solana`.
+- **EVM (BIP-44, secp256k1)**, `m/44'/60'/0'/0/0`. The trailing `/0/0` is non-hardened. MetaMask, Rabby, and Coinbase Wallet all use this path; importing a phrase into any of them yields the same address you see in `wallet address --chain base`.
+- **Solana (SLIP-10, Ed25519)**, `m/44'/501'/0'/0'`. All four levels are hardened (note the trailing `'`). Phantom and Solflare use this path for "Account 0"; importing the same phrase yields the address you see in `wallet address --chain solana`.
 
 If you import the phrase into Phantom and see a different address, check that Phantom is set to "Standard derivation path" (not the legacy `m/44'/501'/0'`).
 
@@ -374,7 +374,7 @@ agentscore-pay balance --chain base --name trading
 agentscore-pay pay POST <url> --chain base --name trading -d '...' --max-spend 5
 ```
 
-Names are limited to `[a-z0-9-]` (max 32 chars). Mnemonic-derived wallets are always stored under `default` — for additional named wallets use random keys (`wallet create`) or import (`wallet import`).
+Names are limited to `[a-z0-9-]` (max 32 chars). Mnemonic-derived wallets are always stored under `default`, for additional named wallets use random keys (`wallet create`) or import (`wallet import`).
 
 #### End-to-end: separate trading + default wallets
 
@@ -386,7 +386,7 @@ agentscore-pay fund --chain base --amount 10        # tops up default
 # Separate "trading" wallet for a high-budget bot
 agentscore-pay wallet create --chain base --name trading
 agentscore-pay wallet address --chain base --name trading
-# → 0xTRADINGADDRESS — fund this address externally (CEX withdrawal, transfer, etc.)
+# → 0xTRADINGADDRESS, fund this address externally (CEX withdrawal, transfer, etc.)
 agentscore-pay balance --chain base --name trading
 
 # Inspect everything
@@ -398,7 +398,7 @@ agentscore-pay wallet list
 agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base                    # uses default
 agentscore-pay pay POST https://merchant.example/api -d '{}' --chain base --name trading   # uses trading
 
-# Remove a wallet (irrecoverable — back up the mnemonic or export the key first)
+# Remove a wallet (irrecoverable, back up the mnemonic or export the key first)
 agentscore-pay wallet export --chain base --name trading --danger --skip-confirm > trading.key
 agentscore-pay wallet remove --chain base --name trading --danger --skip-confirm
 ```
@@ -426,7 +426,7 @@ Three ways to satisfy the passphrase prompt, in precedence order:
 |---|---|---|
 | `AGENTSCORE_PAY_PASSPHRASE=<pass>` env var | Containers, CI, serverless, daemons, any non-interactive agent | Lifetime of the process / shell session |
 | `agentscore-pay unlock --for 1h` | Interactive shell session where you'll run multiple commands | Cached in `~/.agentscore/.unlock` (mode `0600`) until TTL expires (max 8h); `unlock --clear` wipes early |
-| Per-call interactive prompt | First-time setup, one-off commands | None — never written |
+| Per-call interactive prompt | First-time setup, one-off commands | None, never written |
 
 **Env var wins** when set: it produces no on-disk artifact and is the right primitive for every agent context (CI secrets, container env, K8s secrets, Lambda config, MCP host config). When env vars aren't controllable (e.g. an interactive Claude Code session running locally), `unlock` is the fallback.
 
@@ -434,23 +434,23 @@ Three ways to satisfy the passphrase prompt, in precedence order:
 
 ## Funding
 
-The wallet holds USDC only — no ETH or SOL required. x402 (EIP-3009) and MPP Tempo are both gasless for the signer; the facilitator pays.
+The wallet holds USDC only, no ETH or SOL required. x402 (EIP-3009) and MPP Tempo are both gasless for the signer; the facilitator pays.
 
 ### Mainnet
 
-- **All chains** — `agentscore-pay fund --chain <chain> --amount 10` prints an ASCII QR and your wallet address, then polls balance until the deposit lands. Send USDC from any source: another wallet (MetaMask, Rabby, Coinbase Wallet, Phantom), a CEX withdrawal, or any third-party fiat onramp that supports the destination chain (Coinbase Pay, MoonPay, Transak, Onramper, Stripe Crypto Onramp, etc.). Default amount is `$10` (~50-200 typical agent calls).
-- **Tempo specifics** — most fiat-onramp partners don't cover Tempo (chain 4217) yet. Fund by transferring USDC.e from another Tempo wallet, or via a bridge (LayerZero / Squid / Relay) from Base.
-- **No-frills receive** — `agentscore-pay wallet address --chain base` prints just the address if you already know your funding source.
+- **All chains**, `agentscore-pay fund --chain <chain> --amount 10` prints an ASCII QR and your wallet address, then polls balance until the deposit lands. Send USDC from any source: another wallet (MetaMask, Rabby, Coinbase Wallet, Phantom), a CEX withdrawal, or any third-party fiat onramp that supports the destination chain (Coinbase Pay, MoonPay, Transak, Onramper, Stripe Crypto Onramp, etc.). Default amount is `$10` (~50-200 typical agent calls).
+- **Tempo specifics**, most fiat-onramp partners don't cover Tempo (chain 4217) yet. Fund by transferring USDC.e from another Tempo wallet, or via a bridge (LayerZero / Squid / Relay) from Base.
+- **No-frills receive**, `agentscore-pay wallet address --chain base` prints just the address if you already know your funding source.
 
 ### Testnet
 
 | Chain | UX | Time-to-funded |
 |---|---|---|
-| Base Sepolia | `faucet --chain base` — prints Circle URL + copies your address to clipboard. Paste into the form and wait. | ~30s + manual paste |
-| Solana Devnet | `faucet --chain solana` — same Circle flow. | ~30s + manual paste |
-| **Tempo testnet** | **`fund --chain tempo --network testnet` is the only programmatic faucet** — calls Moderato's `tempo_fundAddress` JSON-RPC, mints 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) directly. No browser, no captcha. | ~5s, fully scripted |
+| Base Sepolia | `faucet --chain base`, prints Circle URL + copies your address to clipboard. Paste into the form and wait. | ~30s + manual paste |
+| Solana Devnet | `faucet --chain solana`, same Circle flow. | ~30s + manual paste |
+| **Tempo testnet** | **`fund --chain tempo --network testnet` is the only programmatic faucet**, calls Moderato's `tempo_fundAddress` JSON-RPC, mints 4 test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) directly. No browser, no captcha. | ~5s, fully scripted |
 
-Use `fund --chain tempo --network testnet` in CI/agent setup scripts — it's the only one that works without human interaction. Base Sepolia and Solana Devnet still require pasting your address into Circle's web form.
+Use `fund --chain tempo --network testnet` in CI/agent setup scripts, it's the only one that works without human interaction. Base Sepolia and Solana Devnet still require pasting your address into Circle's web form.
 
 ### Scripted / deployed agents
 
@@ -480,9 +480,9 @@ agentscore-pay fund-estimate https://agents.example.com/purchase \
 
 ### Passphrase strength
 
-For **interactive humans**: any 8+ char passphrase you'll remember is fine — the scrypt-256-GCM combination is robust against offline brute force at typical human-passphrase entropy levels.
+For **interactive humans**: any 8+ char passphrase you'll remember is fine, the scrypt-256-GCM combination is robust against offline brute force at typical human-passphrase entropy levels.
 
-For **autonomous agents**: the passphrase usually lives in `AGENTSCORE_PAY_PASSPHRASE` (env var) or `~/.agentscore/.unlock` (file). Both are filesystem/process-readable to anyone with shell access as that user, so the passphrase isn't really a separate trust boundary — it's primarily protecting the keystore against *theft of the on-disk file alone*. A long, random passphrase makes the file useless if exfiltrated:
+For **autonomous agents**: the passphrase usually lives in `AGENTSCORE_PAY_PASSPHRASE` (env var) or `~/.agentscore/.unlock` (file). Both are filesystem/process-readable to anyone with shell access as that user, so the passphrase isn't really a separate trust boundary, it's primarily protecting the keystore against *theft of the on-disk file alone*. A long, random passphrase makes the file useless if exfiltrated:
 
 ```sh
 # generate a 32-byte (256-bit) random passphrase
@@ -493,7 +493,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 export AGENTSCORE_PAY_PASSPHRASE=4d2a...
 ```
 
-If the wallet keystore *and* the passphrase store are both compromised, the wallet is compromised — there's no extra protection from a complex passphrase. Defend the directory.
+If the wallet keystore *and* the passphrase store are both compromised, the wallet is compromised, there's no extra protection from a complex passphrase. Defend the directory.
 
 ### Verifying release binaries (sigstore / cosign)
 
@@ -507,16 +507,16 @@ cosign verify-blob \
   agentscore-pay-darwin-arm64
 ```
 
-A successful verification (`Verified OK`) confirms the binary was built by a workflow in the `agentscore` GitHub org against the published source — not tampered post-build. The `.bundle` file is uploaded next to each binary in the release.
+A successful verification (`Verified OK`) confirms the binary was built by a workflow in the `agentscore` GitHub org against the published source, not tampered post-build. The `.bundle` file is uploaded next to each binary in the release.
 
-The npm package itself is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (also sigstore-backed) — `npm install @agent-score/pay` inherits the same trust chain automatically.
+The npm package itself is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (also sigstore-backed), `npm install @agent-score/pay` inherits the same trust chain automatically.
 
 ## Environment
 
 | Variable | Purpose |
 |---|---|
 | `AGENTSCORE_PAY_PASSPHRASE` | skip interactive passphrase prompt |
-| `AGENTSCORE_PAY_HOME` | override state dir (default `~/.agentscore`) — lets you run multiple wallet profiles |
+| `AGENTSCORE_PAY_HOME` | override state dir (default `~/.agentscore`), lets you run multiple wallet profiles |
 | `BASE_RPC_URL` | override Base mainnet RPC endpoint |
 | `BASE_SEPOLIA_RPC_URL` | override Base Sepolia RPC endpoint |
 | `SOLANA_RPC_URL` | override Solana mainnet RPC endpoint |
@@ -529,11 +529,11 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 
 `@agent-score/pay` is the universal agent-payment CLI; it works with any 402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
 
-- [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk) — TypeScript client for the AgentScore API
-- [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce) — merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers
-- **`@agent-score/pay`** (this package) — agent-side CLI: wallet + payment across x402/MPP rails + identity commands (assess, sessions, credentials, associate-wallet, reputation). Doubles as an MCP server via `--mcp`.
+- [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk), TypeScript client for the AgentScore API
+- [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce), merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers
+- **`@agent-score/pay`** (this package), agent-side CLI: wallet + payment across x402/MPP rails + identity commands (assess, sessions, credentials, associate-wallet, reputation). Doubles as an MCP server via `--mcp`.
 
-When a merchant uses `@agent-score/commerce`, wallet-to-operator linking happens merchant-side via `captureWallet` — pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
+When a merchant uses `@agent-score/commerce`, wallet-to-operator linking happens merchant-side via `captureWallet`, pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
 ## License
 
