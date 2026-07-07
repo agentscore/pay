@@ -17,8 +17,22 @@ import { emitProgress } from '../progress';
 import { promptPassphrase } from '../prompts';
 import { withRetries } from '../retry';
 import { selectRail } from '../selection';
+import { assertCredentialTarget, createSecureFetch } from '../url-security';
 import { createMppAccount, createX402Signer, loadWallet, type Wallet } from '../wallets';
+import type { AipRequestDescriptor } from '../aip/presenter';
 import type { ClientEvmSigner } from '@x402/evm';
+
+/** Which identity to present to the merchant. */
+export type IdentityMode = 'auto' | 'operator' | 'wallet';
+
+/** Parse a URL into the RFC 9421 covered components an AIT signature binds. Exported for tests. */
+export function requestDescriptor(url: string, method: string): AipRequestDescriptor {
+  const u = new URL(url);
+  // RFC 9421 @path is the absolute path ONLY — the query string is the separate @query component,
+  // which AIP's minimum covered set omits. The verifier reconstructs @path as pathname (query
+  // stripped), so signing pathname+search would make PoP fail for every query-bearing URL.
+  return { method: method.toUpperCase(), authority: u.host, path: u.pathname };
+}
 
 export interface PayInput {
   chain?: Chain;
@@ -35,9 +49,17 @@ export interface PayInput {
   name?: string;
   /** When true, do not auto-attach the stored AgentScore Passport. Default false. */
   skipPassport?: boolean;
+  /** Identity to present (default 'auto'). */
+  identity?: IdentityMode;
 }
 
 export type Protocol = 'x402' | 'mpp';
+
+export interface PayIdentityPlan {
+  mode: IdentityMode;
+  /** What will identify the agent to the merchant on this request. */
+  method: 'operator_token' | 'wallet' | 'caller_supplied';
+}
 
 export interface PayDryRunResult {
   dry_run: true;
@@ -47,6 +69,7 @@ export interface PayDryRunResult {
   method: string;
   url: string;
   protocol: Protocol;
+  identity: PayIdentityPlan;
   headers: Record<string, string>;
   body: string | null;
   max_spend_usd: number | null;
@@ -104,8 +127,12 @@ export async function pay(input: PayInput): Promise<PayResult> {
   const callerOperatorToken = userHeaderKeysAll.includes('x-operator-token')
     ? Object.entries(input.headers ?? {}).find(([k]) => k.toLowerCase() === 'x-operator-token')?.[1]
     : undefined;
+  const identityMode: IdentityMode = input.identity ?? 'auto';
+  // 'wallet' mode and --skip-passport both suppress the passport.
+  const effectiveSkipPassport = Boolean(input.skipPassport) || identityMode === 'wallet';
+
   let passportAttach = await attachPassport({
-    skipPassport: input.skipPassport,
+    skipPassport: effectiveSkipPassport,
     callerSuppliedOperatorToken: callerOperatorToken,
   });
 
@@ -154,21 +181,54 @@ export async function pay(input: PayInput): Promise<PayResult> {
     };
   }
 
-  if (input.dryRun) {
-    const userKeys = userHeaderKeysAll;
-    const callerHasIdentity = userKeys.includes('x-operator-token') || userKeys.includes('x-wallet-address');
-    const passportInjects = passportAttach.kind === 'attached';
-    const hasIdentity = callerHasIdentity || passportInjects;
-    const headers = mergeHeaders(
+  // `--identity operator` is an explicit choice of the operator_token model. With no caller
+  // token and no attached Passport, fail fast — silently downgrading to the wallet header would
+  // present a different identity than the one the caller asked for.
+  if (identityMode === 'operator' && !callerOperatorToken && passportAttach.kind !== 'attached') {
+    throw new CliError(
+      'passport_login_required',
+      'Identity mode `operator` needs a stored operator credential, and none was found — refusing to fall back to wallet identity.',
       {
-        'Content-Type': 'application/json',
-        ...(passportInjects && passportAttach.operatorToken
-          ? { 'X-Operator-Token': passportAttach.operatorToken }
-          : {}),
-        ...(hasIdentity ? {} : { 'X-Wallet-Address': candidate.address }),
+        nextSteps: {
+          action: 'passport_login',
+          suggestion:
+            'Run `agentscore-pay passport login` to mint a Passport (or pass an X-Operator-Token header), then retry with --identity operator.',
+        },
       },
-      input.headers,
     );
+  }
+
+  // Credential-transport guard: the bearer operator_token (durable Passport OR a
+  // caller-supplied X-Operator-Token) is a long-lived secret. Before it is ever
+  // serialized onto the request, require the target be https (loopback http is
+  // the dev carve-out). Runs for dry-run too so the plan never previews
+  // attaching the secret to a cleartext target.
+  //
+  // The token rides the wire when EITHER:
+  //   (a) the caller pasted an X-Operator-Token (merged onto the request
+  //       UNCONDITIONALLY below), or
+  //   (b) a passport is attached AND not suppressed.
+  const callerSuppliedOperatorToken = callerOperatorToken !== undefined;
+  const autoTokenRides = passportAttach.kind === 'attached';
+  const willAttachOperatorToken = callerSuppliedOperatorToken || autoTokenRides;
+  if (willAttachOperatorToken) assertCredentialTarget(input.url);
+
+  if (input.dryRun) {
+    const callerHasIdentity =
+      userHeaderKeysAll.includes('x-operator-token') || userHeaderKeysAll.includes('x-wallet-address');
+    const passportInjects = passportAttach.kind === 'attached';
+    let identity: PayIdentityPlan;
+    const identityHeaders: Record<string, string> = {};
+    if (passportInjects && passportAttach.operatorToken) {
+      identity = { mode: identityMode, method: 'operator_token' };
+      identityHeaders['X-Operator-Token'] = passportAttach.operatorToken;
+    } else if (callerHasIdentity) {
+      identity = { mode: identityMode, method: 'caller_supplied' };
+    } else {
+      identity = { mode: identityMode, method: 'wallet' };
+      identityHeaders['X-Wallet-Address'] = candidate.address;
+    }
+    const headers = mergeHeaders({ 'Content-Type': 'application/json', ...identityHeaders }, input.headers);
     return {
       dry_run: true,
       selected_chain: candidate.chain,
@@ -177,6 +237,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
       method: input.method,
       url: input.url,
       protocol,
+      identity,
       headers,
       body: input.body ?? null,
       max_spend_usd: input.maxSpendUsd ?? null,
@@ -248,8 +309,8 @@ export async function pay(input: PayInput): Promise<PayResult> {
     res = await withRetries(
       () =>
         wallet.chain === 'base'
-          ? payViaX402(wallet, input, init, network, settled)
-          : payViaMpp(wallet, input, init, network, settled),
+          ? payViaX402(wallet, input, init, network, settled, willAttachOperatorToken)
+          : payViaMpp(wallet, input, init, network, settled, willAttachOperatorToken),
       {
         retries,
         baseDelayMs: 200,
@@ -341,6 +402,12 @@ export async function pay(input: PayInput): Promise<PayResult> {
     });
     process.stderr.write(`Passport saved (expires ${new Date(renewal.passport.expires_at).toISOString()}). Retrying payment with X-Operator-Token...\n`);
 
+    // The retry attaches the freshly-minted durable Passport token; same
+    // transport guard as the primary path — never put the bearer credential on
+    // a cleartext target (the cold-start first attempt may have carried no
+    // token, so input.url hasn't necessarily been asserted yet).
+    assertCredentialTarget(input.url);
+
     // Build a new request body that merges any merchant-supplied resume token
     // (e.g. an `order_id`) so the retry continues the pending order rather
     // than minting a new one.
@@ -372,8 +439,8 @@ export async function pay(input: PayInput): Promise<PayResult> {
     try {
       res = await (
         wallet.chain === 'base'
-          ? payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
-          : payViaMpp(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled)
+          ? payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled, true)
+          : payViaMpp(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled, true)
       );
     } catch (err: unknown) {
       if (retrySettled.cliError) throw retrySettled.cliError;
@@ -487,6 +554,7 @@ async function payViaX402(
   init: RequestInit,
   network: Network,
   settled: PaymentSettled,
+  guardRedirects = false,
 ): Promise<Response> {
   const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
@@ -540,7 +608,11 @@ async function payViaX402(
     }
   });
 
-  const fetchWithPay = wrapFetchWithPayment(fetch, client);
+  // When the bearer operator_token rides on this request, route the x402 client
+  // through a redirect-guarded fetch so a merchant 30x can't forward the
+  // credential off-host. Wallet-only requests use the plain fetch.
+  const baseFetch = guardRedirects ? createSecureFetch() : fetch;
+  const fetchWithPay = wrapFetchWithPayment(baseFetch, client);
   return fetchWithPay(input.url, init);
 }
 
@@ -550,6 +622,7 @@ async function payViaMpp(
   init: RequestInit,
   network: Network,
   settled: PaymentSettled,
+  guardRedirects = false,
 ): Promise<Response> {
   const host = safeHost(input.url);
   const limits = await loadLimits();
@@ -564,9 +637,11 @@ async function payViaMpp(
   } else {
     throw new CliError('unsupported_rail', `MPP path called on chain ${wallet.chain} — only Tempo and Solana are supported under MPP.`);
   }
+  // Same redirect guard as the x402 path when the credential rides on the request.
+  const baseFetch = guardRedirects ? createSecureFetch() : fetch;
   const client = Mppx.create({
     methods: methods as never,
-    fetch,
+    fetch: baseFetch,
     onChallenge: async (challenge) => {
       const req = (challenge as { request?: { amount?: string; currency?: string; decimals?: number } }).request ?? {};
       const decimals = resolveDecimals(req.decimals, req.currency, wallet.chain);

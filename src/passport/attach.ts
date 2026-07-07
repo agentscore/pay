@@ -1,3 +1,4 @@
+import { isCredentialSafeUrl } from '../url-security';
 import { refreshAccessToken } from './auth';
 import { isExpired, loadPassport, type Passport } from './storage';
 
@@ -18,7 +19,7 @@ import { isExpired, loadPassport, type Passport } from './storage';
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 
 export interface AttachResult {
-  kind: 'attached' | 'expired' | 'absent' | 'opted_out';
+  kind: 'attached' | 'expired' | 'absent' | 'opted_out' | 'insecure_target';
   passport?: Passport;
   /** Header value to set as `X-Operator-Token`, when kind === 'attached'. */
   operatorToken?: string;
@@ -36,6 +37,14 @@ export interface AttachInput {
   skipPassport?: boolean;
   /** Caller-supplied X-Operator-Token already present on the request — don't override. */
   callerSuppliedOperatorToken?: string;
+  /**
+   * The merchant request URL the credential would be attached to. When provided
+   * and NOT credential-safe (non-https, except loopback http for dev), attach
+   * refuses — returns `kind: 'insecure_target'` and never surfaces the
+   * operator_token. Omit when resolving the passport for a use that does NOT put
+   * the bearer token on the wire (e.g. minting an @authority-bound AIP token).
+   */
+  targetUrl?: string;
   /** Override "now" for testing. */
   now?: number;
   /** Override fetch (testing). */
@@ -53,6 +62,13 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
   if (input.callerSuppliedOperatorToken) {
     // Caller is providing their own token; respect it, don't read or attach passport.
     return { kind: 'opted_out' };
+  }
+  // Credential-transport guard: never put the bearer operator_token on a
+  // cleartext (or otherwise non-https) merchant URL. Loopback http is the dev
+  // carve-out (handled inside isCredentialSafeUrl). Returning before load/refresh
+  // avoids surfacing — or even rotating — the credential for an unsafe target.
+  if (input.targetUrl !== undefined && !isCredentialSafeUrl(input.targetUrl)) {
+    return { kind: 'insecure_target' };
   }
 
   let passport = await loadPassport();
@@ -111,8 +127,16 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
 /**
  * Convenience: builds the headers patch to merge into a fetch's headers.
  * Returns `{}` when nothing should be attached.
+ *
+ * Pass `targetUrl` to enforce the credential-transport guard at the attach
+ * point too: if the URL is not credential-safe (non-https, except loopback
+ * http), the operator_token is withheld even on an otherwise-`attached` result.
  */
-export function attachResultToHeaders(result: AttachResult): Record<string, string> {
+export function attachResultToHeaders(
+  result: AttachResult,
+  targetUrl?: string,
+): Record<string, string> {
   if (result.kind !== 'attached' || !result.operatorToken) return {};
+  if (targetUrl !== undefined && !isCredentialSafeUrl(targetUrl)) return {};
   return { 'X-Operator-Token': result.operatorToken };
 }

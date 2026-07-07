@@ -6,7 +6,7 @@
 #
 class AgentscorePay < Formula
   desc "CLI wallet for one-shell-command agent payments (x402 + MPP)"
-  homepage "https://agentscore.sh"
+  homepage "https://www.agentscore.com"
   url "${URL}"
   sha256 "${SHA}"
   license "MIT"

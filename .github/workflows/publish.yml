@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
 
@@ -111,7 +111,7 @@ jobs:
               -e 's|\${SHA}|'"$SHA256"'|g' \
               ../Formula/agentscore-pay.rb.template > Formula/agentscore-pay.rb
           git config user.name 'agentscore-bot'
-          git config user.email 'bot@agentscore.sh'
+          git config user.email 'bot@agentscore.com'
           git add Formula/agentscore-pay.rb
           git commit -m "agentscore-pay $VERSION" || echo "no changes"
           git push origin HEAD

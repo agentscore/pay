@@ -20,6 +20,8 @@ export type ErrorCode =
   | 'quota_exceeded'
   | 'merchant_error'
   | 'merchant_spec_violation'
+  | 'insecure_credential_transport'
+  | 'credential_redirect_blocked'
   | 'session_timeout'
   | 'passport_api_error'
   | 'passport_verification_failed'
@@ -57,6 +59,8 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
     case 'passport_verification_timeout':
       return EXIT_CODES.NETWORK_ERROR;
     case 'merchant_spec_violation':
+    case 'insecure_credential_transport':
+    case 'credential_redirect_blocked':
       return EXIT_CODES.PAYMENT_REJECTED;
     case 'insufficient_balance':
     case 'no_funded_rail':

@@ -38,6 +38,13 @@ export function ledgerPath(): string {
   return join(baseDir(), 'history.jsonl');
 }
 
+/** Encrypted Ed25519 agent key used as the AIP AIT `cnf` (proof-of-possession) key. Separate
+ *  from payment wallets (chain-typed secp256k1/ed25519 keys); this is one Ed25519 key for AIT
+ *  signing, independent of any chain. */
+export function agentKeyPath(): string {
+  return join(baseDir(), 'aip-agent-key.json');
+}
+
 export function limitsPath(): string {
   return join(baseDir(), 'limits.json');
 }

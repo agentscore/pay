@@ -2,7 +2,7 @@
 # Install @agent-score/pay — agent-friendly CLI wallet for x402 + MPP payments.
 #
 # Usage:
-#   curl -fsSL https://agentscore.sh/install-pay.sh | sh
+#   curl -fsSL https://www.agentscore.com/install-pay.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/agentscore/pay/main/install.sh | sh
 #
 # Strategy:

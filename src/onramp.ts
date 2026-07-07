@@ -12,7 +12,7 @@
 
 import { loadPassport } from './passport/storage';
 
-const ONRAMP_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.sh';
+const ONRAMP_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.com';
 const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
 
 export type OnrampChain = 'base' | 'solana';

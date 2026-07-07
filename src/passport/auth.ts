@@ -1,5 +1,6 @@
 import { AgentScoreError, type SessionCreateResponse, type SessionPollResponse } from '@agent-score/sdk';
 import { CliError } from '../errors';
+import { createSecureFetch } from '../url-security';
 import { type Passport, savePassport } from './storage';
 
 /**
@@ -7,7 +8,7 @@ import { type Passport, savePassport } from './storage';
  * user completes KYC in the browser, persist the resulting operator_token.
  */
 
-const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.sh';
+const POLL_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.com';
 
 const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
 
@@ -61,7 +62,11 @@ export interface PassportResumeInput {
   sessionId: string;
   pollSecret: string;
   verifyUrl: string;
-  /** Optional poll URL from the merchant 403 — falls back to baseUrl-derived. */
+  /**
+   * Optional poll URL from the merchant 403. Accepted for forward-compat but
+   * its HOST IS NEVER TRUSTED — the poll always targets the trusted AgentScore
+   * base (see passportResume). Only the session id (passed separately) is used.
+   */
   pollUrl?: string;
   pollIntervalSeconds?: number;
   timeoutSeconds?: number;
@@ -72,12 +77,16 @@ export interface PassportResumeInput {
 }
 
 export async function passportResume(input: PassportResumeInput): Promise<PassportLoginResult> {
-  // If pollUrl points to a different host than our default baseUrl, derive baseUrl from it.
-  let baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
-  if (input.pollUrl) {
-    const m = input.pollUrl.match(/^(https?:\/\/[^/]+)/);
-    if (m && m[1]) baseUrl = m[1];
-  }
+  // SECURITY: pin the poll + token-store host to the TRUSTED AgentScore base.
+  // The merchant-supplied `pollUrl` arrives in a 403 body from an UNTRUSTED
+  // merchant; adopting its host would let any hostile merchant point the poll
+  // at an attacker server and poison the durable Passport with an
+  // attacker-chosen operator_token (Passport poisoning). We take only the
+  // session id (supplied separately, validated server-side via X-Poll-Secret)
+  // and ALWAYS poll/store against the trusted base. If the merchant pollUrl's
+  // host already matches the trusted base it's a legitimate bootstrap and works
+  // unchanged; if it points anywhere else the host is ignored.
+  const baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
   return pollAndStore({
     sessionId: input.sessionId,
     pollSecret: input.pollSecret,
@@ -173,7 +182,9 @@ export interface RefreshAccessTokenInput {
 
 export async function refreshAccessToken(input: RefreshAccessTokenInput): Promise<Passport> {
   const baseUrl = (input.baseUrl ?? POLL_BASE_URL).replace(/\/+$/, '');
-  const fetchImpl = input.fetch ?? globalThis.fetch;
+  // The body carries the long-lived refresh_token; pin redirects to the IdP origin so a 307/308
+  // can never re-send it elsewhere (undici re-issues bodies on cross-origin redirects).
+  const fetchImpl = createSecureFetch({ fetch: input.fetch ?? globalThis.fetch });
 
   const response = await fetchImpl(`${baseUrl}/v1/sessions/refresh`, {
     method: 'POST',
@@ -224,7 +235,8 @@ async function mintPublicSession(input: {
   baseUrl: string;
   fetch: typeof globalThis.fetch;
 }): Promise<SessionCreateResponse> {
-  const response = await input.fetch(`${input.baseUrl}/v1/sessions/public`, {
+  const fetchImpl = createSecureFetch({ fetch: input.fetch });
+  const response = await fetchImpl(`${input.baseUrl}/v1/sessions/public`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -264,7 +276,10 @@ async function pollPublicSession(input: {
   baseUrl: string;
   fetch: typeof globalThis.fetch;
 }): Promise<SessionPollResponse> {
-  const response = await input.fetch(
+  // The X-Poll-Secret header rides this request and undici forwards custom headers across
+  // cross-origin redirects — same origin-pinning as the credentialed legs above.
+  const fetchImpl = createSecureFetch({ fetch: input.fetch });
+  const response = await fetchImpl(
     `${input.baseUrl}/v1/sessions/${encodeURIComponent(input.sessionId)}`,
     {
       method: 'GET',
