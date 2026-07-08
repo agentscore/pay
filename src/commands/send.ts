@@ -7,7 +7,7 @@
  * transferChecked with idempotent ATA creation).
  *
  * Requires native gas in the source wallet (ETH on Base, the Tempo native
- * token on Tempo, SOL on Solana). 402/MPP payments are gasless from the
+ * token on Tempo, SOL on Solana). x402/MPP payments are gasless from the
  * agent's perspective; raw transfers are not.
  */
 
@@ -75,7 +75,7 @@ function mapGasError(err: unknown, chain: Chain, signer: string): never {
     throw new CliError('insufficient_balance', `${chain} wallet has no native gas to send the transfer.`, {
       nextSteps: {
         action: 'fund_native_gas',
-        suggestion: `Send a small amount of ${native} to ${signer} and retry. 402/MPP payments don't need this; only raw on-chain transfers do.`,
+        suggestion: `Send a small amount of ${native} to ${signer} and retry. x402/MPP payments don't need this; only raw on-chain transfers do.`,
       },
       extra: { chain, signer, original_message: msg },
     });

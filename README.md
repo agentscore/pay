@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/pay.svg)](https://www.npmjs.com/package/@agent-score/pay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**AgentScore Pay; one CLI for agent payments across the ecosystem.** Pay any 402/MPP merchant from a single shell command, natively across **x402** (Base) and **MPP** (Tempo, Solana), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
+**AgentScore Pay; one CLI for agent payments across the ecosystem.** Pay any x402/MPP merchant from a single shell command, natively across **x402** (Base) and **MPP** (Tempo, Solana), with structured hints to compatible clients for rails we don't fund directly (Stripe SPT via [link-cli](https://github.com/stripe/link-cli), other x402 networks).
 
 Closes the UX gap for shell-tool LLM agents (Claude Code, Cursor, ChatGPT with Bash) that want to pay protocol-gated endpoints. One shell command per payment: the request body is preserved through the 402 round-trip and the agent never sees a private key on the wire. Built and maintained by AgentScore. It works with every 402-gated merchant in the ecosystem, AgentScore-gated or not. Pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 
@@ -527,7 +527,7 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 
 ## Relationship to other AgentScore packages
 
-`@agent-score/pay` is the universal agent-payment CLI; it works with any 402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
+`@agent-score/pay` is the universal agent-payment CLI; it works with any x402/MPP merchant regardless of whether they use AgentScore for identity. The packages below are AgentScore's optional identity + integration layer for merchants who choose to use it:
 
 - [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk), TypeScript client for the AgentScore API
 - [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce), merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers

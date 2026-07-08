@@ -494,7 +494,7 @@ export function buildCli() {
   // ── send ────────────────────────────────────────────────────────────────────
   cli.command('send', {
     description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake — just on-chain.',
-    hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). 402/MPP payments are gasless; raw transfers are not.',
+    hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). x402/MPP payments are gasless; raw transfers are not.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,

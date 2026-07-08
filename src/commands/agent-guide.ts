@@ -48,7 +48,7 @@ interface AgentGuide {
 const GUIDE: AgentGuide = {
   for_agents: true,
   intro:
-    'agentscore-pay is the universal agent-payment CLI. It works against any 402/MPP merchant, ' +
+    'agentscore-pay is the universal agent-payment CLI. It works against any x402/MPP merchant, ' +
     'AgentScore-gated or not, across x402 USDC on Base and MPP USDC on Tempo + Solana. Below is the ' +
     'minimum-friction path for an LLM tool-loop agent.',
 
@@ -76,7 +76,7 @@ const GUIDE: AgentGuide = {
     },
     {
       step: '2. (Optional) Discover merchants with `discover`',
-      why: 'Lists 402/MPP services from the x402 Bazaar (Coinbase) + MPP services directory (Tempo) — works against any merchant, AgentScore-gated or not.',
+      why: 'Lists x402/MPP services from the x402 Bazaar (Coinbase) + MPP services directory (Tempo) — works against any merchant, AgentScore-gated or not.',
       command_example: 'agentscore-pay discover --json',
       notes: [
         'Use --search, --chain, --max-price, --protocol to narrow. Returns rail metadata (network, payTo, asset, price) per service.',
@@ -90,7 +90,7 @@ const GUIDE: AgentGuide = {
       notes: [
         'Pass --network testnet to check testnet balances (Base Sepolia, Solana devnet, Tempo testnet).',
         'If a chain is empty, run `agentscore-pay fund --chain <chain>` for a receive QR (mainnet) or testnet faucet/programmatic mint.',
-        'Each row includes `usdc`, `native` (gas balance), and `native_symbol`. 402/MPP payments are gasless from the agent perspective; `send` and `revoke` are not — they need a non-zero `native` balance to write on-chain.',
+        'Each row includes `usdc`, `native` (gas balance), and `native_symbol`. x402/MPP payments are gasless from the agent perspective; `send` and `revoke` are not — they need a non-zero `native` balance to write on-chain.',
       ],
     },
     {
@@ -185,7 +185,7 @@ const GUIDE: AgentGuide = {
       why: 'Different from `pay <url>` — no merchant, no 402 handshake, just an on-chain transfer from the local wallet to the destination. Default `--asset usdc` sends USDC (ERC20 on Base/Tempo, SPL on Solana). `--asset native` sends gas tokens (ETH on Base, TEMPO on Tempo, SOL on Solana). Works on mainnet AND testnets (pass `--network testnet`).',
       command_example: 'agentscore-pay send --chain base --to 0xRecipient --amount 5 --json',
       notes: [
-        'Requires native gas in the signer wallet for BOTH flavors: gas pays the on-chain write itself, regardless of which asset is being transferred. 402/MPP payments are gasless from the agent perspective; raw transfers are not.',
+        'Requires native gas in the signer wallet for BOTH flavors: gas pays the on-chain write itself, regardless of which asset is being transferred. x402/MPP payments are gasless from the agent perspective; raw transfers are not.',
         '`--asset usdc` (default): ERC20 `transfer(to, amount)` on EVM; SPL `TransferChecked` + idempotent ATA creation on Solana. The fee payer is the sender; sender needs SOL for the ATA-creation rent on Solana if the recipient doesn\'t already have one.',
         '`--asset native`: viem `sendTransaction({to, value})` on EVM; `getTransferSolInstruction` on Solana. No token-contract interaction.',
         'Validation: --to must be a valid address for the chain (0x-prefixed 40-hex for EVM, base58 32-44 chars for Solana). EVM zero address is rejected.',
@@ -299,7 +299,7 @@ const GUIDE: AgentGuide = {
     {
       cli_code: 'network_error',
       thrown_when:
-        'RateLimitedError (per-second cap, HTTP 429 rate_limited), SdkTimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
+        'RateLimitedError (per-second cap, HTTP 429 rate_limited), TimeoutError (request timed out), or generic httpx.HTTPError (DNS / network / 5xx) wrapped by the SDK.',
       next_action: 'retry_with_backoff',
       recovery:
         'Retry once with backoff (5–30s typical, longer if Retry-After header was present). If sustained, surface to user with AgentScore\'s status page or support contact — pay calls api.agentscore.com directly, no merchant in the loop here.',
@@ -334,7 +334,7 @@ const GUIDE: AgentGuide = {
     '1': 'user error (bad args, missing wallet, wrong passphrase, account quota)',
     '2': 'network error (merchant unreachable, RPC failure)',
     '3': 'insufficient funds',
-    '4': 'payment rejected (exceeds --max-spend, signer mismatch)',
+    '4': 'payment rejected (exceeds --max-spend, local limit hit)',
     '5': 'multi-rail ambiguity (requires --chain or preferred_chains config)',
   },
 
