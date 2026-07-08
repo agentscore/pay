@@ -49,7 +49,7 @@ describe('banner', () => {
 
   it('groups commands by audience role', () => {
     const out = renderBanner({ cols: 100, color: false });
-    expect(out).toContain('Pay any 402 / MPP endpoint:');
+    expect(out).toContain('Pay any x402 / MPP endpoint:');
     expect(out).toContain('Agents (LLM tool-loop):');
     expect(out).toContain('Account management:');
     expect(out).toContain('Output formats:');

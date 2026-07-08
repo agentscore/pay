@@ -541,7 +541,7 @@ function resolveDecimals(declared: number | undefined, asset: string | undefined
     {
       nextSteps: {
         action: 'contact_merchant',
-        suggestion: 'Ask the merchant to include the required `decimals` field in their 402 challenge per the paymentauth.org / x402 spec.',
+        suggestion: 'Ask the merchant to include the required `decimals` field in their 402 challenge per the paymentauth.org / x402.org specs.',
       },
       extra: { chain, asset: asset ?? null },
     },

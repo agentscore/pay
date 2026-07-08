@@ -23,7 +23,7 @@ const BANNER_ART_PLAIN = [
 const TAGLINE = 'Universal agent-payment CLI';
 
 const COMMANDS = [
-  'Pay any 402 / MPP endpoint:',
+  'Pay any x402 / MPP endpoint:',
   '  pay           Send a paid HTTP request (multi-rail x402 + MPP)',
   '  check         Probe a URL for 402 and accepted rails (no money moves)',
   '  balance       USDC across base, solana, tempo',
