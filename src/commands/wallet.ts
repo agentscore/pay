@@ -17,7 +17,7 @@ function validateWalletName(name: string): void {
   }
 }
 
-export interface CreateResult {
+interface CreateResult {
   chain: Chain;
   name: string;
   address: string;

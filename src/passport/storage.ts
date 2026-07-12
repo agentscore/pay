@@ -9,7 +9,7 @@ import { baseDir, passportPath } from '../paths';
 
 export const PASSPORT_VERSION = 1;
 
-export interface PassportVerifiedFacts {
+interface PassportVerifiedFacts {
   kyc?: boolean;
   age_bracket?: string;
   jurisdiction?: string;

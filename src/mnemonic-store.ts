@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import { CliError } from './errors';
 import { decryptSecret, encryptSecret } from './keystore';
@@ -6,7 +6,7 @@ import { mnemonicPath } from './paths';
 
 export { mnemonicPath } from './paths';
 
-export interface MnemonicFile {
+interface MnemonicFile {
   version: 1;
   created_at: string;
   chains: string[];
@@ -53,15 +53,5 @@ export async function mnemonicExists(): Promise<boolean> {
     return true;
   } catch {
     return false;
-  }
-}
-
-export async function clearMnemonic(): Promise<void> {
-  try {
-    await rm(mnemonicPath());
-  } catch (err: unknown) {
-    if (!err || typeof err !== 'object' || !('code' in err) || (err as { code: string }).code !== 'ENOENT') {
-      throw err;
-    }
   }
 }

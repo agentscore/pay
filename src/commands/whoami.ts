@@ -5,7 +5,7 @@ import { loadConfig } from '../config';
 import { SUPPORTED_CHAINS, type Chain, type Network } from '../constants';
 import { keystoreExists, keystorePath, listWallets, loadKeystore } from '../keystore';
 
-export interface WalletSummary {
+interface WalletSummary {
   chain: Chain;
   name: string;
   address: string;
@@ -14,7 +14,7 @@ export interface WalletSummary {
   keystore: string;
 }
 
-export interface ChainSummary {
+interface ChainSummary {
   chain: Chain;
   has_wallet: boolean;
   wallets: WalletSummary[];

@@ -15,7 +15,7 @@ const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const TEMPO_TESTNET_MINT_TIMEOUT_MS = 30_000;
 const TEMPO_TESTNET_POLL_MS = 2_000;
 
-export type FundVia = 'stripe-onramp';
+type FundVia = 'stripe-onramp';
 
 export interface FundInput {
   chain: Chain;

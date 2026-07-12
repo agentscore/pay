@@ -25,7 +25,7 @@ const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const EVM_ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-export type SendAsset = 'usdc' | 'native';
+type SendAsset = 'usdc' | 'native';
 
 export interface SendInput {
   chain: Chain;

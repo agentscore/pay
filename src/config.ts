@@ -6,7 +6,7 @@ import { baseDir, configPath } from './paths';
 
 export { configPath } from './paths';
 
-export const CONFIG_VERSION = 1;
+const CONFIG_VERSION = 1;
 
 export interface Config {
   version?: number;
