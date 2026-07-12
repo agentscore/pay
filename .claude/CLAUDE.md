@@ -49,6 +49,7 @@ Both paths preserve POST bodies through the 402 round-trip. The CLI's passphrase
 - **ESLint 9** — linting. `bun run lint`.
 - **tsup** — builds ESM with `#!/usr/bin/env node` banner. `bun run build`.
 - **Vitest** — tests. `bun run test`.
+- **knip** — dead-code check. `bun run knip` (src/aip/ excluded: dormant surface kept for re-enable).
 - **Lefthook** — git hooks. Pre-commit: lint. Pre-push: typecheck.
 
 ## Key Commands
