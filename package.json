@@ -62,7 +62,7 @@
     "@clack/prompts": "^1.7.0",
     "@scure/bip39": "^2.2.0",
     "@solana-program/system": "^0.12.2",
-    "@solana-program/token": "^0.13.0",
+    "@solana-program/token": "^0.14.0",
     "@solana/kit": "^6.10.0",
     "@solana/mpp": "^0.6.0",
     "@x402/core": "^2.18.0",
