@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,7 +24,7 @@ jobs:
 
       - name: Install osv-scanner
         run: |
-          curl -fsSL https://github.com/google/osv-scanner/releases/download/v2.3.5/osv-scanner_linux_arm64 -o osv-scanner
+          curl -fsSL https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_arm64 -o osv-scanner
           chmod +x osv-scanner
 
       - name: Scan dependencies

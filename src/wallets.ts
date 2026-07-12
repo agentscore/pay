@@ -62,22 +62,10 @@ export async function loadWallet(
   return { chain, address: file.address, secret, name: file.name ?? name };
 }
 
-export async function getBalance(wallet: Wallet, network: Network = 'mainnet'): Promise<bigint> {
-  if (wallet.chain === 'base') return base.balance(wallet.address, network);
-  if (wallet.chain === 'solana') return solana.balance(wallet.address, network);
-  return tempo.balance(wallet.address, network);
-}
-
 export function getQrUri(wallet: Wallet, amountUsd?: number, network: Network = 'mainnet'): string {
   if (wallet.chain === 'base') return base.qrUri(wallet.address, amountUsd, network);
   if (wallet.chain === 'solana') return solana.qrUri(wallet.address, amountUsd, network);
   return tempo.qrUri(wallet.address, amountUsd, network);
-}
-
-export function formatBalance(chain: Chain, raw: bigint): string {
-  if (chain === 'base') return base.formatBalance(raw);
-  if (chain === 'solana') return solana.formatBalance(raw);
-  return tempo.formatBalance(raw);
 }
 
 export async function createX402Signer(wallet: Wallet, network: Network = 'mainnet'): Promise<unknown> {

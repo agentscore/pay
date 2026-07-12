@@ -2,7 +2,7 @@ import { chainFromNetworkId } from './quotes';
 import { lookupRailHint, type RailHint } from './rail-hints';
 import type { Chain } from './constants';
 
-export interface PaymentRequestBlob {
+interface PaymentRequestBlob {
   amount?: string;
   currency?: string;
   methodDetails?: { chainId?: number; network?: string };

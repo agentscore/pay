@@ -4,23 +4,49 @@ updates:
     directory: "/"
     cooldown:
       default-days: 1
+    commit-message:
+      prefix: "chore(deps)"
     labels: ["dependencies", "javascript"]
     schedule:
       interval: "weekly"
       day: "monday"
       time: "06:00"
       timezone: "America/New_York"
+    groups:
+      minor-patch:
+        update-types: ["minor", "patch"]
     ignore:
+      # eslint 10 defaults churn lint org-wide; upgrade is a deliberate cross-repo pass (2026-07-08)
       - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # TS majors are a deliberate org-wide pass, not a routine bump
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # kit 7 blocked upstream: @solana-program/* still peer-require ^6 (2026-07)
+      - dependency-name: "@solana/kit"
+        update-types: ["version-update:semver-major"]
+      # Tempo/MPP coupled set (agent + verifier + merchants move together via the
+      # live-settle protocol; exact pins). Never bump via dependabot (2026-07-08).
+      - dependency-name: "viem"
+      - dependency-name: "mppx"
+      - dependency-name: "@solana/mpp"
+      # incur bumps go through the serveCli integration protocol (exact pin)
+      - dependency-name: "incur"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     cooldown:
       default-days: 1
+    commit-message:
+      prefix: "chore(deps)"
     labels: ["dependencies", "ci"]
     schedule:
       interval: "weekly"
       day: "monday"
       time: "06:00"
       timezone: "America/New_York"
+    groups:
+      actions:
+        patterns: ["*"]

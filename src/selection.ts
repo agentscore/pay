@@ -34,7 +34,7 @@ function formatBalance(chain: Chain, raw: bigint): string {
   return tempoChain.formatBalance(raw);
 }
 
-export async function listHeldCandidates(
+async function listHeldCandidates(
   network: Network = 'mainnet',
   name: string = DEFAULT_WALLET_NAME,
   filterChain?: Chain,

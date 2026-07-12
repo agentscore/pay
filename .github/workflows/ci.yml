@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -28,6 +29,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bunx tsc --noEmit
+      - run: bun run knip
       - run: bun run test -- --coverage
       - run: bun run build
       - name: Build native binary (linux-arm64)

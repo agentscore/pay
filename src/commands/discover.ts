@@ -7,7 +7,7 @@ const X402_BAZAAR_URL = 'https://api.cdp.coinbase.com/platform/v2/x402/discovery
 const MPP_SERVICES_URL = 'https://mpp.dev/api/services';
 const FETCH_TIMEOUT_MS = 10_000;
 
-export type DiscoverProtocol = 'x402' | 'mpp' | 'both';
+type DiscoverProtocol = 'x402' | 'mpp' | 'both';
 
 interface BazaarAccept {
   scheme?: string;

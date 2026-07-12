@@ -23,7 +23,7 @@ import type { AipRequestDescriptor } from '../aip/presenter';
 import type { ClientEvmSigner } from '@x402/evm';
 
 /** Which identity to present to the merchant. */
-export type IdentityMode = 'auto' | 'operator' | 'wallet';
+type IdentityMode = 'auto' | 'operator' | 'wallet';
 
 /** Parse a URL into the RFC 9421 covered components an AIT signature binds. Exported for tests. */
 export function requestDescriptor(url: string, method: string): AipRequestDescriptor {
@@ -53,15 +53,15 @@ export interface PayInput {
   identity?: IdentityMode;
 }
 
-export type Protocol = 'x402' | 'mpp';
+type Protocol = 'x402' | 'mpp';
 
-export interface PayIdentityPlan {
+interface PayIdentityPlan {
   mode: IdentityMode;
   /** What will identify the agent to the merchant on this request. */
   method: 'operator_token' | 'wallet' | 'caller_supplied';
 }
 
-export interface PayDryRunResult {
+interface PayDryRunResult {
   dry_run: true;
   selected_chain: Chain;
   signer: string;
@@ -75,7 +75,7 @@ export interface PayDryRunResult {
   max_spend_usd: number | null;
 }
 
-export interface PaySettledResult {
+interface PaySettledResult {
   dry_run?: false;
   ok: boolean;
   status: number;
@@ -91,8 +91,8 @@ export interface PaySettledResult {
 
 export type PayResult = PayDryRunResult | PaySettledResult;
 
-export const DEFAULT_TIMEOUT_SECONDS = 60;
-export const DEFAULT_RETRIES = 0;
+const DEFAULT_TIMEOUT_SECONDS = 60;
+const DEFAULT_RETRIES = 0;
 
 interface PaymentSettled {
   price_usd?: string;
