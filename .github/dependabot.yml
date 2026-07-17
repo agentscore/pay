@@ -24,7 +24,7 @@ updates:
       # TS majors are a deliberate org-wide pass, not a routine bump
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # kit 7 blocked upstream: @solana-program/* still peer-require ^6 (2026-07)
+      # @solana/kit on ^7; the next major stays coordinated with @solana/mpp (live-settle gate), not a routine bump
       - dependency-name: "@solana/kit"
         update-types: ["version-update:semver-major"]
       # Tempo/MPP coupled set (agent + verifier + merchants move together via the
