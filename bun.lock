@@ -16,7 +16,7 @@
         "@x402/evm": "^2.18.0",
         "@x402/fetch": "^2.18.0",
         "ed25519-hd-key": "^2.0.0",
-        "incur": "0.4.11",
+        "incur": "0.4.17",
         "mppx": "0.8.6",
         "qrcode-terminal": "^0.12.0",
         "viem": "2.54.6",
@@ -730,7 +730,7 @@
 
     "imurmurhash": ["imurmurhash@0.1.4", "", {}, "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA=="],
 
-    "incur": ["incur@0.4.11", "", { "dependencies": { "@cfworker/json-schema": "^4.1.1", "@modelcontextprotocol/server": "^2.0.0-alpha.2", "@scalar/openapi-types": "^0.8.0", "@toon-format/toon": "^2.1.0", "tokenx": "^1.3.0", "yaml": "^2.8.2", "zod": "^4.3.6" }, "bin": { "incur": "dist/bin.js", "incur.src": "src/bin.ts" } }, "sha512-3mAuuiaA1YaSFm5Ydz76kYZpJAkICPjN/Ep4AyldwTm4x9IsBvKhrOPH8FkzU7T/XSGu+qSN/Av4zc2n5bwYjQ=="],
+    "incur": ["incur@0.4.17", "", { "dependencies": { "@cfworker/json-schema": "^4.1.1", "@modelcontextprotocol/server": "^2.0.0-alpha.2", "@scalar/openapi-types": "^0.8.0", "@toon-format/toon": "^2.1.0", "tokenx": "^1.3.0", "yaml": "^2.8.2", "zod": "^4.3.6" }, "bin": { "incur": "dist/bin.js", "incur.src": "src/bin.ts" } }, "sha512-W9oclC9XZeCxlNmztPPZigUnxU6akJHaH9VBdnGyBPEp4dI/KAZgnjnKnr8g3+CXXN+r9yiY9Ar0B6w1AIxbJA=="],
 
     "internal-slot": ["internal-slot@1.1.0", "", { "dependencies": { "es-errors": "^1.3.0", "hasown": "^2.0.2", "side-channel": "^1.1.0" } }, "sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw=="],
 
@@ -1183,6 +1183,8 @@
     "import-fresh/resolve-from": ["resolve-from@4.0.0", "", {}, "sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g=="],
 
     "make-dir/semver": ["semver@7.8.0", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA=="],
+
+    "mppx/incur": ["incur@0.4.11", "", { "dependencies": { "@cfworker/json-schema": "^4.1.1", "@modelcontextprotocol/server": "^2.0.0-alpha.2", "@scalar/openapi-types": "^0.8.0", "@toon-format/toon": "^2.1.0", "tokenx": "^1.3.0", "yaml": "^2.8.2", "zod": "^4.3.6" }, "bin": { "incur": "dist/bin.js", "incur.src": "src/bin.ts" } }, "sha512-3mAuuiaA1YaSFm5Ydz76kYZpJAkICPjN/Ep4AyldwTm4x9IsBvKhrOPH8FkzU7T/XSGu+qSN/Av4zc2n5bwYjQ=="],
 
     "ox/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 

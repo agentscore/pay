@@ -1,3 +1,3 @@
 [install]
 minimumReleaseAge = 86400
-minimumReleaseAgeExcludes = ["@agent-score/sdk", "@agent-score/commerce", "@agent-score/pay"]
+minimumReleaseAgeExcludes = ["@agent-score/sdk", "@agent-score/commerce", "@agent-score/pay", "incur"]
