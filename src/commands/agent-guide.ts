@@ -190,6 +190,8 @@ const GUIDE: AgentGuide = {
         '`--asset native`: viem `sendTransaction({to, value})` on EVM; `getTransferSolInstruction` on Solana. No token-contract interaction.',
         'Validation: --to must be a valid address for the chain (0x-prefixed 40-hex for EVM, base58 32-44 chars for Solana). EVM zero address is rejected.',
         'Returns `{tx_hash, from, to, amount_usdc | amount_native, asset, native_symbol?, chain, network}` on success. Insufficient-gas errors surface as code=insufficient_balance with action=fund_native_gas.',
+        'EVM transfers wait for the on-chain receipt before returning: a `tx_hash` back means the tx actually settled. A tx that reverts on-chain (or fails gas estimation) surfaces as code=transfer_reverted, never a success envelope with a hash for a tx that moved no funds.',
+        'Tempo pays the network fee in the stablecoin itself, so a USDC `send` of your ENTIRE balance reverts (no headroom left for the fee) with code=transfer_reverted. Leave a little `--amount` headroom below the balance.',
         'Network: pass `--network testnet` to operate on Base Sepolia / Solana devnet / Tempo Moderato. Same code path, different RPC + token mint.',
       ],
     },
