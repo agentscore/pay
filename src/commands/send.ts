@@ -69,6 +69,12 @@ function validateRecipient(chain: Chain, to: string): void {
 }
 
 function mapGasError(err: unknown, chain: Chain, signer: string): never {
+  // Errors already classified by the chain adapter (e.g. transfer_reverted from
+  // on-chain receipt confirmation) pass through untouched; only an RPC-wrapped
+  // submit failure gets sniffed for a native-gas shortfall.
+  if (err instanceof CliError && err.code !== 'rpc_error' && err.code !== 'network_error') {
+    throw err;
+  }
   const msg = err instanceof Error ? err.message : String(err);
   if (/insufficient funds|gas|fee/i.test(msg)) {
     const native = chain === 'base' ? 'ETH on Base' : chain === 'tempo' ? 'the Tempo native token' : 'SOL';

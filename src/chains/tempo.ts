@@ -1,8 +1,9 @@
-import { createPublicClient, createWalletClient, erc20Abi, http } from 'viem';
+import { createPublicClient, createWalletClient, erc20Abi, http, publicActions } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { tempo, tempoModerato } from 'viem/chains';
 import { evmConfig, type Network } from '../constants';
 import { CliError, wrapRpcError } from '../errors';
+import { confirmEvmTransfer, isEvmRevert, transferRevertedError } from './evm-confirm';
 
 type Hex = `0x${string}`;
 
@@ -89,13 +90,14 @@ export async function transferNative(input: {
     account,
     chain: chainFor(network),
     transport: http(cfg.rpcUrl),
-  });
+  }).extend(publicActions);
   const amount = BigInt(Math.round(input.amountNative * 10 ** 18));
   try {
     const txHash = await wallet.sendTransaction({
       to: input.to as Hex,
       value: amount,
     });
+    await confirmEvmTransfer(wallet, txHash, { chain: 'tempo', network, asset: 'native' });
     return {
       tx_hash: txHash,
       from: account.address,
@@ -103,6 +105,7 @@ export async function transferNative(input: {
       amount_native: formatNative(amount),
     };
   } catch (err: unknown) {
+    if (isEvmRevert(err)) throw transferRevertedError({ chain: 'tempo', network, asset: 'native' });
     throw wrapRpcError('tempo', network, err);
   }
 }
@@ -121,7 +124,7 @@ export async function transfer(input: {
     account,
     chain: chainFor(network),
     transport: http(cfg.rpcUrl),
-  });
+  }).extend(publicActions);
   const amount = BigInt(Math.round(input.amountUsd * 10 ** cfg.decimals));
   try {
     const txHash = await wallet.writeContract({
@@ -130,6 +133,7 @@ export async function transfer(input: {
       functionName: 'transfer',
       args: [input.to as Hex, amount],
     });
+    await confirmEvmTransfer(wallet, txHash, { chain: 'tempo', network, asset: 'usdc' });
     return {
       tx_hash: txHash,
       from: account.address,
@@ -137,6 +141,7 @@ export async function transfer(input: {
       amount_usdc: formatBalance(amount),
     };
   } catch (err: unknown) {
+    if (isEvmRevert(err)) throw transferRevertedError({ chain: 'tempo', network, asset: 'usdc' });
     throw wrapRpcError('tempo', network, err);
   }
 }
