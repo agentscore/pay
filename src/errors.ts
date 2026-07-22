@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'multi_rail_candidates'
   | 'unsupported_rail'
   | 'insufficient_balance'
+  | 'transfer_reverted'
   | 'max_spend_exceeded'
   | 'limit_exceeded'
   | 'network_error'
@@ -67,6 +68,7 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
       return EXIT_CODES.INSUFFICIENT_FUNDS;
     case 'max_spend_exceeded':
     case 'limit_exceeded':
+    case 'transfer_reverted':
       return EXIT_CODES.PAYMENT_REJECTED;
     case 'multi_rail_candidates':
       return EXIT_CODES.MULTI_RAIL_AMBIGUITY;

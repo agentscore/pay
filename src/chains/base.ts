@@ -3,6 +3,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
 import { evmConfig, type Network } from '../constants';
 import { wrapRpcError } from '../errors';
+import { confirmEvmTransfer, isEvmRevert, transferRevertedError } from './evm-confirm';
 
 type Hex = `0x${string}`;
 
@@ -97,13 +98,14 @@ export async function transferNative(input: {
     account,
     chain: chainFor(network),
     transport: http(cfg.rpcUrl),
-  });
+  }).extend(publicActions);
   const amount = BigInt(Math.round(input.amountNative * 10 ** 18));
   try {
     const txHash = await wallet.sendTransaction({
       to: input.to as Hex,
       value: amount,
     });
+    await confirmEvmTransfer(wallet, txHash, { chain: 'base', network, asset: 'native' });
     return {
       tx_hash: txHash,
       from: account.address,
@@ -111,6 +113,7 @@ export async function transferNative(input: {
       amount_native: formatNative(amount),
     };
   } catch (err: unknown) {
+    if (isEvmRevert(err)) throw transferRevertedError({ chain: 'base', network, asset: 'native' });
     throw wrapRpcError('base', network, err);
   }
 }
@@ -129,7 +132,7 @@ export async function transfer(input: {
     account,
     chain: chainFor(network),
     transport: http(cfg.rpcUrl),
-  });
+  }).extend(publicActions);
   const amount = BigInt(Math.round(input.amountUsd * 10 ** cfg.decimals));
   try {
     const txHash = await wallet.writeContract({
@@ -138,6 +141,7 @@ export async function transfer(input: {
       functionName: 'transfer',
       args: [input.to as Hex, amount],
     });
+    await confirmEvmTransfer(wallet, txHash, { chain: 'base', network, asset: 'usdc' });
     return {
       tx_hash: txHash,
       from: account.address,
@@ -145,6 +149,7 @@ export async function transfer(input: {
       amount_usdc: formatBalance(amount),
     };
   } catch (err: unknown) {
+    if (isEvmRevert(err)) throw transferRevertedError({ chain: 'base', network, asset: 'usdc' });
     throw wrapRpcError('base', network, err);
   }
 }
