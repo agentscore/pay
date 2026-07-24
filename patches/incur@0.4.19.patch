@@ -17,9 +17,3 @@ index d916f16d0d3789a809d7a90d88ed6de7844708fd..4125dbc6fc1cf71beaced21f6015b532
  /** @internal Executes a tool call and returns a CallToolResult. */
  export async function callTool(tool, params, options = {}) {
      const allMiddleware = [
-diff --git a/examples/npm/node_modules/.bin/incur.src b/Users/varun/.bun/install/cache/incur@0.4.19@@@1/examples/npm/node_modules/.bin/incur.src
-deleted file mode 100644
-index 3bec221a2ebaf0ed75cdb39739d7a2695a24f86e..0000000000000000000000000000000000000000
-diff --git a/examples/npm/node_modules/.bin/tsx b/Users/varun/.bun/install/cache/incur@0.4.19@@@1/examples/npm/node_modules/.bin/tsx
-deleted file mode 100644
-index 8fefc480048f09d3165aaf470c2ddb2525ea3756..0000000000000000000000000000000000000000
