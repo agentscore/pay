@@ -978,7 +978,7 @@ export function buildCli() {
     },
   });
   credentials.command('list', {
-    description: 'List active (non-expired, non-revoked) operator credentials',
+    description: 'List usable operator credentials: unrevoked, plus any expired one a refresh token can still renew',
     options: z.object({ apiKey: apiKeyOpt }),
     run(c) {
       return withCliErrors(async () => {
@@ -1005,7 +1005,7 @@ export function buildCli() {
         const result = await credentialRevoke({ id: c.args.id, apiKey: c.options.apiKey });
         return c.ok(result, {
           cta: {
-            description: 'Next steps:',
+            description: 'Revoking also stops that credential\'s refresh chain from renewing. Next steps:',
             commands: [{ command: 'credentials list', description: 'Confirm the credential is gone' }],
           },
         });
