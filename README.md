@@ -294,14 +294,14 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 |---|---|
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `agentscore-pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--skip-passport`). No API key required. |
 | `passport status` | Show stored Passport, token prefix, access + refresh expiry, `silent_refresh_available`, `expired` flag |
-| `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set; otherwise local-only) |
+| `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set, which also stops the refresh token renewing; otherwise local-only) |
 | `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (requires API key) |
 | `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session, returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
 | `sessions get <id> [--poll-secret s]` | Poll a session, returns `operator_token` once status is `verified` |
 | `credentials create [--label s] [--ttl-days N]` | Mint an operator credential (`opc_...`) |
-| `credentials list` | List active (non-expired) credentials |
-| `credentials revoke <id>` | Revoke a credential by ID |
+| `credentials list` | List usable credentials: unrevoked, plus any expired one a refresh token can still renew |
+| `credentials revoke <id>` | Revoke a credential by ID, and its whole refresh chain |
 | `associate-wallet --operator-token o --wallet-address a --network evm\|solana [--idempotency-key k]` | Report a signer wallet seen paying under a credential (cross-merchant attribution) |
 
 #### Identity error codes
