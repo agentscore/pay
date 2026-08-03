@@ -1,14 +1,29 @@
+# Hooks run the REPO'S OWN pinned tooling, never `bunx`.
+#
+# `bunx <tool>` resolves the tool independently of this project, so it can fetch
+# a different major and then fail, or pass, for reasons that have nothing to do
+# with the code being checked. That is not hypothetical here: this repo
+# deliberately holds eslint at 9 and TypeScript at 6 while 10 and 7 are
+# published, so `bunx eslint` and `bunx tsc` would pull exactly the majors the
+# manifest pins away from. `bunx` also writes to the lockfile as a side effect.
+#
+# A bare `tsc --noEmit` has a second problem: it judges the current source
+# against whatever build output is lying around, so it goes through the pinned
+# `typecheck` script the way CI invokes it.
+#
+# CI already runs the package scripts, so the hooks are the only place that can
+# drift away from them.
 pre-commit:
   parallel: true
   commands:
     eslint:
       glob: "**/*.{ts,tsx,mjs}"
-      run: bunx eslint --max-warnings 0 {staged_files}
+      run: ./node_modules/.bin/eslint --max-warnings 0 {staged_files}
 
 pre-push:
   commands:
     typecheck:
-      run: bunx tsc --noEmit
+      run: bun run typecheck
     build:
       run: bun run build
     knip:
