@@ -1,6 +1,8 @@
 # OSV-Scanner allowlist. Each entry must document why the advisory is not
 # exploitable in this codebase. Keep this list minimal and revisit on review.
-
-[[IgnoredVulns]]
-id = "GHSA-mh99-v99m-4gvg"
-reason = "brace-expansion DoS via unbounded expansion. Both locked copies (1.1.16, 5.0.7) arrive only through dev/build tooling: eslint 9's minimatch@3 chain and typescript-eslint's nested minimatch@10. A `bun install --production` tree contains no brace-expansion at all, so no request path reaches it. The 1.x line has no fixed release, and the fix (5.0.8) is not API-compatible with it (1.x exports a callable, 5.x exports an object), so forcing 5.0.8 breaks @eslint/config-array at lint time; verified by pinning it and watching eslint exit 2. Revisit when the eslint and typescript-eslint chains move to minimatch >= 10."
+#
+# Empty on purpose: every advisory this tree carries currently has a reachable
+# fix. The brace-expansion entry that lived here is gone because upstream
+# backported the DoS fix to the 1.x line (1.1.17, then 1.1.18 for the follow-up
+# bypass), so the "no fixed release on 1.x" that justified it is no longer true
+# and minimatch@3's own `^1.1.7` range takes the fix with no override.
