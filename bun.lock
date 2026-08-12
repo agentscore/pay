@@ -5,7 +5,7 @@
     "": {
       "name": "@agent-score/pay",
       "dependencies": {
-        "@agent-score/sdk": "^2.7.4",
+        "@agent-score/sdk": "^2.7.5",
         "@clack/prompts": "^1.7.0",
         "@scure/bip39": "^2.2.0",
         "@solana-program/system": "^0.13.0",
@@ -51,7 +51,7 @@
   "packages": {
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
-    "@agent-score/sdk": ["@agent-score/sdk@2.7.4", "", {}, "sha512-E70QxslaHJud3AAAtjZO5cDVCIm3bCF8PrKbmu9A0g8wxvQSpvCxx0YS4FiBrEBRmVIOEB3XnpjVg/w/+GiPvQ=="],
+    "@agent-score/sdk": ["@agent-score/sdk@2.7.5", "", {}, "sha512-BMgbKIHrO2aCoQViLs9w6Ps0O2q0RmYHmTOrkaxMLsaGq0lELs/niGGjSOwsBt8Dvs0OrRooYz/8vH87T9iovQ=="],
 
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.7", "", {}, "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="],
 
