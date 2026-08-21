@@ -558,6 +558,16 @@ async function payViaX402(
 ): Promise<Response> {
   const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
+  // @x402/core 2.23.0 turns spend controls on by default: an omitted
+  // maxAmountPerPayment falls back to $1, and non-default assets are rejected
+  // unless allowlisted. pay already owns that decision through `limits`
+  // (per-call, daily, per-merchant) enforced in onBeforePaymentCreation below,
+  // so leaving both on would give pay two ceilings with the lower one winning
+  // silently: x402 filters the requirements out rather than surfacing pay's
+  // structured limit error, so an over-$1 payment would fail as "no acceptable
+  // payment requirements" instead of a limit verdict. Keep `limits` the single
+  // authority.
+  client.setSpendControls(false);
   if (wallet.chain === 'base') {
     const cfg = evmConfig('base', network);
     const evmClient = new ExactEvmScheme(signer as ClientEvmSigner);
