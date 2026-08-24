@@ -8,8 +8,8 @@
         "@agent-score/sdk": "^2.7.7",
         "@clack/prompts": "^1.7.0",
         "@scure/bip39": "^2.2.0",
-        "@solana-program/system": "^0.13.0",
-        "@solana-program/token": "^0.15.0",
+        "@solana-program/system": "^0.14.0",
+        "@solana-program/token": "^0.16.0",
         "@solana/kit": "^7.1.1",
         "@solana/mpp": "^0.7.0",
         "@x402/core": "^2.23.0",
@@ -349,9 +349,9 @@
 
     "@solana-program/compute-budget": ["@solana-program/compute-budget@0.15.0", "", { "peerDependencies": { "@solana/kit": "^6.3.0" } }, "sha512-toejNdIkzpUTqLSIzP0Nofr/EFel8QpPWuTtIKzfCcjn+mXpkThHxPJaNesk251rSTiWaxDZ3WxG7RxYwTWTqA=="],
 
-    "@solana-program/system": ["@solana-program/system@0.13.0", "", { "peerDependencies": { "@solana/kit": "^7.0.0" } }, "sha512-Id6QQxCG7ByImXPD5X/c3Ag2kySD+49aJ9waIkfxyUFyokhMQgxYQAx2rKuaygaBlaBQY6VVfBS46pqxZV+99A=="],
+    "@solana-program/system": ["@solana-program/system@0.14.0", "", { "peerDependencies": { "@solana/kit": "^8.0.0" } }, "sha512-Pjs2RINZHYmk/pqWNBCuQmfNjZT9woPJ/w7QkzzCSwcqcokbARtxsnIdgj4lJVxvr1DuxG8JGIbKnq6z1QRY6Q=="],
 
-    "@solana-program/token": ["@solana-program/token@0.15.0", "", { "dependencies": { "@solana-program/system": "^0.13.0" }, "peerDependencies": { "@solana/kit": "^7.0.0" } }, "sha512-SeLm08EYIfT453I6lo7wTGgfMbz1s7bJ1jSHFHBFebSJHD3xF46zRgMxq3YKRlr/RM8jN0cG8SjZVu+IDvMxEA=="],
+    "@solana-program/token": ["@solana-program/token@0.16.0", "", { "dependencies": { "@solana-program/system": "^0.14.0" }, "peerDependencies": { "@solana/kit": "^8.0.0" } }, "sha512-VuFIu5vXsw1zwqls4/sGB88234oucmpuig553A33UnrbYnPZ8yXmqLYULBD92/k1pCGnMK+NMLWvsKzlZQ/1Kw=="],
 
     "@solana/accounts": ["@solana/accounts@7.1.1", "", { "dependencies": { "@solana/addresses": "7.1.1", "@solana/codecs-core": "7.1.1", "@solana/codecs-strings": "7.1.1", "@solana/errors": "7.1.1", "@solana/rpc-spec": "7.1.1", "@solana/rpc-types": "7.1.1" }, "peerDependencies": { "typescript": ">=5.4.0" }, "optionalPeers": ["typescript"] }, "sha512-7sy9VIFMdmu/7+2kVBRMU6mEvYx/DDjfam8DsBXbh+JszaTNZH3V8FutQYHRxrca3jxiumVfsy5USwKfVg8ElQ=="],
 
