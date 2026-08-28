@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.4.14",
+  "version": "0.5.0",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
