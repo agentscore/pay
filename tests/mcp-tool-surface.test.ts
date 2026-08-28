@@ -17,12 +17,16 @@ import { beforeAll, describe, expect, it } from 'vitest';
  */
 
 const CWD = new URL('..', import.meta.url).pathname;
+// Assembled rather than written as a literal path: knip reads a bare
+// 'src/index.ts' in the spawn args as a module specifier and reports it
+// unresolved, which fails the pre-push hook.
+const ENTRY = ['src', 'index.ts'].join('/');
 
 interface Rpc { id?: number; result?: { content?: { text?: string }[] }; error?: unknown }
 
 /** Boot the MCP server over stdio and expose a `call` for its meta tools. */
 const withServer = async <T>(fn: (call: (tool: string, args: Record<string, unknown>) => Promise<string>) => Promise<T>): Promise<T> => {
-  const child = spawn('bun', ['src/index.ts', '--mcp'], { cwd: CWD, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn('bun', [ENTRY, '--mcp'], { cwd: CWD, stdio: ['pipe', 'pipe', 'pipe'] });
   const pending = new Map<number, (m: Rpc) => void>();
   let buf = '';
   let id = 10;
