@@ -1,89 +1,86 @@
-import { mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CliError } from '../src/errors';
-import {
-  clearCache,
-  parseDuration,
-  readCachedPassphrase,
-  unlockCachePath,
-  writeCachedPassphrase,
-} from '../src/unlock-cache';
 
-const ROOT = '/tmp/pay-unlock-test';
+/**
+ * The plaintext passphrase cache is gone. `~/.agentscore/.unlock` used to hold
+ * the wallet passphrase in cleartext for up to 8 hours beside the keystores it
+ * unlocks, protected only by file modes, which stop nothing already running as
+ * that user.
+ *
+ * These pin the two properties that matter after the removal. The passphrase is
+ * never read back from disk, and a leftover file from an older version is
+ * DELETED rather than ignored: an ignored file would leave a cleartext secret
+ * sitting there with nothing left that admits to using it, which is worse than
+ * either extreme.
+ */
 
-describe('parseDuration', () => {
-  it('parses seconds/minutes/hours/days', () => {
-    expect(parseDuration('30s')).toBe(30 * 1000);
-    expect(parseDuration('15m')).toBe(15 * 60 * 1000);
-    expect(parseDuration('2h')).toBe(2 * 60 * 60 * 1000);
-    expect(parseDuration('1d')).toBe(24 * 60 * 60 * 1000);
-  });
+const ROOT = '/tmp/pay-unlock-removal-test';
+const CACHE = join(ROOT, '.agentscore', '.unlock');
 
-  it('rejects malformed input', () => {
-    expect(() => parseDuration('15')).toThrow(CliError);
-    expect(() => parseDuration('15x')).toThrow(CliError);
-    expect(() => parseDuration('')).toThrow(CliError);
-    expect(() => parseDuration('abc')).toThrow(CliError);
-  });
-
-  it('trims whitespace', () => {
-    expect(parseDuration('  15m  ')).toBe(15 * 60 * 1000);
-  });
-});
-
-describe('unlock cache file I/O', () => {
+describe('plaintext passphrase cache removal', () => {
   let originalHome: string | undefined;
+  let originalPass: string | undefined;
 
   beforeEach(async () => {
     originalHome = process.env.HOME;
+    originalPass = process.env.AGENTSCORE_PAY_PASSPHRASE;
     process.env.HOME = ROOT;
-    await rm(ROOT, { recursive: true, force: true });
+    delete process.env.AGENTSCORE_PAY_PASSPHRASE;
+    await rm(ROOT, { force: true, recursive: true });
     await mkdir(join(ROOT, '.agentscore'), { recursive: true });
   });
 
   afterEach(async () => {
     process.env.HOME = originalHome;
-    await rm(ROOT, { recursive: true, force: true });
+    if (originalPass === undefined) { delete process.env.AGENTSCORE_PAY_PASSPHRASE; }
+    else { process.env.AGENTSCORE_PAY_PASSPHRASE = originalPass; }
+    await rm(ROOT, { force: true, recursive: true });
   });
 
-  it('returns null when no cache file', async () => {
-    expect(await readCachedPassphrase()).toBeNull();
+  it('no longer exposes a way to read or write the cache', async () => {
+    const mod = await import('../src/unlock-cache');
+    // The whole point: nothing can put a passphrase on disk or take one off it.
+    expect(mod).not.toHaveProperty('readCachedPassphrase');
+    expect(mod).not.toHaveProperty('writeCachedPassphrase');
+    // Positive control, so this does not pass by importing the wrong module.
+    expect(mod).toHaveProperty('clearCache');
   });
 
-  it('round-trips a passphrase', async () => {
-    await writeCachedPassphrase('correct horse battery staple', 60_000);
-    expect(await readCachedPassphrase()).toBe('correct horse battery staple');
+  it('DELETES a leftover cache rather than reading it', async () => {
+    await writeFile(CACHE, JSON.stringify({
+      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      passphrase: 'left-over-secret',
+    }), { mode: 0o600 });
+    expect(existsSync(CACHE), 'fixture did not land; the path is wrong').toBe(true);
+
+    const { promptPassphrase } = await import('../src/prompts');
+    // No TTY and no env var, so this rejects. What matters is the side effect.
+    await expect(promptPassphrase()).rejects.toThrow();
+    expect(existsSync(CACHE), 'a leftover plaintext passphrase was left on disk').toBe(false);
   });
 
-  it('clamps TTL to MAX_TTL_MS (8h)', async () => {
-    const expires = await writeCachedPassphrase('x', 99 * 60 * 60 * 1000);
-    const expiresAt = Date.parse(expires);
-    expect(expiresAt - Date.now()).toBeLessThanOrEqual(8 * 60 * 60 * 1000 + 100);
+  it('never returns the cached value even while the file exists', async () => {
+    await writeFile(CACHE, JSON.stringify({
+      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      passphrase: 'left-over-secret',
+    }), { mode: 0o600 });
+
+    const { promptPassphrase } = await import('../src/prompts');
+    await expect(promptPassphrase()).rejects.toThrow(/AGENTSCORE_PAY_PASSPHRASE/);
   });
 
-  it('returns null for an expired cache and removes it', async () => {
-    const stale = { passphrase: 'old', expires_at: new Date(Date.now() - 1000).toISOString() };
-    await writeFile(unlockCachePath(), JSON.stringify(stale), { mode: 0o600 });
-    expect(await readCachedPassphrase()).toBeNull();
-    await expect(readFile(unlockCachePath(), 'utf-8')).rejects.toThrow();
+  it('still prefers the environment variable, which is the supported path', async () => {
+    process.env.AGENTSCORE_PAY_PASSPHRASE = 'from-env';
+    const { promptPassphrase } = await import('../src/prompts');
+    await expect(promptPassphrase()).resolves.toBe('from-env');
   });
 
-  it('returns null for malformed cache', async () => {
-    await writeFile(unlockCachePath(), 'not-json', { mode: 0o600 });
-    expect(await readCachedPassphrase()).toBeNull();
-  });
-
-  it('clearCache returns true on hit, false on miss', async () => {
-    expect(await clearCache()).toBe(false);
-    await writeCachedPassphrase('x', 60_000);
-    expect(await clearCache()).toBe(true);
-    expect(await clearCache()).toBe(false);
-  });
-
-  it('rejects non-positive TTL', async () => {
-    await expect(writeCachedPassphrase('x', 0)).rejects.toBeInstanceOf(CliError);
-    await expect(writeCachedPassphrase('x', -1)).rejects.toBeInstanceOf(CliError);
-    await expect(writeCachedPassphrase('x', NaN)).rejects.toBeInstanceOf(CliError);
+  it('clearCache reports whether it removed anything', async () => {
+    const { clearCache } = await import('../src/unlock-cache');
+    expect(await clearCache(), 'nothing to remove should report false').toBe(false);
+    await writeFile(CACHE, '{}', { mode: 0o600 });
+    expect(await clearCache(), 'an existing file should report true').toBe(true);
   });
 });

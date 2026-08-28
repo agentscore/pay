@@ -165,8 +165,11 @@ describe('compact error envelope — JSON', () => {
   });
 
   it('omits extra and next_steps fields when CliError has neither', async () => {
-    // unlock --for with bad format → invalid_input, no extras, no nextSteps
-    const { json, exitCode } = await runJson('unlock', '--for', 'bad-format');
+    // A bare invalid_input with no extras and no nextSteps. This used
+    // `unlock --for bad-format` until the plaintext passphrase cache and its
+    // command were removed; `assess` with neither identity raises the same
+    // shape (identity.ts throws CliError('invalid_input', msg) with no options).
+    const { json, exitCode } = await runJson('assess');
     expect(exitCode).toBe(1);
     expect(json.code).toBe('invalid_input');
     expect(json.extra).toBeUndefined();

@@ -1,6 +1,6 @@
 import { cancel, isCancel, password as clackPassword } from '@clack/prompts';
 import { CliError } from './errors';
-import { readCachedPassphrase } from './unlock-cache';
+import { clearCache } from './unlock-cache';
 
 const ENV_PASSPHRASE = 'AGENTSCORE_PAY_PASSPHRASE';
 
@@ -11,13 +11,20 @@ function isInteractive(): boolean {
 export async function promptPassphrase(message = 'Enter wallet passphrase'): Promise<string> {
   const envPass = process.env[ENV_PASSPHRASE];
   if (envPass) return envPass;
-  const cached = await readCachedPassphrase();
-  if (cached) return cached;
+
+  // The plaintext passphrase cache is gone; this DELETES a leftover one rather
+  // than reading it. An installation upgrading from a version that wrote the
+  // file would otherwise keep a cleartext secret on disk with nothing left that
+  // admits to using it, which is worse than either using it or never having
+  // written it. Silent because it is cleanup rather than an error, and the
+  // passphrase is asked for immediately below.
+  await clearCache().catch(() => false);
+
   if (!isInteractive()) {
     throw new CliError('user_cancelled', 'Passphrase required but no TTY and AGENTSCORE_PAY_PASSPHRASE not set.', {
       nextSteps: {
         action: 'set_env_passphrase',
-        suggestion: 'Set AGENTSCORE_PAY_PASSPHRASE=... in the environment, or run `unlock --for 15m` from a TTY first.',
+        suggestion: 'Set AGENTSCORE_PAY_PASSPHRASE=... in the environment. The `unlock` passphrase cache was removed: it stored the passphrase in cleartext on disk, and the environment variable is the supported way to run unattended.',
       },
     });
   }

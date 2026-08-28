@@ -16,6 +16,7 @@ import * as solanaChain from '../chains/solana';
 import * as tempoChain from '../chains/tempo';
 import { type Chain, type Network } from '../constants';
 import { CliError } from '../errors';
+import { enforce, loadLimits } from '../limits';
 import { DEFAULT_WALLET_NAME } from '../paths';
 import { promptPassphrase } from '../prompts';
 import { loadWallet } from '../wallets';
@@ -98,6 +99,27 @@ export async function send(input: SendInput): Promise<SendResult> {
   validateRecipient(input.chain, input.to);
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new CliError('invalid_amount', '--amount must be a positive number.');
+  }
+
+  // Spend limits apply to EVERY transfer path, not just the 402 ones. `pay`
+  // enforced them and this did not, so a configured ceiling could be walked
+  // straight past by using `send` instead. Only the USDC path is denominated in
+  // dollars, so that is the one a USD limit can judge; a native transfer moves
+  // gas tokens whose USD value this command does not price, and inventing a
+  // conversion here would be a worse guess than not claiming one.
+  //
+  // A no-op when nothing is configured: enforce() returns allowed with no
+  // limits set, so this changes behavior only for someone who asked for it.
+  if (asset === 'usdc') {
+    const limits = await loadLimits();
+    const verdict = await enforce(limits, { priceUsd: input.amount, host: `send:${input.chain}` });
+    if (!verdict.allowed) {
+      throw new CliError(
+        'limit_exceeded',
+        `Local limit violated: ${verdict.violated}=${verdict.limit}`,
+        { extra: { violated: verdict.violated, limit: verdict.limit, would_be: verdict.would_be } },
+      );
+    }
   }
 
   const passphrase = await promptPassphrase();
