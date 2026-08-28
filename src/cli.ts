@@ -29,7 +29,6 @@ import { pay } from './commands/pay';
 import { qr } from './commands/qr';
 import { revoke } from './commands/revoke';
 import { send } from './commands/send';
-import { unlock } from './commands/unlock';
 import {
   walletAddress,
   walletCreate,
@@ -578,29 +577,6 @@ export function buildCli() {
           name: options.name,
         }),
       );
-    },
-  });
-
-  // ── unlock ──────────────────────────────────────────────────────────────────
-  cli.command('unlock', {
-    // Hidden from MCP. Reachable on the CLI, where a human is present and the
-    // --danger / typed-confirm gates mean something. Served as an MCP tool those
-    // gates become boolean parameters the model can set for itself, so a single
-    // prompt injection reaches irreversible key disclosure or fund movement, and
-    // any secret returned lands in the transcript and the model provider's logs.
-    mcp: false,
-    description: 'Cache the wallet passphrase to ~/.agentscore/.unlock for a bounded duration',
-    hint: 'Prefer AGENTSCORE_PAY_PASSPHRASE in env when running unattended — it leaves no on-disk artifact.',
-    options: z.object({
-      for: z.string().default('15m').describe('TTL — e.g. 15m, 2h, 30s, 1d (max 8h)'),
-      clear: z.boolean().optional().describe('Remove the cached passphrase'),
-    }),
-    examples: [
-      { options: { for: '1h' }, description: 'Cache the passphrase for one hour' },
-      { options: { clear: true }, description: 'Wipe the cached passphrase early' },
-    ],
-    run({ options }) {
-      return withCliErrors(() => unlock({ forDuration: options.for, clear: options.clear }));
     },
   });
 
