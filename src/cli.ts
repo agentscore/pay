@@ -204,6 +204,12 @@ export function buildCli() {
   const wallet = Cli.create('wallet', { description: 'Manage the local encrypted keystore' });
 
   wallet.command('create', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Generate a new encrypted keystore. Omit --chain to create all three chains.',
     options: z.object({
       chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
@@ -268,6 +274,12 @@ export function buildCli() {
   });
 
   wallet.command('show-mnemonic', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Print the stored BIP-39 mnemonic. DANGER — only run in a trusted environment.',
     hint: 'The mnemonic restores every chain wallet — anyone with this phrase can drain your funds. Never paste it into chat, logs, or unencrypted storage.',
     outputPolicy: 'agent-only',
@@ -298,6 +310,12 @@ export function buildCli() {
   });
 
   wallet.command('export', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Decrypt and print a private key. DANGER — only run if you trust the surrounding environment.',
     hint: 'The exported key gives full control of the wallet to anyone who reads it. Pipe to an encrypted store; never to a shared shell history.',
     outputPolicy: 'agent-only',
@@ -320,6 +338,12 @@ export function buildCli() {
   });
 
   wallet.command('remove', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Delete a keystore. DANGER — irrecoverable unless you have the BIP-39 mnemonic backup.',
     hint: 'No undo. Run `wallet show-mnemonic --danger` first if you want to be able to restore.',
     options: z.object({
@@ -493,6 +517,12 @@ export function buildCli() {
 
   // ── send ────────────────────────────────────────────────────────────────────
   cli.command('send', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake — just on-chain.',
     hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). x402/MPP payments are gasless; raw transfers are not.',
     options: z.object({
@@ -553,6 +583,12 @@ export function buildCli() {
 
   // ── unlock ──────────────────────────────────────────────────────────────────
   cli.command('unlock', {
+    // Hidden from MCP. Reachable on the CLI, where a human is present and the
+    // --danger / typed-confirm gates mean something. Served as an MCP tool those
+    // gates become boolean parameters the model can set for itself, so a single
+    // prompt injection reaches irreversible key disclosure or fund movement, and
+    // any secret returned lands in the transcript and the model provider's logs.
+    mcp: false,
     description: 'Cache the wallet passphrase to ~/.agentscore/.unlock for a bounded duration',
     hint: 'Prefer AGENTSCORE_PAY_PASSPHRASE in env when running unattended — it leaves no on-disk artifact.',
     options: z.object({

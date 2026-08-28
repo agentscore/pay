@@ -25,6 +25,40 @@ describe('send command — input validation', () => {
     await rm(ROOT, { recursive: true, force: true });
   });
 
+  // Spend limits applied to the 402 paths but not to `send`, so a configured
+  // ceiling could be walked straight past by using a raw transfer instead.
+  it('refuses a USDC transfer that exceeds a configured per-call limit', async () => {
+    const { saveLimits } = await import('../src/limits');
+    await saveLimits({ per_call_usd: 5 });
+    const { send } = await import('../src/commands/send');
+    await expect(
+      send({ amount: 50, chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }),
+    ).rejects.toThrow(/limit/i);
+  });
+
+  // The guard must be inert for anyone who never configured limits, which is
+  // the default and is how the agent fleet runs.
+  it('does not block when no limits are configured', async () => {
+    const { send } = await import('../src/commands/send');
+    // Fails later for a missing keystore, NOT on the limit check. Asserting the
+    // message discriminates: a limit rejection here would be a false positive
+    // for every unconfigured user.
+    await expect(
+      send({ amount: 50, chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }),
+    ).rejects.not.toThrow(/limit/i);
+  });
+
+  // A native transfer moves gas tokens this command does not price in dollars,
+  // so a USD ceiling cannot judge it and must not pretend to.
+  it('does not apply the USD limit to a native transfer', async () => {
+    const { saveLimits } = await import('../src/limits');
+    await saveLimits({ per_call_usd: 5 });
+    const { send } = await import('../src/commands/send');
+    await expect(
+      send({ amount: 50, asset: 'native', chain: 'base', to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }),
+    ).rejects.not.toThrow(/limit/i);
+  });
+
   it('rejects empty --to', async () => {
     const { send } = await import('../src/commands/send');
     await expect(
