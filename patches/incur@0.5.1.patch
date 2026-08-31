@@ -1,5 +1,5 @@
 diff --git a/dist/Mcp.js b/dist/Mcp.js
-index d916f16d0d3789a809d7a90d88ed6de7844708fd..4125dbc6fc1cf71beaced21f6015b532f4300a1d 100644
+index 3102a678e6c37a08be9e735485e3e1187619ea88..06b1f719e8b8d3af88c9d4ae1485a337bb4726d6 100644
 --- a/dist/Mcp.js
 +++ b/dist/Mcp.js
 @@ -40,7 +40,13 @@ function importStdioModule() {
