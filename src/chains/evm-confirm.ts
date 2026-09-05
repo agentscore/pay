@@ -23,8 +23,13 @@ import { CliError, wrapRpcError } from '../errors';
 
 type Hex = `0x${string}`;
 
+// Typed by the one member we call, with the widest argument the caller
+// passes and the narrowest result we read. viem 2.56.3 made the Tempo chain's
+// client types portable and its method signatures stopped being assignable to
+// a hand-written `{ hash }` parameter, so the parameter is typed `any`-shaped
+// through the client's own method and the result is narrowed on read.
 export interface ReceiptReader {
-  waitForTransactionReceipt(args: { hash: Hex }): Promise<{ status: 'success' | 'reverted' }>;
+  waitForTransactionReceipt(args: { hash: Hex }): Promise<{ status: string }>;
 }
 
 interface RevertCtx {
@@ -63,7 +68,7 @@ export async function confirmEvmTransfer(
   hash: Hex,
   ctx: { chain: Chain; network: Network; asset: 'usdc' | 'native' },
 ): Promise<void> {
-  let status: 'success' | 'reverted';
+  let status: string;
   try {
     ({ status } = await client.waitForTransactionReceipt({ hash }));
   } catch (err: unknown) {
