@@ -5,9 +5,34 @@ import type { Chain } from './constants';
 interface PaymentRequestBlob {
   amount?: string;
   currency?: string;
-  methodDetails?: { chainId?: number; network?: string };
+  methodDetails?: { chainId?: number; network?: string; decimals?: number };
   recipient?: string;
   [key: string]: unknown;
+}
+
+// Stripe's zero-decimal currencies: their minor unit IS the major unit.
+const ZERO_DECIMAL_FIAT = new Set([
+  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+]);
+
+// A challenge's `amount` is in the currency's minor unit, and the unit depends on the
+// method: a token rail quotes a token address (USDC, 6 decimals), while stripe/charge
+// quotes an ISO 4217 code with the amount in cents. Treating every rail as 6-decimal
+// rendered a $5.20 card charge as $0.000520. methodDetails.decimals wins when declared.
+function challengeDecimals(req: PaymentRequestBlob): number {
+  const declared = req.methodDetails?.decimals;
+  if (typeof declared === 'number' && Number.isInteger(declared) && declared >= 0) return declared;
+  const currency = req.currency;
+  if (currency !== undefined && /^[a-z]{3}$/i.test(currency)) {
+    return ZERO_DECIMAL_FIAT.has(currency.toLowerCase()) ? 0 : 2;
+  }
+  return 6;
+}
+
+function isUsdQuote(req: PaymentRequestBlob): boolean {
+  const currency = req.currency;
+  if (currency !== undefined && /^[a-z]{3}$/i.test(currency)) return currency.toLowerCase() === 'usd';
+  return true;
 }
 
 export interface PaymentChallenge {
@@ -72,9 +97,11 @@ export function challengeToRail(c: PaymentChallenge): ChallengeRail {
   else if (network) chain = chainFromNetworkId(network);
 
   const priceRaw = c.request?.amount;
-  const decimals = 6;
+  // A non-USD fiat quote leaves price_usd undefined rather than carrying a number in
+  // the wrong currency under a field named usd. Token rails are USDC on every rail we quote.
   let priceUsd: string | undefined;
-  if (priceRaw !== undefined) {
+  if (priceRaw !== undefined && c.request && isUsdQuote(c.request)) {
+    const decimals = challengeDecimals(c.request);
     try {
       priceUsd = (Number(BigInt(priceRaw)) / 10 ** decimals).toFixed(decimals);
     } catch {
