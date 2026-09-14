@@ -62,11 +62,20 @@ jobs:
       - name: Read balance again
         run: ./dist/index.js balance --chain ${{ matrix.chain }} --network ${{ matrix.network }} --json
 
-      - name: Probe an x402-gated testnet endpoint (smoke)
+      # A real merchant 402, probed without paying, asserting the challenge
+      # parses into every rail pay settles on. A probe of a page that never
+      # returns 402 passes whatever pay does, so this one has to be able to fail.
+      - name: Parse a live 402 challenge (no payment)
         if: matrix.chain == 'base'
         run: |
-          ./dist/index.js check https://example.com --json || true
-        continue-on-error: true
+          set -euo pipefail
+          url=https://fullenrich.agentscore.com/company/lookup
+          ./dist/index.js check "$url" --method POST -H 'Content-Type: application/json' -d '{"domain":"stripe.com"}' --json > probe.json
+          jq -e '.status == 402 and .payment_required == true' probe.json > /dev/null || { echo "expected a 402 challenge from $url" >&2; cat probe.json >&2; exit 1; }
+          for rail in 'exact/eip155:8453' 'tempo/charge' 'solana/charge'; do
+            jq -e --arg r "$rail" '[.rails[].rail] | index($r) != null' probe.json > /dev/null || { echo "rail $rail missing from the parsed challenge" >&2; jq '[.rails[].rail]' probe.json >&2; exit 1; }
+          done
+          echo "parsed rails: $(jq -c '[.rails[].rail]' probe.json)"
 
       - name: Faucet hint summary
         if: matrix.chain != 'tempo'
