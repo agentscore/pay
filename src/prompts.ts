@@ -33,7 +33,7 @@ export async function promptPassphrase(message = 'Enter wallet passphrase'): Pro
     validate: (v) => (v && v.length >= 8 ? undefined : 'Passphrase must be at least 8 characters'),
   });
   if (isCancel(result)) {
-    cancel('Cancelled.');
+    cancel('Canceled.');
     throw new CliError('user_cancelled', 'Passphrase input cancelled.');
   }
   return result as string;

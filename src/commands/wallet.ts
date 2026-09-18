@@ -402,7 +402,7 @@ async function typeToConfirm(message: string): Promise<void> {
     validate: (v) => (v === 'EXPORT' ? undefined : 'Type EXPORT exactly to confirm'),
   });
   if (isCancel(answer)) {
-    cancel('Cancelled.');
+    cancel('Canceled.');
     throw new CliError('user_cancelled', 'Operation cancelled.');
   }
 }
