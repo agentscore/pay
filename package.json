@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
@@ -72,7 +72,7 @@
     "incur": "0.5.1",
     "mppx": "0.10.1",
     "qrcode-terminal": "^0.12.0",
-    "viem": "2.56.7"
+    "viem": "2.56.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -93,7 +93,7 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
-    "viem": "2.56.7"
+    "viem": "2.56.8"
   },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
