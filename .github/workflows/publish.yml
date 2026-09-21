@@ -26,7 +26,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -47,6 +47,10 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
 
+      # Pack once and publish that exact file, so the Homebrew step can checksum
+      # the bytes npm received without fetching them back through npm's CDN.
+      # A local pack does not reproduce an earlier run's bytes, so the file is
+      # only trusted when THIS run published it.
       - name: Publish to npm (with provenance)
         run: |
           VERSION="${RELEASE_TAG#v}"
@@ -54,14 +58,17 @@ jobs:
             echo "@agent-score/pay@${VERSION} is already on npm; skipping publish (resumed run)"
             exit 0
           fi
+          TARBALL="$RUNNER_TEMP/$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -1)"
+          test -s "$TARBALL"
           if [[ "$VERSION" == *-* ]]; then
             DIST_TAG="${VERSION#*-}"
             DIST_TAG="${DIST_TAG%%.*}"
             echo "prerelease detected — publishing under dist-tag: $DIST_TAG"
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish "$TARBALL" --access public --provenance --tag "$DIST_TAG"
           else
-            npm publish --access public --provenance
+            npm publish "$TARBALL" --access public --provenance
           fi
+          echo "PUBLISHED_TARBALL=$TARBALL" >> "$GITHUB_ENV"
 
       - name: Build native binaries
         run: bun run build:binary:all
@@ -107,22 +114,38 @@ jobs:
           set -euo pipefail
           VERSION_NO_V="${VERSION#v}"
           TARBALL_URL="https://registry.npmjs.org/@agent-score/pay/-/pay-${VERSION_NO_V}.tgz"
-          # npm CDN can take several minutes to propagate a new tarball; poll up to 5 min.
+          # The registry's recorded integrity is the authority on which bytes the
+          # formula must pin. Package metadata appears within seconds of a
+          # publish; the tarball URL can serve a cached 404 for far longer, which
+          # is why this step never waits on it when it has the file already.
+          INTEGRITY=""
           for i in $(seq 1 30); do
-            if curl -fsSI "$TARBALL_URL" >/dev/null 2>&1; then
-              echo "tarball reachable after ${i}0s"
-              break
-            fi
-            if [ "$i" = "30" ]; then
-              echo "tarball never became reachable in 5 minutes — aborting" >&2
-              exit 1
-            fi
+            INTEGRITY="$(npm view "@agent-score/pay@${VERSION_NO_V}" dist.integrity 2>/dev/null || true)"
+            [ -n "$INTEGRITY" ] && break
             sleep 10
           done
-          # Download once + checksum the file (separate steps so a partial download fails)
-          curl -fsSL "$TARBALL_URL" -o /tmp/pay.tgz
-          test -s /tmp/pay.tgz || { echo "downloaded tarball is empty" >&2; exit 1; }
-          SHA256=$(shasum -a 256 /tmp/pay.tgz | awk '{print $1}')
+          [ -n "$INTEGRITY" ] || { echo "registry has no integrity for ${VERSION_NO_V} after 5 minutes" >&2; exit 1; }
+          integrity_of() { echo "sha512-$(openssl dgst -sha512 -binary "$1" | base64 -w0)"; }
+
+          if [ -n "${PUBLISHED_TARBALL:-}" ] && [ "$(integrity_of "$PUBLISHED_TARBALL")" = "$INTEGRITY" ]; then
+            TARBALL_FILE="$PUBLISHED_TARBALL"
+            echo "using the tarball this run published"
+          else
+            # Resumed run: the version was published earlier, so fetch it.
+            TARBALL_FILE=/tmp/pay.tgz
+            for i in $(seq 1 40); do
+              if curl -fsSL "$TARBALL_URL" -o "$TARBALL_FILE" && [ "$(integrity_of "$TARBALL_FILE")" = "$INTEGRITY" ]; then
+                echo "downloaded tarball matches the registry integrity"
+                break
+              fi
+              if [ "$i" = "40" ]; then
+                echo "could not fetch a tarball matching ${INTEGRITY} in 10 minutes" >&2
+                exit 1
+              fi
+              sleep 15
+            done
+          fi
+          SHA256=$(shasum -a 256 "$TARBALL_FILE" | awk '{print $1}')
           echo "tarball: $TARBALL_URL"
           echo "sha256:  $SHA256"
 
