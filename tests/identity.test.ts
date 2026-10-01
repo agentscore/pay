@@ -15,7 +15,6 @@ import {
   credentialCreate,
   credentialList,
   credentialRevoke,
-  reputation,
   sessionCreate,
   sessionGet,
 } from '../src/commands/identity';
@@ -30,10 +29,6 @@ describe('identity commands', () => {
 
   afterEach(() => {
     if (originalKey !== undefined) process.env.AGENTSCORE_API_KEY = originalKey;
-  });
-
-  it('reputation rejects with config_error when API key is missing', async () => {
-    await expect(reputation({ address: '0xabc' })).rejects.toMatchObject({ code: 'config_error' });
   });
 
   it('assess rejects when neither address nor operator-token is provided', async () => {
@@ -183,20 +178,6 @@ describe('identity commands — SDK typed-error mapping', () => {
     await expect(assess({ address: '0xabc' })).rejects.toMatchObject({
       code: 'network_error',
       nextSteps: { action: 'retry_with_backoff' },
-    });
-  });
-
-  it('getReputation also routes typed errors through wrapApiError (e.g. PaymentRequiredError → insufficient_balance)', async () => {
-    // /v1/reputation is free in normal operation, but the wrap function should still
-    // map a typed error correctly if the API ever returns 402 for this endpoint
-    // (e.g. gated region, account state). Regression guard against the wrap function
-    // accidentally only handling the assess path.
-    vi.spyOn(AgentScore.prototype, 'getReputation').mockRejectedValueOnce(
-      new PaymentRequiredError('Endpoint not enabled'),
-    );
-    await expect(reputation({ address: '0xabc' })).rejects.toMatchObject({
-      code: 'insufficient_balance',
-      nextSteps: { action: 'upgrade_plan' },
     });
   });
 

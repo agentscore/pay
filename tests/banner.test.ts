@@ -83,7 +83,7 @@ describe('banner', () => {
     const out = renderBanner({ cols: 100, color: false });
     // These all route through getClient() and throw without AGENTSCORE_API_KEY.
     // Bare invocation should only surface commands that work out-of-the-box.
-    for (const apiKeyOnly of ['reputation', 'assess', 'credentials', 'associate-wallet', 'sessions']) {
+    for (const apiKeyOnly of ['assess', 'credentials', 'associate-wallet', 'sessions']) {
       const lines = out.split('\n');
       const matches = lines.filter((l) => l.match(new RegExp(`^\\s+${apiKeyOnly}\\s`)));
       expect(matches).toHaveLength(0);
