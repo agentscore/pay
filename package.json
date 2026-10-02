@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
@@ -63,16 +63,16 @@
     "@scure/bip39": "^2.4.0",
     "@solana-program/system": "^0.15.0",
     "@solana-program/token": "^0.17.0",
-    "@solana/kit": "^8.3.0",
+    "@solana/kit": "^8.4.0",
     "@solana/mpp": "^0.7.0",
-    "@x402/core": "2.27.0",
-    "@x402/evm": "2.27.0",
-    "@x402/fetch": "2.27.0",
+    "@x402/core": "2.28.0",
+    "@x402/evm": "2.28.0",
+    "@x402/fetch": "2.28.0",
     "ed25519-hd-key": "^2.0.0",
-    "incur": "0.5.1",
-    "mppx": "0.11.0",
+    "incur": "0.7.0",
+    "mppx": "0.12.0",
     "qrcode-terminal": "^0.12.0",
-    "viem": "2.57.0"
+    "viem": "2.57.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -93,10 +93,10 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
-    "viem": "2.57.0"
+    "viem": "2.57.2"
   },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
-    "incur@0.5.1": "patches/incur@0.5.1.patch"
+    "incur@0.7.0": "patches/incur@0.7.0.patch"
   }
 }
