@@ -14,7 +14,6 @@ import {
   credentialCreate,
   credentialList,
   credentialRevoke,
-  reputation,
   sessionCreate,
   sessionGet,
 } from './commands/identity';
@@ -139,7 +138,7 @@ export function buildCli() {
       command: 'npx -y @agent-score/pay --mcp',
     },
     env: z.object({
-      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet, reputation). Not required for passport login/status — those use the public session endpoint.'),
+      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet). Not required for passport login/status — those use the public session endpoint.'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
       AGENTSCORE_PAY_HOME: z.string().optional().describe('Override the state dir (default: ~/.agentscore)'),
       BASE_RPC_URL: z.string().optional().describe('Override Base mainnet RPC endpoint'),
@@ -156,7 +155,6 @@ export function buildCli() {
         'discover paid services with `agentscore-pay discover --search <query>`',
         'probe a 402 endpoint with `agentscore-pay check <url> -X POST -d <body>`',
         'pay an endpoint with `agentscore-pay pay POST <url> -d <body> --max-spend 5`',
-        'check trust reputation for a wallet with `agentscore-pay reputation <address>`',
       ],
     },
   });
@@ -830,29 +828,10 @@ export function buildCli() {
   // ── identity (AgentScore SDK) ───────────────────────────────────────────────
   const apiKeyOpt = z.string().optional().describe('AgentScore API key (falls back to AGENTSCORE_API_KEY)');
 
-  cli.command('reputation', {
-    description: 'Look up the cached trust reputation for a wallet address (no API key required)',
-    args: z.object({ address: z.string().describe('EVM (0x...) or Solana base58 wallet address') }),
-    options: z.object({
-      chain: z.string().optional().describe('Optional chain filter (e.g., base, ethereum)'),
-      apiKey: apiKeyOpt,
-    }),
-    examples: [
-      { args: { address: '0xdb5aa553feeb2c3e3d03e8360b36fb0f7e480671' }, description: 'Look up a wallet across all chains' },
-      { args: { address: '0xdb5aa553feeb2c3e3d03e8360b36fb0f7e480671' }, options: { chain: 'base' }, description: 'Restrict to one chain' },
-    ],
-    run(c) {
-      return withCliErrors(async () => {
-        const result = await reputation({ address: c.args.address, chain: c.options.chain, apiKey: c.options.apiKey });
-        return c.ok(result);
-      });
-    },
-  });
-
   cli.command('assess', {
     description:
-      "Assess a wallet/operator's trustworthiness with policy. Pass --address (wallet) or --operator-token (credential).",
-    hint: 'Requires AGENTSCORE_API_KEY (or --api-key). Reputation lookup (no key) is via `reputation`.',
+      'Check a wallet or operator against a compliance policy. Pass --address (wallet) or --operator-token (credential).',
+    hint: 'Requires AGENTSCORE_API_KEY (or --api-key).',
     options: z.object({
       address: z.string().optional().describe('Wallet address — EVM (0x...) or Solana (base58)'),
       operatorToken: z.string().optional().describe('Operator credential (opc_...) for non-wallet identity'),

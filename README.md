@@ -286,7 +286,7 @@ Each row below is a subcommand of `agentscore-pay`, invoke as `agentscore-pay <c
 
 ### Identity commands
 
-`passport login`/`status`/`logout` use AgentScore's buyer-side identity flow and require **no API key**. The other identity commands below (`reputation`, `assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK, set `AGENTSCORE_API_KEY`.
+`passport login`/`status`/`logout` use AgentScore's buyer-side identity flow and require **no API key**. The other identity commands below (`assess`, `sessions`, `credentials`, `associate-wallet`) wrap the AgentScore SDK, set `AGENTSCORE_API_KEY`.
 
 AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/merchants, buyers and agents-as-buyers never pay us.
 
@@ -295,7 +295,6 @@ AgentScore Passport is free for buyers, forever. AgentScore monetizes sellers/me
 | `passport login` | Verify your identity in browser; saves `operator_token` to `~/.agentscore/passport.json`. After login, every `agentscore-pay <url>` call auto-attaches `X-Operator-Token` (suppress with `--skip-passport`). No API key required. |
 | `passport status` | Show stored Passport, token prefix, access + refresh expiry, `silent_refresh_available`, `expired` flag |
 | `passport logout` | Remove the local file (and revoke remotely if `AGENTSCORE_API_KEY` is set, which also stops the refresh token renewing; otherwise local-only) |
-| `reputation <address> [--chain c]` | Cached trust reputation lookup (no API key required) |
 | `assess [--address a \| --operator-token o] [--require-kyc] [--min-age N] [--require-sanctions-clear] [--blocked-jurisdictions cc...] [--allowed-jurisdictions cc...] [--refresh]` | On-the-fly assessment with policy (requires API key) |
 | `sessions create [--address a] [--operator-token o] [--context s] [--product-name s]` | Create a verification session, returns `verify_url` + `poll_secret` (low-level; `passport login` is the wrapper most agents want) |
 | `sessions get <id> [--poll-secret s]` | Poll a session, returns `operator_token` once status is `verified` |
@@ -523,7 +522,7 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 | `SOLANA_DEVNET_RPC_URL` | override Solana Devnet RPC endpoint |
 | `TEMPO_RPC_URL` | override Tempo mainnet RPC endpoint |
 | `TEMPO_TESTNET_RPC_URL` | override Tempo testnet RPC endpoint |
-| `AGENTSCORE_API_KEY` | API key for identity commands (`assess`, `sessions`, `credentials`, `associate-wallet`, `reputation`) |
+| `AGENTSCORE_API_KEY` | API key for identity commands (`assess`, `sessions`, `credentials`, `associate-wallet`) |
 
 ## Relationship to other AgentScore packages
 
@@ -531,7 +530,7 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 
 - [`@agent-score/sdk`](https://www.npmjs.com/package/@agent-score/sdk), TypeScript client for the AgentScore API
 - [`@agent-score/commerce`](https://www.npmjs.com/package/@agent-score/commerce), merchant-side SDK: trust-gating middleware (`/identity/{hono,express,fastify,nextjs,web}`) plus 402 / payment / discovery / Stripe-multichain helpers
-- **`@agent-score/pay`** (this package), agent-side CLI: wallet + payment across x402/MPP rails + identity commands (assess, sessions, credentials, associate-wallet, reputation). Doubles as an MCP server via `--mcp`.
+- **`@agent-score/pay`** (this package), agent-side CLI: wallet + payment across x402/MPP rails + identity commands (assess, sessions, credentials, associate-wallet). Doubles as an MCP server via `--mcp`.
 
 When a merchant uses `@agent-score/commerce`, wallet-to-operator linking happens merchant-side via `captureWallet`, pay does not duplicate the `POST /v1/credentials/wallets` call. For non-AgentScore merchants this is a no-op; pay does not contact AgentScore APIs unless the merchant's 402 challenge requires AgentScore identity.
 

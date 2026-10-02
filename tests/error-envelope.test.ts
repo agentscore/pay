@@ -347,6 +347,12 @@ describe('format precedence — last-wins', () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 describe('non-CliError passthrough', () => {
+  it('the retired reputation command is not registered', async () => {
+    const { json, exitCode } = await runJson('reputation', '0xabc');
+    expect(exitCode).toBe(1);
+    expect(json.code).toBe('COMMAND_NOT_FOUND');
+  });
+
   it('COMMAND_NOT_FOUND emits incur envelope with cta intact (no enrichment)', async () => {
     const { json, exitCode } = await runJson('doesnotexist');
     expect(exitCode).toBe(1);
