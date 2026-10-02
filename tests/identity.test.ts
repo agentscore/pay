@@ -15,7 +15,6 @@ import {
   credentialCreate,
   credentialList,
   credentialRevoke,
-  reputation,
   sessionCreate,
   sessionGet,
 } from '../src/commands/identity';
@@ -32,8 +31,8 @@ describe('identity commands', () => {
     if (originalKey !== undefined) process.env.AGENTSCORE_API_KEY = originalKey;
   });
 
-  it('reputation rejects with config_error when API key is missing', async () => {
-    await expect(reputation({ address: '0xabc' })).rejects.toMatchObject({ code: 'config_error' });
+  it('credentialList rejects with config_error when API key is missing', async () => {
+    await expect(credentialList()).rejects.toMatchObject({ code: 'config_error' });
   });
 
   it('assess rejects when neither address nor operator-token is provided', async () => {
@@ -186,15 +185,13 @@ describe('identity commands — SDK typed-error mapping', () => {
     });
   });
 
-  it('getReputation also routes typed errors through wrapApiError (e.g. PaymentRequiredError → insufficient_balance)', async () => {
-    // /v1/reputation is free in normal operation, but the wrap function should still
-    // map a typed error correctly if the API ever returns 402 for this endpoint
-    // (e.g. gated region, account state). Regression guard against the wrap function
-    // accidentally only handling the assess path.
-    vi.spyOn(AgentScore.prototype, 'getReputation').mockRejectedValueOnce(
+  it('listCredentials also routes typed errors through wrapApiError (e.g. PaymentRequiredError → insufficient_balance)', async () => {
+    // Regression guard against the wrap function accidentally only handling the assess path.
+    process.env.AGENTSCORE_API_KEY = 'as_test_dummy';
+    vi.spyOn(AgentScore.prototype, 'listCredentials').mockRejectedValueOnce(
       new PaymentRequiredError('Endpoint not enabled'),
     );
-    await expect(reputation({ address: '0xabc' })).rejects.toMatchObject({
+    await expect(credentialList()).rejects.toMatchObject({
       code: 'insufficient_balance',
       nextSteps: { action: 'upgrade_plan' },
     });

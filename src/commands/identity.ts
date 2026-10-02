@@ -11,7 +11,6 @@ import {
   type AssociateWalletResponse,
   type CredentialCreateResponse,
   type CredentialListResponse,
-  type ReputationResponse,
   type SessionCreateResponse,
   type SessionPollResponse,
 } from '@agent-score/sdk';
@@ -19,8 +18,8 @@ import { CliError } from '../errors';
 
 /**
  * Identity commands wrap the AgentScore SDK so the agent-facing CLI carries the
- * full identity surface (assess, sessions, credentials, associate-wallet,
- * reputation) alongside wallet + payment. Reachable as a stdio MCP server via
+ * full identity surface (assess, sessions, credentials, associate-wallet)
+ * alongside wallet + payment. Reachable as a stdio MCP server via
  * `agentscore-pay --mcp`.
  *
  * API key is read from AGENTSCORE_API_KEY (or --api-key per command). Errors map
@@ -121,21 +120,6 @@ function wrapApiError(err: unknown): never {
     throw new CliError('network_error', err.message);
   }
   throw new CliError('network_error', String(err));
-}
-
-// ── reputation ──────────────────────────────────────────────────────────────
-export interface ReputationInput {
-  address: string;
-  chain?: string;
-  apiKey?: string;
-}
-
-export async function reputation(input: ReputationInput): Promise<ReputationResponse> {
-  try {
-    return await getClient(input.apiKey).getReputation(input.address, input.chain ? { chain: input.chain } : undefined);
-  } catch (err: unknown) {
-    wrapApiError(err);
-  }
 }
 
 // ── assess ──────────────────────────────────────────────────────────────────
