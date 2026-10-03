@@ -15,7 +15,7 @@ Thanks for your interest in contributing! Here's how to get started.
 
 - All PRs require 1 approval before merging
 - Squash merge to `main` is the standard
-- Keep PRs focused — one feature or fix per PR
+- Keep PRs focused, one feature or fix per PR
 - Include tests for new functionality
 - Make sure CI passes before requesting review
 

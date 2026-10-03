@@ -21,7 +21,7 @@ export interface PassportLoginInput {
   baseUrl?: string;
   /** Override fetch (testing). */
   fetch?: typeof globalThis.fetch;
-  /** Hook called once with the verify URL — terminal prints it for the user. */
+  /** Hook called once with the verify URL, terminal prints it for the user. */
   onVerifyUrl?: (verifyUrl: string) => void;
   /** Hook called on every poll iteration (for a TTY spinner / progress event). */
   onPoll?: (info: { attempt: number; status: string }) => void;
@@ -64,7 +64,7 @@ export interface PassportResumeInput {
   verifyUrl: string;
   /**
    * Optional poll URL from the merchant 403. Accepted for forward-compat but
-   * its HOST IS NEVER TRUSTED — the poll always targets the trusted AgentScore
+   * its HOST IS NEVER TRUSTED, the poll always targets the trusted AgentScore
    * base (see passportResume). Only the session id (passed separately) is used.
    */
   pollUrl?: string;
@@ -164,7 +164,7 @@ async function pollAndStore(input: {
   }
 
   throw new CliError('passport_verification_timeout', 'Passport verification timed out.', {
-    nextSteps: { action: 'retry_login', suggestion: 'Run `agentscore-pay passport login` again — sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
+    nextSteps: { action: 'retry_login', suggestion: 'Run `agentscore-pay passport login` again, sessions stay alive for 1 hour by default; you can resume the same session URL if it has not expired.' },
     extra: { session_id: input.sessionId, verify_url: input.verifyUrl },
   });
 }
@@ -267,7 +267,7 @@ async function mintPublicSession(input: {
 /**
  * Poll a session minted via the public endpoint. The /v1/sessions/{id} GET path
  * is the same for merchant + public sessions (gated by X-Poll-Secret), so we
- * don't need a separate SDK method — but since we're not constructing an
+ * don't need a separate SDK method, but since we're not constructing an
  * authenticated client here, we hit it via raw fetch.
  */
 async function pollPublicSession(input: {
@@ -277,7 +277,7 @@ async function pollPublicSession(input: {
   fetch: typeof globalThis.fetch;
 }): Promise<SessionPollResponse> {
   // The X-Poll-Secret header rides this request and undici forwards custom headers across
-  // cross-origin redirects — same origin-pinning as the credentialed legs above.
+  // cross-origin redirects, same origin-pinning as the credentialed legs above.
   const fetchImpl = createSecureFetch({ fetch: input.fetch });
   const response = await fetchImpl(
     `${input.baseUrl}/v1/sessions/${encodeURIComponent(input.sessionId)}`,

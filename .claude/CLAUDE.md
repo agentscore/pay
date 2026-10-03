@@ -4,7 +4,7 @@ CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Temp
 
 ## Purpose
 
-One shell command for shell-tool LLM agents to pay any 402/MPP merchant. POST body preserved through the round-trip; agent never sees a private key on the wire. Works with any 402-gated merchant — AgentScore-gated or not.
+One shell command for shell-tool LLM agents to pay any 402/MPP merchant. POST body preserved through the round-trip; agent never sees a private key on the wire. Works with any 402-gated merchant, AgentScore-gated or not.
 
 ## Architecture
 
@@ -24,16 +24,16 @@ Single-package TypeScript CLI published to npm. Runnable via `npx @agent-score/p
 | `src/commands/wallet.ts` | `wallet create/import/address/list/remove/export/show-mnemonic` |
 | `src/commands/balance.ts` | `balance` across chains |
 | `src/commands/qr.ts` | `qr` with optional amount |
-| `src/commands/fund.ts` | `fund` — receive QR + balance polling (default); `--via stripe-onramp` mints a Stripe Crypto Onramp session (base/solana mainnet only); `--quote-only` returns the Stripe price preview without minting. Tempo testnet uses programmatic mint via tempo_fundAddress. |
-| `src/onramp.ts` | API client for the AgentScore Crypto Onramp endpoints (POST /v1/onramp/sessions + POST /v1/onramp/quotes). Sends X-Client-Id + the stored passport operator_token in the body — no merchant API key required. |
-| `src/commands/pay.ts` | `pay <METHOD> <URL>` — routes to `@x402/fetch` (base) or `mppx/client` (tempo, solana via `@solana/mpp/client`). `--identity auto\|operator\|wallet` selects the identity to present (`operator` uses the stored passport operator_token; `wallet` uses the wallet address; `auto` is the default passport/wallet path). |
+| `src/commands/fund.ts` | `fund`, receive QR + balance polling (default); `--via stripe-onramp` mints a Stripe Crypto Onramp session (base/solana mainnet only); `--quote-only` returns the Stripe price preview without minting. Tempo testnet uses programmatic mint via tempo_fundAddress. |
+| `src/onramp.ts` | API client for the AgentScore Crypto Onramp endpoints (POST /v1/onramp/sessions + POST /v1/onramp/quotes). Sends X-Client-Id + the stored passport operator_token in the body, no merchant API key required. |
+| `src/commands/pay.ts` | `pay <METHOD> <URL>`, routes to `@x402/fetch` (base) or `mppx/client` (tempo, solana via `@solana/mpp/client`). `--identity auto\|operator\|wallet` selects the identity to present (`operator` uses the stored passport operator_token; `wallet` uses the wallet address; `auto` is the default passport/wallet path). |
 | `src/commands/identity.ts` | `assess`, `sessions create/get`, `credentials create/list/revoke`, `associate-wallet` (wraps `@agent-score/sdk`) |
-| `src/commands/send.ts` | `send --chain <chain> --to <addr> --amount <n> [--asset usdc\|native]` — raw transfer (no merchant / 402). Default `--asset usdc` (ERC20 transfer on EVM / SPL transferChecked + idempotent ATA on Solana). `--asset native` sends ETH/TEMPO/SOL via viem sendTransaction (EVM) or `getTransferSolInstruction` (Solana). EVM transfers confirm the on-chain receipt (`src/chains/evm-confirm.ts`) and surface a reverted tx as `transfer_reverted` instead of returning a hash for a tx that never settled. Note Tempo pays the network fee in the stablecoin itself, so a full-balance USDC send reverts (no headroom for the fee); leave a little `--amount` headroom. Works on mainnet + testnet (`--network testnet`). |
-| `src/commands/passport.ts` | `passport login/status/logout` — AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `agentscore-pay <url>` settle leg |
+| `src/commands/send.ts` | `send --chain <chain> --to <addr> --amount <n> [--asset usdc\|native]`, raw transfer (no merchant / 402). Default `--asset usdc` (ERC20 transfer on EVM / SPL transferChecked + idempotent ATA on Solana). `--asset native` sends ETH/TEMPO/SOL via viem sendTransaction (EVM) or `getTransferSolInstruction` (Solana). EVM transfers confirm the on-chain receipt (`src/chains/evm-confirm.ts`) and surface a reverted tx as `transfer_reverted` instead of returning a hash for a tx that never settled. Note Tempo pays the network fee in the stablecoin itself, so a full-balance USDC send reverts (no headroom for the fee); leave a little `--amount` headroom. Works on mainnet + testnet (`--network testnet`). |
+| `src/commands/passport.ts` | `passport login/status/logout`, AgentScore Passport (buyer-side identity); stores opc_ at `~/.agentscore/passport.json`, auto-attached on `agentscore-pay <url>` settle leg |
 | `src/passport/{auth,storage,attach}.ts` | Passport login flow (mint+poll), conf-style local keystore, X-Operator-Token attach decision tree |
 | `src/progress.ts` | stderr-only structured progress events (stdout belongs to incur) |
 | `tests/` | Vitest unit tests |
-| `dist/` | tsup output — ESM only with shebang banner |
+| `dist/` | tsup output, ESM only with shebang banner |
 
 ## Chain-to-protocol routing
 
@@ -45,12 +45,12 @@ Both paths preserve POST bodies through the 402 round-trip. The CLI's passphrase
 
 ## Tooling
 
-- **Bun** — package manager. Use `bun install`, `bun run <script>`.
-- **ESLint 9** — linting. `bun run lint`.
-- **tsup** — builds ESM with `#!/usr/bin/env node` banner. `bun run build`.
-- **Vitest** — tests. `bun run test`.
-- **knip** — dead-code check. `bun run knip` (src/aip/ excluded: dormant surface kept for re-enable).
-- **Lefthook** — git hooks. Pre-commit: lint. Pre-push: typecheck.
+- **Bun**, package manager. Use `bun install`, `bun run <script>`.
+- **ESLint 9**, linting. `bun run lint`.
+- **tsup**, builds ESM with `#!/usr/bin/env node` banner. `bun run build`.
+- **Vitest**, tests. `bun run test`.
+- **knip**, dead-code check. `bun run knip` (src/aip/ excluded: dormant surface kept for re-enable).
+- **Lefthook**, git hooks. Pre-commit: lint. Pre-push: typecheck.
 
 ## Patched dependencies
 
@@ -86,14 +86,14 @@ bun run build
 1. Create a branch
 2. Make changes
 3. Lefthook runs lint on commit, typecheck on push
-4. Open a PR — CI runs automatically
+4. Open a PR, CI runs automatically
 5. Merge (squash)
 
 ## Rules
 
 - **No silent refactors**
 - **Never commit .env files or secrets**
-- **Use PRs** — never push directly to main
+- **Use PRs**, never push directly to main
 
 ## Releasing
 

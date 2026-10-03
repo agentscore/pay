@@ -6,7 +6,7 @@
  * resolves to their account.
  *
  * The hosted_url returned points at Stripe's hosted onramp (crypto.link.com).
- * The CLI never auto-opens a browser — emit the URL on stderr and let the
+ * The CLI never auto-opens a browser, emit the URL on stderr and let the
  * user click it from their terminal.
  */
 
@@ -139,7 +139,7 @@ export async function createOnrampSession(input: CreateOnrampSessionInput): Prom
 
 /**
  * Fetch a Stripe Crypto Onramp price preview without committing to a session.
- * No passport credential needed — quotes are public pricing information.
+ * No passport credential needed, quotes are public pricing information.
  */
 export async function getOnrampQuote(input: CreateOnrampQuoteInput): Promise<OnrampQuoteResponse> {
   const baseUrl = (input.baseUrl ?? ONRAMP_BASE_URL).replace(/\/+$/, '');

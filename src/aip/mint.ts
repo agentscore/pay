@@ -3,7 +3,7 @@
  *
  * pay sends X-Client-Id `agentscore_pay_pubclient_v1` when minting.
  * The issuer resolves the operator's verified identity from its passport/account and stamps the
- * derived compliance claims (id_verified, age bands, jurisdiction, sanctions) — pay does NOT and
+ * derived compliance claims (id_verified, age bands, jurisdiction, sanctions), pay does NOT and
  * cannot assert those. pay supplies only the operator_token, the agent cnf public key, and an
  * honest `trust_level` reflecting whether a human is at the terminal.
  *
@@ -17,7 +17,7 @@ import type { Ed25519PublicJwk } from './http-signature';
 const DEFAULT_BASE_URL = process.env.AGENTSCORE_BASE_URL ?? 'https://api.agentscore.com';
 const PUBLIC_CLIENT_ID = 'agentscore_pay_pubclient_v1';
 
-/** AIP trust level — the per-action human-authorization strength. `autonomous` (no human) and
+/** AIP trust level, the per-action human-authorization strength. `autonomous` (no human) and
  *  `human_present` (TTY) are inferred from terminal presence; `human_confirmed` is set only when the
  *  human explicitly confirms the intent at the terminal (requires auth.amr + intent.description). */
 export type TrustLevel = 'autonomous' | 'human_present' | 'human_confirmed';
@@ -32,7 +32,7 @@ export interface MintAitInput {
   intent?: string;
   /** Machine-readable intent actions (e.g. `['purchase']`), stamped into `intent.actions`. */
   actions?: string[];
-  /** Authentication context for `human_confirmed` — `auth.amr` (RFC 8176) MUST carry ≥1 value
+  /** Authentication context for `human_confirmed`, `auth.amr` (RFC 8176) MUST carry ≥1 value
    *  (e.g. `['user']` for a terminal confirmation). The issuer rejects human_confirmed without it. */
   auth?: { amr?: string[]; time?: number };
   baseUrl?: string;

@@ -33,7 +33,7 @@ export async function qr(input: QrInput): Promise<QrResult> {
         ? solanaChain.qrUri(ks.address, input.amountUsd, network)
         : tempoChain.qrUri(ks.address, input.amountUsd, network);
 
-  // Capture QR ascii into a string instead of printing to stdout — caller decides
+  // Capture QR ascii into a string instead of printing to stdout, caller decides
   // whether to render it (TTY) or pass it through structured output (JSON/TOON).
   const ascii_qr = await new Promise<string>((resolve) => {
     qrcode.generate(uri, { small: true }, (q) => resolve(q));

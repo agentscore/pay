@@ -12,7 +12,7 @@ export interface PassportLoginInput {
   baseUrl?: string;
   /** Override fetch (testing). */
   fetch?: typeof globalThis.fetch;
-  /** Hook invoked once with the verify URL — terminal prints it for the user. */
+  /** Hook invoked once with the verify URL, terminal prints it for the user. */
   onVerifyUrl?: (verifyUrl: string) => void;
   /** Hook invoked on each poll iteration. */
   onPoll?: (info: { attempt: number; status: string }) => void;
@@ -27,7 +27,7 @@ export interface PassportLoginOutput {
   expires_in_days: number;
   /** Whether the passport has a refresh_token (i.e. silent refresh is available). */
   silent_refresh_available: boolean;
-  /** Refresh-token expiry — when the user actually has to re-verify in browser. Absent for legacy / merchant-mint passports. */
+  /** Refresh-token expiry, when the user actually has to re-verify in browser. Absent for legacy / merchant-mint passports. */
   refresh_expires_at?: string;
   /** Days until the user has to re-verify in browser. Absent when refresh isn't available. */
   refresh_expires_in_days?: number;

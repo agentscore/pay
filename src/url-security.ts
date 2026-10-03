@@ -6,7 +6,7 @@ import { CliError } from './errors';
  * The durable Passport credential is a long-lived bearer secret. It must ONLY
  * ever travel:
  *   1. over `https:` (never cleartext), and
- *   2. to the exact host the user targeted — never silently forwarded to a
+ *   2. to the exact host the user targeted, never silently forwarded to a
  *      redirect target the merchant chose.
  *
  * On Node/undici a cross-origin `30x` strips `Authorization` and `Cookie` from
@@ -30,8 +30,8 @@ export function isLoopbackHost(hostname: string): boolean {
 /**
  * True when it is safe to attach the bearer credential to a request for `url`:
  * the scheme is https, OR it is a loopback host over http (dev). Returns false
- * (rather than throwing) so callers that only need a yes/no — e.g. the dry-run
- * planner deciding whether to show the header — can branch without a try/catch.
+ * (rather than throwing) so callers that only need a yes/no, e.g. the dry-run
+ * planner deciding whether to show the header, can branch without a try/catch.
  * Unparseable URLs are unsafe.
  */
 export function isCredentialSafeUrl(url: string): boolean {
@@ -77,7 +77,7 @@ export function assertCredentialTarget(url: string): void {
 /**
  * Same-origin check used to decide whether a redirect may carry the credential.
  * Both targets must be https (the dev loopback carve-out does NOT extend to
- * following redirects — a redirect is merchant-controlled and we never relax
+ * following redirects, a redirect is merchant-controlled and we never relax
  * transport security on it).
  */
 function sameSecureOrigin(from: URL, to: URL): boolean {
@@ -102,7 +102,7 @@ export interface SecureFetchOptions {
  *
  * Pass this as the `fetch` to x402/MPP client wrappers so every request they
  * make on the credentialed path (initial 402 probe + the post-payment settle)
- * is guarded — the wrappers own the fetch loop, so guarding at the fetch layer
+ * is guarded, the wrappers own the fetch loop, so guarding at the fetch layer
  * is the only place that covers both legs.
  */
 export function createSecureFetch(opts: SecureFetchOptions = {}): typeof globalThis.fetch {
@@ -121,7 +121,7 @@ export function createSecureFetch(opts: SecureFetchOptions = {}): typeof globalT
       if (!isRedirect(res.status)) return res;
 
       const location = res.headers.get('location');
-      if (!location) return res; // 3xx with no Location — nothing to follow, hand it back.
+      if (!location) return res; // 3xx with no Location, nothing to follow, hand it back.
 
       let target: URL;
       try {

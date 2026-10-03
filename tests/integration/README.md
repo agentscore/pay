@@ -20,10 +20,8 @@ can run them on a best-effort basis.
 
 - Base Sepolia USDC: https://faucet.circle.com/
 - Solana Devnet USDC: https://faucet.circle.com/
-- Tempo testnet USDC.e: contact Tempo team
+- Tempo testnet: `agentscore-pay fund --chain tempo --network testnet` mints test stablecoins directly
 
 ## What's covered
 
-- `tests/integration/balance.test.ts` — reads USDC balance on Base Sepolia and Solana Devnet
-- (future) `tests/integration/pay.test.ts` — completes a real 402 payment round-trip
-  against an x402 base demo endpoint and an MPP `solana/charge` demo endpoint on Solana Devnet
+- `tests/integration/balance.test.ts` reads USDC balance on Base Sepolia and Solana Devnet

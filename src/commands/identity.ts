@@ -79,7 +79,7 @@ function wrapApiError(err: unknown): never {
     throw new CliError('quota_exceeded', 'AgentScore account quota exceeded.', {
       nextSteps: {
         action: 'upgrade_plan',
-        suggestion: 'Your account has reached its cap. Surface to the user — agent retry will not fix this. See https://www.agentscore.com/pricing.',
+        suggestion: 'Your account has reached its cap. Surface to the user, agent retry will not fix this. See https://www.agentscore.com/pricing.',
       },
       extra: { code: err.code, status: err.status },
     });
@@ -97,7 +97,7 @@ function wrapApiError(err: unknown): never {
     });
   }
   if (err instanceof AgentScoreError) {
-    // 401 with no specific subclass (rare — most 401s subclass to TokenExpiredError or
+    // 401 with no specific subclass (rare, most 401s subclass to TokenExpiredError or
     // InvalidCredentialError above). Treat as auth-config issue.
     if (err.status === 401) {
       throw new CliError('config_error', `AgentScore auth error: ${err.message}`, {

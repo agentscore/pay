@@ -2,7 +2,7 @@ import { passportLogin, passportResume, type PassportLoginResult } from './auth'
 
 /**
  * Inline session acquisition during an `agentscore-pay <url>` settle leg when the agent
- * has no usable Passport — either resuming a merchant-supplied session
+ * has no usable Passport, either resuming a merchant-supplied session
  * surfaced in a 403 or minting a fresh one after the stored Passport expired.
  */
 
@@ -39,7 +39,7 @@ export function detectMerchantBootstrap(
 }
 
 export interface BootstrapHooks {
-  /** Hook called once with the verify URL — terminal prints it for the user. */
+  /** Hook called once with the verify URL, terminal prints it for the user. */
   onVerifyUrl?: (verifyUrl: string) => void;
   /** Hook called on every poll iteration. */
   onPoll?: (info: { attempt: number; status: string }) => void;

@@ -149,7 +149,7 @@ export async function transfer(input: {
 /**
  * Calls Moderato testnet's `tempo_fundAddress` JSON-RPC method, which mints
  * test stablecoins (pathUSD, AlphaUSD, BetaUSD, ThetaUSD) to the address.
- * Testnet only — mainnet has no programmatic faucet.
+ * Testnet only, mainnet has no programmatic faucet.
  */
 export async function fundTestnet(address: string): Promise<string[]> {
   const cfg = evmConfig('tempo', 'testnet');
