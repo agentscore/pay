@@ -196,12 +196,11 @@ const GUIDE: AgentGuide = {
       ],
     },
     {
-      step: 'Skip the passphrase prompt with `unlock` (when env var is not an option)',
-      why: 'Each pay/wallet call decrypts the keystore and normally prompts for the passphrase. Agents can either set AGENTSCORE_PAY_PASSPHRASE in the env, or — when env vars are not controllable — run `unlock --for <ttl>` once to cache the passphrase to ~/.agentscore/.unlock for a bounded duration (max 8h).',
-      command_example: 'agentscore-pay unlock --for 1h',
+      step: 'Supply the passphrase through AGENTSCORE_PAY_PASSPHRASE',
+      why: 'Each pay/wallet call decrypts the keystore and otherwise prompts for the passphrase, which an agent cannot answer. Set AGENTSCORE_PAY_PASSPHRASE in the environment from your secret store at startup: it leaves no on-disk artifact. There is no passphrase cache: it would hold the passphrase in cleartext beside the keystores it unlocks.',
+      command_example: 'AGENTSCORE_PAY_PASSPHRASE=... agentscore-pay pay POST <url> -d \'{}\' --max-spend 5',
       notes: [
-        'Use `agentscore-pay unlock --clear` when finished to wipe the cache early.',
-        'AGENTSCORE_PAY_PASSPHRASE in env always wins over the cache and produces no on-disk artifact — prefer it in CI or any ephemeral execution context.',
+        'Read it from a secret store (CI secrets, container env, MCP host config); never put it in the agent prompt or memory.',
       ],
     },
     {

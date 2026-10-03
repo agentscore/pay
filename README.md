@@ -50,7 +50,7 @@ agentscore-pay pay POST https://merchant.example/api --chain tempo -d '...' --ma
 
 ## Agents (scripting)
 
-For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output). It prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`unlock`, `limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
+For LLM tool-loop agents, run `agentscore-pay agent-guide` (add `--json` for parseable output). It prints the structured how-to: golden path (init → discover → balance → check → dry-run → pay), testnet path, funding, auxiliary commands (`limits`, `whoami`, `history`), pitfalls, and exit-code branching. The same notes also surface in `agentscore-pay <command> --help` for `check` and `pay`.
 
 ### Output formats
 
@@ -281,7 +281,6 @@ Each row below is a subcommand of `agentscore-pay`, invoke as `agentscore-pay <c
 | `limits show \| set \| clear` | Persistent per-call / daily / per-merchant USD spending limits |
 | `config get [key] \| set <k> <v> \| unset <k> \| path` | Read/write `~/.agentscore/config.json` (e.g. `config set preferred_chains tempo,base`) |
 | `discover [--search q] [--chain c] [--max-price N] [--limit N] [--protocol x402\|mpp\|both]` | List paid services from the x402 Bazaar (Coinbase) and MPP services directory (Tempo). Both queried in parallel by default. |
-| `unlock [--for 15m] \| --clear` | Cache passphrase to `~/.agentscore/.unlock` (mode 0600) for a bounded TTL, skip per-call prompts during a session |
 | `revoke --chain c --token <addr> --spender <addr> [--network n]` | Send `approve(spender, 0)` on EVM (base/tempo). Requires native gas. |
 
 ### Identity commands
@@ -419,15 +418,14 @@ AGENTSCORE_PAY_HOME=~/.agentscore-test agentscore-pay pay --network testnet ...
 
 ## Unlocking the keystore
 
-Three ways to satisfy the passphrase prompt, in precedence order:
+Two ways to satisfy the passphrase prompt, in precedence order:
 
 | Mechanism | Best for | Persistence |
 |---|---|---|
 | `AGENTSCORE_PAY_PASSPHRASE=<pass>` env var | Containers, CI, serverless, daemons, any non-interactive agent | Lifetime of the process / shell session |
-| `agentscore-pay unlock --for 1h` | Interactive shell session where you'll run multiple commands | Cached in `~/.agentscore/.unlock` (mode `0600`) until TTL expires (max 8h); `unlock --clear` wipes early |
 | Per-call interactive prompt | First-time setup, one-off commands | None, never written |
 
-**Env var wins** when set: it produces no on-disk artifact and is the right primitive for every agent context (CI secrets, container env, K8s secrets, Lambda config, MCP host config). When env vars aren't controllable (e.g. an interactive Claude Code session running locally), `unlock` is the fallback.
+**Env var wins** when set: it produces no on-disk artifact and is the right primitive for every agent context (CI secrets, container env, K8s secrets, Lambda config, MCP host config). There is no on-disk passphrase cache: it would hold the passphrase in cleartext beside the keystores it unlocks.
 
 **For agent authors**: prefer env var. Read it from your secret store at agent startup; don't bake it into the agent's prompt or memory. Pay's `agent-guide` command (`agentscore-pay agent-guide`) explains the precedence in its own structured output.
 
@@ -481,7 +479,7 @@ agentscore-pay fund-estimate https://agents.example.com/purchase \
 
 For **interactive humans**: any 8+ char passphrase you'll remember is fine, the scrypt-256-GCM combination is robust against offline brute force at typical human-passphrase entropy levels.
 
-For **autonomous agents**: the passphrase usually lives in `AGENTSCORE_PAY_PASSPHRASE` (env var) or `~/.agentscore/.unlock` (file). Both are filesystem/process-readable to anyone with shell access as that user, so the passphrase isn't really a separate trust boundary, it's primarily protecting the keystore against *theft of the on-disk file alone*. A long, random passphrase makes the file useless if exfiltrated:
+For **autonomous agents**: the passphrase usually lives in `AGENTSCORE_PAY_PASSPHRASE` (env var), which is process-readable to anyone with shell access as that user, so the passphrase isn't really a separate trust boundary, it's primarily protecting the keystore against *theft of the on-disk file alone*. A long, random passphrase makes the file useless if exfiltrated:
 
 ```sh
 # generate a 32-byte (256-bit) random passphrase
