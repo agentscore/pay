@@ -841,7 +841,7 @@ export function buildCli() {
       minAge: z.coerce.number().optional().describe('Minimum age bracket (18 or 21)'),
       blockedJurisdictions: z.array(z.string()).optional().describe('ISO country codes to block (repeatable)'),
       allowedJurisdictions: z.array(z.string()).optional().describe('ISO country codes to allow (repeatable)'),
-      refresh: z.boolean().optional().describe('Force on-the-fly assessment instead of cached'),
+      refresh: z.boolean().optional().describe('Deprecated and ignored: every assess is evaluated live'),
       signerAddress: z.string().optional().describe('Payment signer wallet address for server-side signer-match + OFAC SDN screening. Response carries signer_match (wallet-binding) + signer_sanctions (OFAC SDN) verdicts. An SDN hit flips decision to deny automatically (unconditional; no policy flag needed).'),
       signerNetwork: z.enum(['evm', 'solana']).optional().describe('Signer network family (required when --signer-address is set).'),
       apiKey: apiKeyOpt,
