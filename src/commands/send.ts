@@ -1,5 +1,5 @@
 /**
- * `agentscore-pay send` — raw USDC transfer to an arbitrary recipient.
+ * `agentscore-pay send`, raw USDC transfer to an arbitrary recipient.
  *
  * Different from `pay <url>`: there is no merchant, no 402 handshake, no
  * MPP receipt. Just an on-chain transfer of USDC from the local wallet

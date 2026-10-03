@@ -116,7 +116,7 @@ async function walletCreateMnemonic(chain?: Chain): Promise<WalletCreateResult> 
   const chains = chain ? [chain] : [...SUPPORTED_CHAINS];
   for (const c of chains) {
     if (await keystoreExists(c)) {
-      throw new CliError('wallet_exists', `Keystore for ${c} already exists — can't mint new mnemonic-derived key.`, {
+      throw new CliError('wallet_exists', `Keystore for ${c} already exists, can't mint new mnemonic-derived key.`, {
         nextSteps: {
           action: 'remove_then_create',
           suggestion: `Delete ${keystorePath(c)} and try again.`,

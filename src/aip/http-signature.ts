@@ -1,5 +1,5 @@
 /**
- * RFC 9421 HTTP Message Signature — the AIP proof-of-possession SIGNER (client side).
+ * RFC 9421 HTTP Message Signature, the AIP proof-of-possession SIGNER (client side).
  *
  * pay presents an Agent Identity Token (AIT) to a merchant by signing the request with the
  * Ed25519 key whose public half is bound in the token's `cnf` claim. This module produces the

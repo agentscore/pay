@@ -189,7 +189,7 @@ export async function fund(input: FundInput): Promise<FundResult> {
       const seconds = POLL_INTERVAL_MS / 1000;
       process.stderr.write(
         `\nOpen Stripe Crypto Onramp in your browser:\n  ${session.hosted_url}\n\n${ascii}\n` +
-          `Polling ${input.chain} balance every ${seconds}s (timeout ${minutes}m). The CLI does NOT auto-open the browser — click or scan the URL above to start the onramp flow.\n\n`,
+          `Polling ${input.chain} balance every ${seconds}s (timeout ${minutes}m). The CLI does NOT auto-open the browser, click or scan the URL above to start the onramp flow.\n\n`,
       );
     }
 

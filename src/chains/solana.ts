@@ -85,7 +85,7 @@ export async function nativeBalance(ownerBase58: string, network: Network = 'mai
 }
 
 export function formatNative(raw: bigint): string {
-  // SOL has 9 decimals (lamports). Show 4 fractional digits — enough for
+  // SOL has 9 decimals (lamports). Show 4 fractional digits, enough for
   // typical fee-balance reads.
   const whole = raw / 10n ** 9n;
   const frac = raw % 10n ** 9n;

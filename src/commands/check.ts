@@ -59,7 +59,7 @@ function normalizeX402(body: unknown): RailSummary[] {
   return accepts.map((a) => {
     const chain = chainFromNetworkId(a.network);
     // x402 v1 uses `maxAmountRequired`; v2 uses `amount`. Decimals is never carried
-    // at the top level — extra.decimals is best-effort, otherwise canonical USDC = 6,
+    // at the top level, extra.decimals is best-effort, otherwise canonical USDC = 6,
     // unknown asset = leave price_usd undefined rather than displaying a wrong value.
     const declaredDecimals = a.extra?.decimals;
     const decimals = declaredDecimals ?? (chain && isKnownUSDC(a.asset, chain) ? 6 : null);

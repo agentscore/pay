@@ -48,7 +48,7 @@ const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0-dev';
 
 const chainSchema = z.enum(SUPPORTED_CHAINS).describe('Blockchain rail (base, solana, tempo)');
 const networkSchema = z.enum(SUPPORTED_NETWORKS).default('mainnet').describe('Mainnet (default) or testnet');
-const walletNameSchema = z.string().default('default').describe('Named keystore — pass a name to pick a non-default wallet');
+const walletNameSchema = z.string().default('default').describe('Named keystore, pass a name to pick a non-default wallet');
 
 function parseHeaders(values: string[] | undefined): Record<string, string> | undefined {
   if (!values || values.length === 0) return undefined;
@@ -97,7 +97,7 @@ export function isRetryable(code: string): boolean {
  * Implementation note: many call sites pass a non-async arrow (e.g.
  * `withCliErrors(() => fundEstimate({headers: parseHeaders(...)}))`) where
  * `parseHeaders` can throw a CliError synchronously while constructing the
- * args object — *before* the inner promise is returned. A naive `fn().catch`
+ * args object, *before* the inner promise is returned. A naive `fn().catch`
  * would let that sync throw propagate uncaught, reaching incur as a raw Error
  * and erasing the CliError.code. `Promise.resolve().then(fn)` defers the call
  * onto the microtask queue, so any sync throw becomes a Promise rejection
@@ -138,7 +138,7 @@ export function buildCli() {
       command: 'npx -y @agent-score/pay --mcp',
     },
     env: z.object({
-      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet). Not required for passport login/status — those use the public session endpoint.'),
+      AGENTSCORE_API_KEY: z.string().optional().describe('API key for identity tools (assess, sessions, credentials, associate-wallet). Not required for passport login/status, those use the public session endpoint.'),
       AGENTSCORE_PAY_PASSPHRASE: z.string().optional().describe('Skip the interactive passphrase prompt for keystore operations'),
       AGENTSCORE_PAY_HOME: z.string().optional().describe('Override the state dir (default: ~/.agentscore)'),
       BASE_RPC_URL: z.string().optional().describe('Override Base mainnet RPC endpoint'),
@@ -151,7 +151,7 @@ export function buildCli() {
     sync: {
       suggestions: [
         'create a wallet on every supported chain with `agentscore-pay init`',
-        'verify your AgentScore Passport once with `agentscore-pay passport login` — pay then auto-attaches X-Operator-Token to every gated merchant',
+        'verify your AgentScore Passport once with `agentscore-pay passport login`, pay then auto-attaches X-Operator-Token to every gated merchant',
         'discover paid services with `agentscore-pay discover --search <query>`',
         'probe a 402 endpoint with `agentscore-pay check <url> -X POST -d <body>`',
         'pay an endpoint with `agentscore-pay pay POST <url> -d <body> --max-spend 5`',
@@ -186,7 +186,7 @@ export function buildCli() {
           cta: {
             description: 'Next steps:',
             commands: [
-              { command: 'passport login', description: 'Verify identity once — required for AgentScore-gated merchants. Skipped automatically for unregulated ones. ~30 seconds in browser, no money needed.' },
+              { command: 'passport login', description: 'Verify identity once, required for AgentScore-gated merchants. Skipped automatically for unregulated ones. ~30 seconds in browser, no money needed.' },
               { command: 'fund', options: { chain: true }, description: 'Print a receive QR + poll for the deposit' },
               { command: 'balance', description: 'Confirm wallet balances' },
               { command: 'discover', description: 'Browse paid services in the x402 + MPP ecosystem' },
@@ -238,7 +238,7 @@ export function buildCli() {
     }),
     examples: [
       { args: { key: '0xYOUR_PRIVATE_KEY' }, options: { chain: 'base' }, description: 'Import an EVM private key (replace 0xYOUR_PRIVATE_KEY)' },
-      { options: { mnemonic: "'twelve or twenty-four word phrase here'" }, description: 'Import a BIP-39 mnemonic — quote it (derives all three chains)' },
+      { options: { mnemonic: "'twelve or twenty-four word phrase here'" }, description: 'Import a BIP-39 mnemonic, quote it (derives all three chains)' },
     ],
     run({ args, options }) {
       return withCliErrors(async () => {
@@ -277,8 +277,8 @@ export function buildCli() {
     // prompt injection reaches irreversible key disclosure or fund movement, and
     // any secret returned lands in the transcript and the model provider's logs.
     mcp: false,
-    description: 'Print the stored BIP-39 mnemonic. DANGER — only run in a trusted environment.',
-    hint: 'The mnemonic restores every chain wallet — anyone with this phrase can drain your funds. Never paste it into chat, logs, or unencrypted storage.',
+    description: 'Print the stored BIP-39 mnemonic. DANGER, only run in a trusted environment.',
+    hint: 'The mnemonic restores every chain wallet, anyone with this phrase can drain your funds. Never paste it into chat, logs, or unencrypted storage.',
     outputPolicy: 'agent-only',
     options: z.object({
       danger: z.boolean().optional().describe('Acknowledge the risk of printing the mnemonic'),
@@ -313,7 +313,7 @@ export function buildCli() {
     // prompt injection reaches irreversible key disclosure or fund movement, and
     // any secret returned lands in the transcript and the model provider's logs.
     mcp: false,
-    description: 'Decrypt and print a private key. DANGER — only run if you trust the surrounding environment.',
+    description: 'Decrypt and print a private key. DANGER, only run if you trust the surrounding environment.',
     hint: 'The exported key gives full control of the wallet to anyone who reads it. Pipe to an encrypted store; never to a shared shell history.',
     outputPolicy: 'agent-only',
     options: z.object({
@@ -341,7 +341,7 @@ export function buildCli() {
     // prompt injection reaches irreversible key disclosure or fund movement, and
     // any secret returned lands in the transcript and the model provider's logs.
     mcp: false,
-    description: 'Delete a keystore. DANGER — irrecoverable unless you have the BIP-39 mnemonic backup.',
+    description: 'Delete a keystore. DANGER, irrecoverable unless you have the BIP-39 mnemonic backup.',
     hint: 'No undo. Run `wallet show-mnemonic --danger` first if you want to be able to restore.',
     options: z.object({
       chain: chainSchema,
@@ -412,7 +412,7 @@ export function buildCli() {
   cli.command('fund', {
     description:
       'Fund the wallet. Default: print receive QR + poll balance (works for any chain via external wallet/exchange). With --via stripe-onramp: mint a Stripe Crypto Onramp session for card-funding (base + solana mainnet only). Tempo testnet uses programmatic mint via tempo_fundAddress.',
-    hint: 'Default flow works on any chain (receive QR + poll). For Stripe Crypto Onramp, pass --via stripe-onramp --amount <USD>; pay never auto-opens a browser — click the printed hosted URL yourself.',
+    hint: 'Default flow works on any chain (receive QR + poll). For Stripe Crypto Onramp, pass --via stripe-onramp --amount <USD>; pay never auto-opens a browser, click the printed hosted URL yourself.',
     options: z.object({
       chain: chainSchema,
       network: networkSchema,
@@ -495,7 +495,7 @@ export function buildCli() {
     }),
     alias: { method: 'X', data: 'd', header: 'H' },
     examples: [
-      { args: { url: 'https://merchant.example/api' }, description: 'GET probe — assumes the merchant gates GET requests' },
+      { args: { url: 'https://merchant.example/api' }, description: 'GET probe, assumes the merchant gates GET requests' },
       { args: { url: 'https://merchant.example/api' }, options: { method: 'POST', data: "'{}'" }, description: 'POST probe with body (quote the JSON)' },
     ],
     run({ args, options }) {
@@ -520,7 +520,7 @@ export function buildCli() {
     // prompt injection reaches irreversible key disclosure or fund movement, and
     // any secret returned lands in the transcript and the model provider's logs.
     mcp: false,
-    description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake — just on-chain.',
+    description: 'Raw transfer to an arbitrary address on Base, Tempo, or Solana. Default --asset usdc; --asset native sends gas (ETH on Base, TEMPO on Tempo, SOL on Solana). No merchant, no 402 handshake, just on-chain.',
     hint: 'Both flavors require native gas in the signer wallet (gas pays the on-chain write, regardless of which asset is being transferred). x402/MPP payments are gasless; raw transfers are not.',
     options: z.object({
       chain: chainSchema,
@@ -715,11 +715,11 @@ export function buildCli() {
   // ── check ───────────────────────────────────────────────────────────────────
   cli.command('check', {
     description: 'Probe a URL for a 402 response and show accepted rails without paying',
-    hint: 'Always probe with the same method + body you intend to pay with — most paid endpoints only respond 402 to POST + JSON.',
+    hint: 'Always probe with the same method + body you intend to pay with, most paid endpoints only respond 402 to POST + JSON.',
     args: z.object({ url: z.string() }),
     options: z.object({
       method: z.string().default('GET').describe('HTTP method'),
-      data: z.string().optional().describe('Request body — quote JSON values, e.g. -d \'{"k":"v"}\''),
+      data: z.string().optional().describe('Request body, quote JSON values, e.g. -d \'{"k":"v"}\''),
       header: z.array(z.string()).optional().describe("Additional header (repeatable, 'Name: value')"),
     }),
     alias: { method: 'X', data: 'd', header: 'H' },
@@ -833,7 +833,7 @@ export function buildCli() {
       'Check a wallet or operator against a compliance policy. Pass --address (wallet) or --operator-token (credential).',
     hint: 'Requires AGENTSCORE_API_KEY (or --api-key).',
     options: z.object({
-      address: z.string().optional().describe('Wallet address — EVM (0x...) or Solana (base58)'),
+      address: z.string().optional().describe('Wallet address, EVM (0x...) or Solana (base58)'),
       operatorToken: z.string().optional().describe('Operator credential (opc_...) for non-wallet identity'),
       chain: z.string().optional().describe('Optional chain filter'),
       requireKyc: z.boolean().optional().describe('Require KYC verification to allow'),
@@ -877,7 +877,7 @@ export function buildCli() {
     description: 'Identity verification sessions (requires API key)',
   });
   sessions.command('create', {
-    description: 'Create an identity verification session — returns verify_url + poll credentials',
+    description: 'Create an identity verification session, returns verify_url + poll credentials',
     options: z.object({
       address: z.string().optional().describe('Pre-associate session with a known wallet'),
       operatorToken: z.string().optional().describe('Refresh KYC for an existing operator credential'),
@@ -910,7 +910,7 @@ export function buildCli() {
     },
   });
   sessions.command('get', {
-    description: 'Poll a verification session — returns operator_token when status becomes verified',
+    description: 'Poll a verification session, returns operator_token when status becomes verified',
     args: z.object({ id: z.string().describe('Session ID (sess_...)') }),
     options: z.object({
       pollSecret: z.string().optional().describe('Poll secret returned from sessions create'),
@@ -925,7 +925,7 @@ export function buildCli() {
         if (result.status !== 'verified' || !result.operator_token) return c.ok(result);
         return c.ok(result, {
           cta: {
-            description: 'Verified — use the operator_token to retry the original gated request:',
+            description: 'Verified, use the operator_token to retry the original gated request:',
             commands: [
               { command: 'pay', description: 'Re-run the merchant request with -H "X-Operator-Token: <operator_token>"' },
               { command: 'associate-wallet', description: 'After paying, attribute the signer wallet to this operator credential' },
@@ -942,8 +942,8 @@ export function buildCli() {
     description: 'Operator credentials (opc_...) for non-wallet agent identity (requires API key)',
   });
   credentials.command('create', {
-    description: 'Create an operator credential. Run `credentials list` first — reuse beats creating.',
-    hint: 'Returned credential is shown ONCE. Store it securely — there is no recovery flow.',
+    description: 'Create an operator credential. Run `credentials list` first, reuse beats creating.',
+    hint: 'Returned credential is shown ONCE. Store it securely, there is no recovery flow.',
     options: z.object({
       label: z.string().optional().describe('Label for the credential (e.g., "claude-code")'),
       ttlDays: z.coerce.number().optional().describe('Time to live in days (default 1, max 365)'),
@@ -1008,7 +1008,7 @@ export function buildCli() {
   // ── passport group (AgentScore identity, browser-redirect login) ────────────
   const passport = Cli.create('passport', {
     description:
-      'AgentScore Passport — buyer-side identity (KYC + verified facts). Stores a 24h access token + 90d refresh credential locally; auto-attached to merchant requests on settle. Pay rotates the access token silently in the background — the user re-verifies in browser only when the refresh credential also expires (~90 days).',
+      'AgentScore Passport, buyer-side identity (KYC + verified facts). Stores a 24h access token + 90d refresh credential locally; auto-attached to merchant requests on settle. Pay rotates the access token silently in the background, the user re-verifies in browser only when the refresh credential also expires (~90 days).',
   });
   passport.command('login', {
     description:
@@ -1019,7 +1019,7 @@ export function buildCli() {
       timeoutSeconds: z.coerce.number().optional().describe('Polling timeout (default 3600s)'),
     }),
     examples: [
-      { description: 'Cold-start login — opens verify URL, polls until verified' },
+      { description: 'Cold-start login, opens verify URL, polls until verified' },
     ],
     run(c) {
       return withCliErrors(async () => {
@@ -1038,7 +1038,7 @@ export function buildCli() {
           cta: {
             description: 'Passport active. Next steps:',
             commands: [
-              { command: 'pay', description: 'Make a payment — pay auto-attaches X-Operator-Token to merchant requests' },
+              { command: 'pay', description: 'Make a payment, pay auto-attaches X-Operator-Token to merchant requests' },
               { command: 'passport status', description: 'View verified facts + expiry at any time' },
             ],
           },
@@ -1047,7 +1047,7 @@ export function buildCli() {
     },
   });
   passport.command('status', {
-    description: 'Show stored AgentScore Passport — token prefix, access-token expiry, refresh availability, and days until the user has to re-verify in browser.',
+    description: 'Show stored AgentScore Passport, token prefix, access-token expiry, refresh availability, and days until the user has to re-verify in browser.',
     options: z.object({}),
     run(c) {
       return withCliErrors(async () => {
@@ -1079,10 +1079,10 @@ export function buildCli() {
   // ── associate-wallet ────────────────────────────────────────────────────────
   cli.command('associate-wallet', {
     description:
-      'Report a wallet that paid under an operator credential — builds the cross-merchant credential↔wallet attribution profile. Fire-and-forget.',
+      'Report a wallet that paid under an operator credential, builds the cross-merchant credential↔wallet attribution profile. Fire-and-forget.',
     options: z.object({
       operatorToken: z.string().describe('Operator credential (opc_...) the agent paid under'),
-      walletAddress: z.string().describe('Wallet that signed the payment — EVM (0x...) or Solana (base58)'),
+      walletAddress: z.string().describe('Wallet that signed the payment, EVM (0x...) or Solana (base58)'),
       network: z.enum(['evm', 'solana']).describe('Network family'),
       idempotencyKey: z.string().optional().describe('Stable per-payment key (PI id, x402 tx hash, etc.)'),
       apiKey: apiKeyOpt,
@@ -1117,7 +1117,7 @@ export function buildCli() {
           cta: {
             description: 'Golden path:',
             commands: [
-              { command: 'init', description: 'First-run setup — create wallets on every chain' },
+              { command: 'init', description: 'First-run setup, create wallets on every chain' },
               { command: 'check', description: 'Probe a 402-gated URL to see accepted rails + price' },
               { command: 'pay', options: { dryRun: true, maxSpend: true }, description: 'Dry-run a payment, then drop --dry-run to settle' },
             ],
@@ -1139,7 +1139,7 @@ export interface ServeCliOptions {
 /**
  * Wraps `cli.serve` to enrich the wire envelope on CliError-driven failures.
  *
- * incur's error renderer surfaces only `code`, `message`, and `retryable` —
+ * incur's error renderer surfaces only `code`, `message`, and `retryable`,
  * `extra` and `nextSteps` from CliError are silently discarded. We capture
  * the originating CliError in `pendingError`, let incur run, then if a
  * CliError fired we discard incur's error output and re-emit our own
@@ -1193,7 +1193,7 @@ export async function serveCli(
     // of its own output (token count, byte slice). Enrichment would replace
     // that rendering with a synthesized envelope, breaking the agent's
     // expectation that `--token-count` returns a number and `--token-limit`
-    // returns a truncated slice. Pass through verbatim — incur already
+    // returns a truncated slice. Pass through verbatim, incur already
     // applied the correct treatment to its error rendering.
     const tokenFlag =
       effectiveArgv.includes('--token-count') ||
@@ -1201,7 +1201,7 @@ export async function serveCli(
       effectiveArgv.includes('--token-offset');
 
     // Human-TTY context (interactive terminal, no explicit format/full-output):
-    // preserve incur's `formatHumanError` rendering — the friendly one-line
+    // preserve incur's `formatHumanError` rendering, the friendly one-line
     // `Error (code): message` shape humans expect at a terminal. Enrichment
     // here would replace it with a multi-line TOON dump, which is a regression
     // for humans without giving them anything they need (extras are for

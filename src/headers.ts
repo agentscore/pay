@@ -5,7 +5,7 @@
  *
  * Without this dedupe step, `Object.assign({Content-Type: 'application/json'}, {'content-type': 'application/json'})`
  * keeps BOTH keys and `fetch` sends them as a comma-joined value (`application/json, application/json`),
- * which strict body-parsers (Express's, etc.) reject — silently breaking POSTs against any merchant
+ * which strict body-parsers (Express's, etc.) reject, silently breaking POSTs against any merchant
  * whose server doesn't tolerate the duplicate.
  */
 export function mergeHeaders(

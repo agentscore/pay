@@ -28,7 +28,7 @@ type IdentityMode = 'auto' | 'operator' | 'wallet';
 /** Parse a URL into the RFC 9421 covered components an AIT signature binds. Exported for tests. */
 export function requestDescriptor(url: string, method: string): AipRequestDescriptor {
   const u = new URL(url);
-  // RFC 9421 @path is the absolute path ONLY — the query string is the separate @query component,
+  // RFC 9421 @path is the absolute path ONLY, the query string is the separate @query component,
   // which AIP's minimum covered set omits. The verifier reconstructs @path as pathname (query
   // stripped), so signing pathname+search would make PoP fail for every query-bearing URL.
   return { method: method.toUpperCase(), authority: u.host, path: u.pathname };
@@ -162,7 +162,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
         },
       );
     }
-    process.stderr.write('Stored Passport has expired — re-verifying (KYC stays valid, this is a one-click renewal)...\n');
+    process.stderr.write('Stored Passport has expired, re-verifying (KYC stays valid, this is a one-click renewal)...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromExpiry({
       onVerifyUrl: (verifyUrl) => {
@@ -182,12 +182,12 @@ export async function pay(input: PayInput): Promise<PayResult> {
   }
 
   // `--identity operator` is an explicit choice of the operator_token model. With no caller
-  // token and no attached Passport, fail fast — silently downgrading to the wallet header would
+  // token and no attached Passport, fail fast, silently downgrading to the wallet header would
   // present a different identity than the one the caller asked for.
   if (identityMode === 'operator' && !callerOperatorToken && passportAttach.kind !== 'attached') {
     throw new CliError(
       'passport_login_required',
-      'Identity mode `operator` needs a stored operator credential, and none was found — refusing to fall back to wallet identity.',
+      'Identity mode `operator` needs a stored operator credential, and none was found, refusing to fall back to wallet identity.',
       {
         nextSteps: {
           action: 'passport_login',
@@ -255,7 +255,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
   if (input.body !== undefined) init.body = input.body;
   // Auto-inject X-Wallet-Address ONLY when the caller hasn't already chosen an identity
   // header. If the agent passed X-Operator-Token, layering X-Wallet-Address on top makes
-  // the merchant's gate evaluate BOTH identities — and unlinked wallets without their
+  // the merchant's gate evaluate BOTH identities, and unlinked wallets without their
   // own KYC will fail compliance even though the operator_token is fully verified.
   const userHeaderKeys = userHeaderKeysAll;
   const userSpecifiedIdentity =
@@ -286,7 +286,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     });
   }
   if (passportAttach.expiringSoon) {
-    process.stderr.write(`Passport expires soon — run \`agentscore-pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
+    process.stderr.write(`Passport expires soon, run \`agentscore-pay passport login\` to renew before ${new Date(passportAttach.passport!.expires_at).toISOString()}.\n`);
   }
   // Note: kind === 'expired' on the live path was already handled inline above.
   // Dry-run doesn't drive reauth; the user can see kind: 'expired' in the dry-run output.
@@ -347,7 +347,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
   let text = await res.text();
   let parsed = tryParseJson(text);
 
-  // Cold-start bootstrap on 403 — when a merchant gate auto-mints a verification
+  // Cold-start bootstrap on 403, when a merchant gate auto-mints a verification
   // session for us and surfaces it in the deny body. Drives the inline browser-
   // redirect flow once, then RETRIES the original payment with X-Operator-Token
   // attached + (when present) the merchant's order_id merged into the body so
@@ -368,7 +368,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     // non-TTY agents shouldn't block ~1h on the inline browser flow. Surface
     // a structured envelope with the merchant-supplied verify_url + session
     // fields so the agent can either run `passport login` interactively
-    // (recommended — mints a refresh-bearing Passport that prevents this
+    // (recommended, mints a refresh-bearing Passport that prevents this
     // round-trip on subsequent calls) or proxy the merchant URL out-of-band.
     if (!process.stdout.isTTY) {
       throw new CliError(
@@ -378,7 +378,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
           nextSteps: {
             action: 'passport_login',
             suggestion:
-              'Recommended: run `agentscore-pay passport login` interactively to mint a fresh access + refresh credential, then re-run this command — the new credential lasts ~90 days and prevents this round-trip on subsequent merchants. Alternative: surface the merchant-supplied verify_url to the user; completing it issues a one-shot 24h token tied to this merchant\'s session.',
+              'Recommended: run `agentscore-pay passport login` interactively to mint a fresh access + refresh credential, then re-run this command, the new credential lasts ~90 days and prevents this round-trip on subsequent merchants. Alternative: surface the merchant-supplied verify_url to the user; completing it issues a one-shot 24h token tied to this merchant\'s session.',
           },
           extra: {
             verify_url: bootstrapFields.verify_url,
@@ -390,7 +390,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
         },
       );
     }
-    process.stderr.write('Merchant requires identity verification — bootstrapping inline...\n');
+    process.stderr.write('Merchant requires identity verification, bootstrapping inline...\n');
     let printedVerifyUrl = false;
     const renewal = await bootstrapFromMerchantSession(bootstrapFields, {
       onVerifyUrl: (verifyUrl) => {
@@ -403,7 +403,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     process.stderr.write(`Passport saved (expires ${new Date(renewal.passport.expires_at).toISOString()}). Retrying payment with X-Operator-Token...\n`);
 
     // The retry attaches the freshly-minted durable Passport token; same
-    // transport guard as the primary path — never put the bearer credential on
+    // transport guard as the primary path, never put the bearer credential on
     // a cleartext target (the cold-start first attempt may have carried no
     // token, so input.url hasn't necessarily been asserted yet).
     assertCredentialTarget(input.url);
@@ -419,7 +419,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
       }
     }
 
-    // Rebuild init for the retry — fresh signal, fresh headers (with the new opc).
+    // Rebuild init for the retry, fresh signal, fresh headers (with the new opc).
     const retryController = new AbortController();
     const retryTimer = setTimeout(() => retryController.abort(), timeoutSeconds * 1000);
     const retryInit: RequestInit = { method: input.method, signal: retryController.signal };
@@ -537,7 +537,7 @@ function resolveDecimals(declared: number | undefined, asset: string | undefined
   if (isKnownUSDC(asset, chain)) return 6;
   throw new CliError(
     'merchant_spec_violation',
-    `Merchant 402 omitted 'decimals' for unrecognized asset ${asset ?? '(none)'} on ${chain}. Refusing to pay — guessing decimals risks orders-of-magnitude mis-billing.`,
+    `Merchant 402 omitted 'decimals' for unrecognized asset ${asset ?? '(none)'} on ${chain}. Refusing to pay, guessing decimals risks orders-of-magnitude mis-billing.`,
     {
       nextSteps: {
         action: 'contact_merchant',
@@ -574,7 +574,7 @@ async function payViaX402(
     client.register(cfg.network as `${string}:${string}`, evmClient);
     client.registerV1(cfg.network as `${string}:${string}`, evmClient);
   } else {
-    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain} — only Base is supported under x402; Tempo and Solana go through MPP.`);
+    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain}, only Base is supported under x402; Tempo and Solana go through MPP.`);
   }
 
   const host = safeHost(input.url);
@@ -645,7 +645,7 @@ async function payViaMpp(
     const signer = (await createX402Signer(wallet, network)) as Parameters<typeof solanaCharge>[0]['signer'];
     methods = [solanaCharge({ signer, rpcUrl: cfg.rpcUrl })];
   } else {
-    throw new CliError('unsupported_rail', `MPP path called on chain ${wallet.chain} — only Tempo and Solana are supported under MPP.`);
+    throw new CliError('unsupported_rail', `MPP path called on chain ${wallet.chain}, only Tempo and Solana are supported under MPP.`);
   }
   // Same redirect guard as the x402 path when the credential rides on the request.
   const baseFetch = guardRedirects ? createSecureFetch() : fetch;
@@ -679,7 +679,7 @@ async function payViaMpp(
 
 /**
  * Stable per-invocation idempotency key. Hashes the request shape (url + method + body +
- * signer) so all retries within `withRetries` reuse the same key — merchants that honor
+ * signer) so all retries within `withRetries` reuse the same key, merchants that honor
  * X-Idempotency-Key (Stripe-pattern dedup) won't double-charge if a payment settled but
  * the network response was lost.
  */

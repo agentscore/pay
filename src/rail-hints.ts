@@ -12,25 +12,25 @@ export interface RailHint {
 const HINTS: Record<string, RailHint> = {
   'eip155:1': {
     name: 'Ethereum mainnet (x402)',
-    description: 'x402 on Ethereum L1 — not natively supported by agentscore-pay; gas typically makes micropayments uneconomical.',
+    description: 'x402 on Ethereum L1, not natively supported by agentscore-pay; gas typically makes micropayments uneconomical.',
     docs_url: 'https://x402.org',
   },
   'eip155:137': {
     name: 'Polygon (x402)',
-    description: 'x402 on Polygon — not natively supported by agentscore-pay.',
+    description: 'x402 on Polygon, not natively supported by agentscore-pay.',
     docs_url: 'https://polygon.technology',
   },
   'eip155:42161': {
     name: 'Arbitrum (x402)',
-    description: 'x402 on Arbitrum — not natively supported by agentscore-pay.',
+    description: 'x402 on Arbitrum, not natively supported by agentscore-pay.',
     docs_url: 'https://x402.org',
   },
   'eip155:10': {
     name: 'Optimism (x402)',
-    description: 'x402 on Optimism — not natively supported by agentscore-pay.',
+    description: 'x402 on Optimism, not natively supported by agentscore-pay.',
     docs_url: 'https://x402.org',
   },
-  // Single canonical entry for Stripe SPT — the lookup function below maps any rail name
+  // Single canonical entry for Stripe SPT, the lookup function below maps any rail name
   // starting with `stripe` (`stripe`, `stripe-spt`, `stripe/charge`, Stripe-flavored
   // schemes) to this hint, so we don't need duplicate entries per spelling variant.
   stripe: {

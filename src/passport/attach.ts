@@ -10,7 +10,7 @@ import { isExpired, loadPassport, type Passport } from './storage';
 
 /**
  * Proactive-refresh trigger window. Fire silent refresh when the access
- * token is within this window of expiry, even if it hasn't expired yet —
+ * token is within this window of expiry, even if it hasn't expired yet,
  * gives clock-skew + on-the-wire-latency headroom so a token doesn't
  * expire between attach and merchant validation. Distinct from the
  * reactive case (access already expired), which always attempts refresh
@@ -26,7 +26,7 @@ export interface AttachResult {
   /**
    * Informational warning that the *user* needs to re-verify in browser
    * soon. False when a refresh_token is still comfortably valid (pay
-   * will rotate silently — no user action). True only when access is
+   * will rotate silently, no user action). True only when access is
    * near expiry AND refresh is unavailable or also near expiry.
    */
   expiringSoon?: boolean;
@@ -35,12 +35,12 @@ export interface AttachResult {
 export interface AttachInput {
   /** Set to true to skip attach entirely (caller is doing explicit-anonymous). */
   skipPassport?: boolean;
-  /** Caller-supplied X-Operator-Token already present on the request — don't override. */
+  /** Caller-supplied X-Operator-Token already present on the request, don't override. */
   callerSuppliedOperatorToken?: string;
   /**
    * The merchant request URL the credential would be attached to. When provided
    * and NOT credential-safe (non-https, except loopback http for dev), attach
-   * refuses — returns `kind: 'insecure_target'` and never surfaces the
+   * refuses, returns `kind: 'insecure_target'` and never surfaces the
    * operator_token. Omit when resolving the passport for a use that does NOT put
    * the bearer token on the wire (e.g. minting an @authority-bound AIP token).
    */
@@ -66,7 +66,7 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
   // Credential-transport guard: never put the bearer operator_token on a
   // cleartext (or otherwise non-https) merchant URL. Loopback http is the dev
   // carve-out (handled inside isCredentialSafeUrl). Returning before load/refresh
-  // avoids surfacing — or even rotating — the credential for an unsafe target.
+  // avoids surfacing, or even rotating, the credential for an unsafe target.
   if (input.targetUrl !== undefined && !isCredentialSafeUrl(input.targetUrl)) {
     return { kind: 'insecure_target' };
   }
@@ -83,7 +83,7 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
 
   // Try silent refresh in two cases:
   //   - Reactive: access has already expired but refresh_token is still
-  //     valid (the dominant real-world case — agent comes back after the
+  //     valid (the dominant real-world case, agent comes back after the
   //     24h access TTL but well within the 90d refresh TTL).
   //   - Proactive: access within REFRESH_THRESHOLD_MS of expiry; rotates
   //     before the merchant sees a near-expired token.
@@ -107,7 +107,7 @@ export async function attachPassport(input: AttachInput = {}): Promise<AttachRes
 
   // `expiringSoon` is the signal that the *user* needs to take action
   // (re-verify in browser). With a refresh_token still comfortably valid,
-  // pay rotates silently and the user has nothing to do — don't print the
+  // pay rotates silently and the user has nothing to do, don't print the
   // misleading "run passport login" warning. Only set it when access is
   // near expiry AND refresh is unavailable / also near expiry.
   const refreshWillSaveUs =
