@@ -328,7 +328,7 @@ Both codes only fire on non-TTY runs. In a human terminal pay continues to drive
 
 ```bash
 agentscore-pay assess --address 0xabc... --json | jq '.quota'
-# → { "limit": 1000, "used": 780, "reset": "2026-06-01T00:00:00Z" }
+# → { "limit": 1000, "used": 780, "reset": "2026-06-01" }
 ```
 
 `quota` is absent on accounts with no per-period quota.
