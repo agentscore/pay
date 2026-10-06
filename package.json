@@ -92,6 +92,8 @@
     "vitest": "^5.0.3"
   },
   "overrides": {
+    "smol-toml": "^1.9.0",
+    "source-map-js": "^1.2.2",
     "esbuild": "^0.28.1",
     "viem": "2.57.3"
   },
