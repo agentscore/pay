@@ -42,7 +42,7 @@ export interface AttachInput {
    * and NOT credential-safe (non-https, except loopback http for dev), attach
    * refuses, returns `kind: 'insecure_target'` and never surfaces the
    * operator_token. Omit when resolving the passport for a use that does NOT put
-   * the bearer token on the wire (e.g. minting an @authority-bound AIP token).
+   * the bearer token on the wire.
    */
   targetUrl?: string;
   /** Override "now" for testing. */
