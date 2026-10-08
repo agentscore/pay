@@ -19,20 +19,10 @@ import { withRetries } from '../retry';
 import { selectRail } from '../selection';
 import { assertCredentialTarget, createSecureFetch } from '../url-security';
 import { createMppAccount, createX402Signer, loadWallet, type Wallet } from '../wallets';
-import type { AipRequestDescriptor } from '../aip/presenter';
 import type { ClientEvmSigner } from '@x402/evm';
 
 /** Which identity to present to the merchant. */
 type IdentityMode = 'auto' | 'operator' | 'wallet';
-
-/** Parse a URL into the RFC 9421 covered components an AIT signature binds. Exported for tests. */
-export function requestDescriptor(url: string, method: string): AipRequestDescriptor {
-  const u = new URL(url);
-  // RFC 9421 @path is the absolute path ONLY, the query string is the separate @query component,
-  // which AIP's minimum covered set omits. The verifier reconstructs @path as pathname (query
-  // stripped), so signing pathname+search would make PoP fail for every query-bearing URL.
-  return { method: method.toUpperCase(), authority: u.host, path: u.pathname };
-}
 
 export interface PayInput {
   chain?: Chain;
