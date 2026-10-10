@@ -36,3 +36,29 @@ jobs:
         run: bun run build:binary:linux-arm64
       - name: Smoke test the native binary
         run: ./dist/bin/agentscore-pay-linux-arm64 --version
+
+  # engines.node declares the majors tested here; widen both together.
+  node-compat:
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24", "26"]
+    steps:
+      - uses: useblacksmith/checkout@v1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+      - run: bun install --frozen-lockfile
+      - run: node --version
+      - run: bun run test
+      - run: bun run build
+      - name: Run the built CLI under this Node
+        run: node dist/index.js --version
