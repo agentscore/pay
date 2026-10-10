@@ -66,10 +66,10 @@ describe('challengeToRail', () => {
   });
 
   it('prices a stripe/charge challenge in cents, not 6-decimal token units', () => {
-    // Real challenge from agents.scaledown.ai for a $5 top-up: 520 cents on the card rail.
+    // A live store's $5 top-up challenge (identifiers replaced): 520 cents on the card rail.
     const headers = new Headers({
       'www-authenticate':
-        'Payment id="-HTImfu1z1M_d_wnBV7gi5SxlH-E0E4rP1z1h2ovm1E", realm="agents.scaledown.ai", method="stripe", intent="charge", request="eyJhbW91bnQiOiI1MjAiLCJjdXJyZW5jeSI6InVzZCIsIm1ldGhvZERldGFpbHMiOnsibmV0d29ya0lkIjoicHJvZmlsZV82MVVoenpxcVdScUFsOFJpZkE2VWh6enBMTlNRS2VmQnB2dXdLbThvYTg1SSIsInBheW1lbnRNZXRob2RUeXBlcyI6WyJjYXJkIiwibGluayJdfX0", expires="2026-09-09T16:54:53.226Z"',
+        'Payment id="-HTImfu1z1M_d_wnBV7gi5SxlH-E0E4rP1z1h2ovm1E", realm="merchant.example", method="stripe", intent="charge", request="eyJhbW91bnQiOiI1MjAiLCJjdXJyZW5jeSI6InVzZCIsIm1ldGhvZERldGFpbHMiOnsibmV0d29ya0lkIjoicHJvZmlsZV90ZXN0IiwicGF5bWVudE1ldGhvZFR5cGVzIjpbImNhcmQiLCJsaW5rIl19fQ", expires="2026-09-09T16:54:53.226Z"',
     });
     const [c] = parsePaymentChallenges(headers);
     const rail = challengeToRail(c);
@@ -82,7 +82,7 @@ describe('challengeToRail', () => {
   it('honors methodDetails.decimals on a solana challenge', () => {
     const headers = new Headers({
       'www-authenticate':
-        'Payment id="WwV8KyG2lRZ0OWV3Wy5EirC2cAkD7E-Itfv8Tshsgws", realm="agents.scaledown.ai", method="solana", intent="charge", request="eyJhbW91bnQiOiI1MDAwMDAwIiwiY3VycmVuY3kiOiJFUGpGV2RkNUF1ZnFTU3FlTTJxTjF4enliYXBDOEc0d0VHR2tad3lURHQxdiIsIm1ldGhvZERldGFpbHMiOnsiZGVjaW1hbHMiOjYsImZlZVBheWVyIjp0cnVlLCJmZWVQYXllcktleSI6IjZTODlZTXk5dGN5UWVqOHVidzN1Q1NQZHdCRG1CTUNlVlRNalFWWmZBcExWIiwibmV0d29yayI6Im1haW5uZXQtYmV0YSIsInJlY2VudEJsb2NraGFzaCI6IjZQWHRGTUF4VVQ1WWlBR2lXR2tDY2I4RWFqZ3d1MnhMSFpKM3FYVjIxclVnIiwidG9rZW5Qcm9ncmFtIjoiVG9rZW5rZWdRZmVaeWlOd0FKYk5iR0tQRlhDV3VCdmY5U3M2MjNWUTVEQSJ9LCJyZWNpcGllbnQiOiI4Um5rU0NpaHJIaVh1R2RhcFZwRHRBZUo0Umo4aXdkb2tLcEc1NDltNTlBZiJ9", expires="2026-09-09T16:54:53.173Z"',
+        'Payment id="WwV8KyG2lRZ0OWV3Wy5EirC2cAkD7E-Itfv8Tshsgws", realm="merchant.example", method="solana", intent="charge", request="eyJhbW91bnQiOiI1MDAwMDAwIiwiY3VycmVuY3kiOiJFUGpGV2RkNUF1ZnFTU3FlTTJxTjF4enliYXBDOEc0d0VHR2tad3lURHQxdiIsIm1ldGhvZERldGFpbHMiOnsiZGVjaW1hbHMiOjYsImZlZVBheWVyIjp0cnVlLCJmZWVQYXllcktleSI6IjZTODlZTXk5dGN5UWVqOHVidzN1Q1NQZHdCRG1CTUNlVlRNalFWWmZBcExWIiwibmV0d29yayI6Im1haW5uZXQtYmV0YSIsInJlY2VudEJsb2NraGFzaCI6IjZQWHRGTUF4VVQ1WWlBR2lXR2tDY2I4RWFqZ3d1MnhMSFpKM3FYVjIxclVnIiwidG9rZW5Qcm9ncmFtIjoiVG9rZW5rZWdRZmVaeWlOd0FKYk5iR0tQRlhDV3VCdmY5U3M2MjNWUTVEQSJ9LCJyZWNpcGllbnQiOiIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSJ9", expires="2026-09-09T16:54:53.173Z"',
     });
     const [c] = parsePaymentChallenges(headers);
     const rail = challengeToRail(c);
