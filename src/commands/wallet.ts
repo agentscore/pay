@@ -1,4 +1,4 @@
-import { SUPPORTED_CHAINS, type Chain } from '../constants';
+import { SUPPORTED_CHAINS, type WalletChain } from '../constants';
 import { CliError } from '../errors';
 import { decryptSecret, deleteKeystore, keystoreExists, listWallets, loadKeystore } from '../keystore';
 import { deriveKey, generatePhrase, validatePhrase } from '../mnemonic';
@@ -18,7 +18,7 @@ function validateWalletName(name: string): void {
 }
 
 interface CreateResult {
-  chain: Chain;
+  chain: WalletChain;
   name: string;
   address: string;
   keystore: string;
@@ -28,7 +28,7 @@ interface CreateResult {
 }
 
 export interface WalletCreateInput {
-  chain?: Chain;
+  chain?: WalletChain;
   mnemonic?: boolean;
   name?: string;
 }
@@ -55,7 +55,7 @@ export async function walletCreate(input: WalletCreateInput = {}): Promise<Walle
     return walletCreateMnemonic(input.chain);
   }
   const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
-  const targets: Chain[] = [];
+  const targets: WalletChain[] = [];
   const existing: CreateResult[] = [];
 
   for (const c of chains) {
@@ -103,7 +103,7 @@ export async function walletCreate(input: WalletCreateInput = {}): Promise<Walle
   return { created, skipped: existing };
 }
 
-async function walletCreateMnemonic(chain?: Chain): Promise<WalletCreateResult> {
+async function walletCreateMnemonic(chain?: WalletChain): Promise<WalletCreateResult> {
   if (await mnemonicExists()) {
     throw new CliError('wallet_exists', 'A mnemonic is already stored.', {
       nextSteps: {
@@ -145,13 +145,13 @@ async function walletCreateMnemonic(chain?: Chain): Promise<WalletCreateResult> 
 }
 
 export interface WalletImportInput {
-  chain: Chain;
+  chain: WalletChain;
   key: string;
   name?: string;
 }
 
 export interface WalletImportResult {
-  chain: Chain;
+  chain: WalletChain;
   name: string;
   address: string;
   keystore: string;
@@ -187,7 +187,7 @@ export async function walletImport(input: WalletImportInput): Promise<WalletImpo
 
 export interface WalletImportMnemonicInput {
   phrase: string;
-  chain?: Chain;
+  chain?: WalletChain;
 }
 
 export interface WalletImportMnemonicResult {
@@ -242,11 +242,11 @@ export async function walletImportMnemonic(input: WalletImportMnemonicInput): Pr
 }
 
 export interface WalletAddressInput {
-  chain: Chain;
+  chain: WalletChain;
   name?: string;
 }
 
-export async function walletAddress(input: WalletAddressInput): Promise<{ chain: Chain; name: string; address: string }> {
+export async function walletAddress(input: WalletAddressInput): Promise<{ chain: WalletChain; name: string; address: string }> {
   const name = input.name ?? DEFAULT_WALLET_NAME;
   validateWalletName(name);
   const file = await loadKeystore(input.chain, name);
@@ -254,10 +254,10 @@ export async function walletAddress(input: WalletAddressInput): Promise<{ chain:
 }
 
 export interface WalletListInput {
-  chain?: Chain;
+  chain?: WalletChain;
 }
 
-export async function walletList(input: WalletListInput = {}): Promise<{ wallets: Array<{ chain: Chain; names: string[] }> }> {
+export async function walletList(input: WalletListInput = {}): Promise<{ wallets: Array<{ chain: WalletChain; names: string[] }> }> {
   const chains = input.chain ? [input.chain] : [...SUPPORTED_CHAINS];
   const rows = await Promise.all(
     chains.map(async (c) => ({ chain: c, names: await listWallets(c) })),
@@ -266,7 +266,7 @@ export async function walletList(input: WalletListInput = {}): Promise<{ wallets
 }
 
 export interface WalletRemoveInput {
-  chain: Chain;
+  chain: WalletChain;
   name?: string;
   danger?: boolean;
   skipConfirm?: boolean;
@@ -274,7 +274,7 @@ export interface WalletRemoveInput {
 
 export interface WalletRemoveResult {
   ok: true;
-  chain: Chain;
+  chain: WalletChain;
   name: string;
   address: string;
   removed_files: string[];
@@ -314,14 +314,14 @@ export async function walletRemove(input: WalletRemoveInput): Promise<WalletRemo
 }
 
 export interface WalletExportInput {
-  chain: Chain;
+  chain: WalletChain;
   name?: string;
   danger?: boolean;
   skipConfirm?: boolean;
 }
 
 export interface WalletExportResult {
-  chain: Chain;
+  chain: WalletChain;
   name: string;
   address: string;
   format: 'hex' | 'base64';

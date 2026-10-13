@@ -1,4 +1,4 @@
-import { isKnownUSDC, type Chain } from './constants';
+import { isKnownUSDC, type Chain, type WalletChain } from './constants';
 import { lookupRailHint, type RailHint } from './rail-hints';
 import { challengeToRail, parsePaymentChallenges } from './www-authenticate';
 
@@ -11,7 +11,7 @@ function safeBigInt(raw: string): bigint | null {
 }
 
 export interface RailQuote {
-  chain: Chain;
+  chain: WalletChain;
   price_usd?: number;
   decimals?: number;
   price_raw?: string;
@@ -70,11 +70,16 @@ export function parseBody(body: unknown, headers?: Headers): ParsedRails {
 
   if (Array.isArray(record.accepts)) {
     for (const a of record.accepts as X402Accept[]) {
-      const chain = chainFromNetworkId(a.network);
       // x402 v1 → maxAmountRequired; v2 → amount. Decimals not at top level; use
       // extra.decimals if present, else canonical USDC = 6, else leave undefined
       // rather than display a wrong value.
       const priceRaw = a.amount ?? a.maxAmountRequired ?? '0';
+      if (a.network === 'nano:mainnet' && (a.scheme ?? 'exact') === 'exact') {
+        // Opt-in rail (`pay --chain nano`). XNO is quoted in raw and is never reported as USD.
+        supported.push({ chain: 'nano', decimals: 30, price_raw: priceRaw, asset: a.asset, pay_to: a.payTo, protocol: 'x402' });
+        continue;
+      }
+      const chain = chainFromNetworkId(a.network);
       if (!chain) {
         unsupported.push({
           protocol: 'x402',

@@ -4,9 +4,12 @@ import { x402Client } from '@x402/core/client';
 import { ExactEvmScheme } from '@x402/evm/exact/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
 import { Mppx, tempo } from 'mppx/client';
-import { evmConfig, isKnownUSDC, svmConfig, type Chain, type Network } from '../constants';
+import * as nanoChain from '../chains/nano';
+import { ExactNanoScheme } from '../chains/nano-x402';
+import { evmConfig, isKnownUSDC, nanoConfig, svmConfig, type Network, type WalletChain } from '../constants';
 import { CliError } from '../errors';
 import { mergeHeaders } from '../headers';
+import { loadKeystore } from '../keystore';
 import { appendEntry } from '../ledger';
 import { enforce, loadLimits } from '../limits';
 import { attachPassport } from '../passport/attach';
@@ -25,13 +28,15 @@ import type { ClientEvmSigner } from '@x402/evm';
 type IdentityMode = 'auto' | 'operator' | 'wallet';
 
 export interface PayInput {
-  chain?: Chain;
+  chain?: WalletChain;
   network?: Network;
   method: string;
   url: string;
   body?: string;
   headers?: Record<string, string>;
   maxSpendUsd?: number;
+  /** Per-call XNO ceiling (decimal string). Required with chain 'nano', which has no USD price. */
+  maxSpendXno?: string;
   verbose?: boolean;
   dryRun?: boolean;
   timeoutSeconds?: number;
@@ -53,9 +58,10 @@ interface PayIdentityPlan {
 
 interface PayDryRunResult {
   dry_run: true;
-  selected_chain: Chain;
+  selected_chain: WalletChain;
   signer: string;
-  balance_usdc: string;
+  balance_usdc?: string;
+  balance_xno?: string;
   method: string;
   url: string;
   protocol: Protocol;
@@ -63,6 +69,7 @@ interface PayDryRunResult {
   headers: Record<string, string>;
   body: string | null;
   max_spend_usd: number | null;
+  max_spend_xno?: string;
 }
 
 interface PaySettledResult {
@@ -70,10 +77,11 @@ interface PaySettledResult {
   ok: boolean;
   status: number;
   status_text: string;
-  chain: Chain;
+  chain: WalletChain;
   signer: string;
   protocol: Protocol;
   price_usd?: string;
+  price_xno?: string;
   tx_hash?: string;
   next_steps_action?: string;
   body: unknown;
@@ -86,6 +94,7 @@ const DEFAULT_RETRIES = 0;
 
 interface PaymentSettled {
   price_usd?: string;
+  price_xno?: string;
   tx_hash?: string;
   /**
    * Structured abort surfaced by the x402 onBeforePaymentCreation hook. x402-fetch wraps
@@ -94,22 +103,29 @@ interface PaymentSettled {
    * with the right code + nextSteps.
    */
   cliError?: CliError;
+  /** Nano blocks published during this invocation, so a retry re-presents rather than re-pays. */
+  nanoPublished?: Map<string, string>;
 }
 
 export async function pay(input: PayInput): Promise<PayResult> {
   const network: Network = input.network ?? 'mainnet';
   const walletName = input.name ?? DEFAULT_WALLET_NAME;
-  const candidate = await selectRail({ chainOverride: input.chain, walletName, network });
+  const candidate: PayCandidate =
+    input.chain === 'nano'
+      ? await selectNanoRail(input, walletName, network)
+      : await selectRail({ chainOverride: input.chain, walletName, network });
   if (input.verbose) {
     emitProgress('rail_selected', {
       chain: candidate.chain,
       address: candidate.address,
-      balance_usdc: candidate.balance_usdc,
+      ...(candidate.balance_xno !== undefined
+        ? { balance_xno: candidate.balance_xno }
+        : { balance_usdc: candidate.balance_usdc }),
       reason: input.chain ? 'user_override' : 'auto',
     });
   }
 
-  const protocol: Protocol = candidate.chain === 'base' ? 'x402' : 'mpp';
+  const protocol: Protocol = usesX402(candidate.chain) ? 'x402' : 'mpp';
 
   // Resolve AgentScore Passport once (also reused on the live path below). When the
   // caller provided their own X-Operator-Token or set --skip-passport, this is a no-op.
@@ -223,7 +239,9 @@ export async function pay(input: PayInput): Promise<PayResult> {
       dry_run: true,
       selected_chain: candidate.chain,
       signer: candidate.address,
-      balance_usdc: candidate.balance_usdc,
+      ...(candidate.balance_xno !== undefined
+        ? { balance_xno: candidate.balance_xno }
+        : { balance_usdc: candidate.balance_usdc }),
       method: input.method,
       url: input.url,
       protocol,
@@ -231,6 +249,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
       headers,
       body: input.body ?? null,
       max_spend_usd: input.maxSpendUsd ?? null,
+      ...(input.maxSpendXno !== undefined ? { max_spend_xno: input.maxSpendXno } : {}),
     };
   }
 
@@ -298,7 +317,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
   try {
     res = await withRetries(
       () =>
-        wallet.chain === 'base'
+        usesX402(wallet.chain)
           ? payViaX402(wallet, input, init, network, settled, willAttachOperatorToken)
           : payViaMpp(wallet, input, init, network, settled, willAttachOperatorToken),
       {
@@ -428,7 +447,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     const retrySettled: PaymentSettled = {};
     try {
       res = await (
-        wallet.chain === 'base'
+        usesX402(wallet.chain)
           ? payViaX402(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled, true)
           : payViaMpp(wallet, { ...input, body: retryBody }, retryInit, network, retrySettled, true)
       );
@@ -442,6 +461,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     text = await res.text();
     parsed = tryParseJson(text);
     settled.price_usd = retrySettled.price_usd ?? settled.price_usd;
+    settled.price_xno = retrySettled.price_xno ?? settled.price_xno;
     settled.tx_hash = retrySettled.tx_hash ?? settled.tx_hash;
   }
 
@@ -459,6 +479,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     status: res.status,
     protocol,
     ...(settled.price_usd ? { price_usd: settled.price_usd } : {}),
+    ...(settled.price_xno ? { price_xno: settled.price_xno } : {}),
     ...(settled.tx_hash ? { tx_hash: settled.tx_hash } : {}),
     ...(nextStepsAction ? { next_steps_action: nextStepsAction } : {}),
     ok: res.ok,
@@ -473,6 +494,7 @@ export async function pay(input: PayInput): Promise<PayResult> {
     signer: wallet.address,
     protocol,
     ...(settled.price_usd ? { price_usd: settled.price_usd } : {}),
+    ...(settled.price_xno ? { price_xno: settled.price_xno } : {}),
     ...(settled.tx_hash ? { tx_hash: settled.tx_hash } : {}),
     ...(nextStepsAction ? { next_steps_action: nextStepsAction } : {}),
     body: parsed ?? text,
@@ -522,9 +544,9 @@ function safeHost(url: string): string {
   }
 }
 
-function resolveDecimals(declared: number | undefined, asset: string | undefined, chain: Chain): number {
+function resolveDecimals(declared: number | undefined, asset: string | undefined, chain: WalletChain): number {
   if (declared !== undefined) return Number(declared);
-  if (isKnownUSDC(asset, chain)) return 6;
+  if (chain !== 'nano' && isKnownUSDC(asset, chain)) return 6;
   throw new CliError(
     'merchant_spec_violation',
     `Merchant 402 omitted 'decimals' for unrecognized asset ${asset ?? '(none)'} on ${chain}. Refusing to pay, guessing decimals risks orders-of-magnitude mis-billing.`,
@@ -546,7 +568,6 @@ async function payViaX402(
   settled: PaymentSettled,
   guardRedirects = false,
 ): Promise<Response> {
-  const signer = await createX402Signer(wallet, network);
   const client = new x402Client();
   // @x402/core 2.23.0 turns spend controls on by default: an omitted
   // maxAmountPerPayment falls back to $1, and non-default assets are rejected
@@ -559,12 +580,24 @@ async function payViaX402(
   // authority.
   client.setSpendControls(false);
   if (wallet.chain === 'base') {
+    const signer = await createX402Signer(wallet, network);
     const cfg = evmConfig('base', network);
     const evmClient = new ExactEvmScheme(signer as ClientEvmSigner);
     client.register(cfg.network as `${string}:${string}`, evmClient);
     client.registerV1(cfg.network as `${string}:${string}`, evmClient);
+  } else if (wallet.chain === 'nano') {
+    const cfg = nanoConfig();
+    const nanoClient = new ExactNanoScheme({
+      key: wallet.secret,
+      rpc: nanoChain.createRpc(cfg.rpcUrl),
+      published: (settled.nanoPublished ??= new Map()),
+      onError: (err) => {
+        if (err instanceof CliError) settled.cliError = err;
+      },
+    });
+    client.register(cfg.network as `${string}:${string}`, nanoClient);
   } else {
-    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain}, only Base is supported under x402; Tempo and Solana go through MPP.`);
+    throw new CliError('unsupported_rail', `x402 path called on chain ${wallet.chain}, only Base and Nano are supported under x402; Tempo and Solana go through MPP.`);
   }
 
   const host = safeHost(input.url);
@@ -577,6 +610,7 @@ async function payViaX402(
       extra?: { decimals?: number };
     };
     try {
+      if (wallet.chain === 'nano') return checkNanoSpend(req, input, settled);
       const declaredDecimals = typeof req.extra?.decimals === 'number' ? req.extra.decimals : undefined;
       const decimals = resolveDecimals(declaredDecimals, req.asset, wallet.chain);
       const priceRaw = BigInt(req.amount ?? req.maxAmountRequired ?? '0');
@@ -614,6 +648,69 @@ async function payViaX402(
   const baseFetch = guardRedirects ? createSecureFetch() : fetch;
   const fetchWithPay = wrapFetchWithPayment(baseFetch, client);
   return fetchWithPay(input.url, init);
+}
+
+function usesX402(chain: WalletChain): boolean {
+  return chain === 'base' || chain === 'nano';
+}
+
+interface PayCandidate {
+  chain: WalletChain;
+  address: string;
+  balance_usdc?: string;
+  balance_xno?: string;
+}
+
+/**
+ * Nano is reached only by an explicit `--chain nano`. XNO has no USD price inside
+ * pay, so neither --max-spend nor the USD `limits` can bound it: the caller must
+ * name an XNO ceiling, and the payment is never written as price_usd.
+ */
+async function selectNanoRail(input: PayInput, walletName: string, network: Network): Promise<PayCandidate> {
+  if (network !== 'mainnet') {
+    throw new CliError('invalid_network', 'Nano is mainnet-only in pay; drop --network testnet.', {
+      extra: { chain: 'nano', network },
+    });
+  }
+  if (input.maxSpendXno === undefined) {
+    throw new CliError(
+      'limit_required',
+      '--chain nano needs --max-spend-xno. XNO is not priced in USD, so --max-spend and the USD limits cannot cap it.',
+      {
+        nextSteps: { action: 'pass_max_spend_xno', suggestion: 'Re-run with --max-spend-xno <XNO>, e.g. --max-spend-xno 0.05.' },
+        extra: { chain: 'nano' },
+      },
+    );
+  }
+  nanoChain.parseXno(input.maxSpendXno);
+  const ks = await loadKeystore('nano', walletName);
+  const raw = await nanoChain.balance(ks.address);
+  return { chain: 'nano', address: ks.address, balance_xno: nanoChain.formatBalance(raw) };
+}
+
+function checkNanoSpend(
+  req: { amount?: string; maxAmountRequired?: string },
+  input: PayInput,
+  settled: PaymentSettled,
+): { abort: true; reason: string } | undefined {
+  const amount = req.amount ?? req.maxAmountRequired ?? '';
+  if (!/^\d+$/.test(amount)) {
+    throw new CliError('merchant_spec_violation', `Merchant 402 amount for nano is not integer raw: ${amount}`, {
+      extra: { chain: 'nano', amount },
+    });
+  }
+  const priceRaw = BigInt(amount);
+  const capRaw = nanoChain.parseXno(input.maxSpendXno ?? '0');
+  settled.price_xno = nanoChain.formatBalance(priceRaw);
+  if (priceRaw > capRaw) {
+    settled.cliError = new CliError(
+      'max_spend_exceeded',
+      `Payment ${settled.price_xno} XNO exceeds --max-spend-xno ${input.maxSpendXno}`,
+      { extra: { price_raw: priceRaw.toString(), max_spend_xno: input.maxSpendXno, chain: 'nano' } },
+    );
+    return { abort: true, reason: settled.cliError.message };
+  }
+  return undefined;
 }
 
 async function payViaMpp(

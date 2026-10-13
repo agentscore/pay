@@ -1,13 +1,13 @@
 import { appendFile, mkdir, readFile } from 'fs/promises';
 import { dirname } from 'path';
 import { ledgerPath } from './paths';
-import type { Chain } from './constants';
+import type { WalletChain } from './constants';
 
 export { ledgerPath } from './paths';
 
 export interface LedgerEntry {
   timestamp: string;
-  chain: Chain;
+  chain: WalletChain;
   signer: string;
   method: string;
   url: string;
@@ -15,6 +15,7 @@ export interface LedgerEntry {
   status: number;
   protocol: 'x402' | 'mpp';
   price_usd?: string;
+  price_xno?: string;
   tx_hash?: string;
   next_steps_action?: string;
   ok: boolean;

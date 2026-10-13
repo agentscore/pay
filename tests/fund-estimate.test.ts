@@ -129,6 +129,39 @@ describe('parseBody', () => {
     expect(supported.map((q) => q.protocol).sort()).toEqual(['mpp', 'x402']);
   });
 
+  it('lists x402 exact on nano:mainnet as supported, in raw and never as USD', () => {
+    const body = {
+      accepts: [
+        {
+          scheme: 'exact',
+          network: 'nano:mainnet',
+          amount: '10000000000000000000000000000',
+          asset: 'XNO',
+          payTo: 'nano_3i1aq1cchnmbn9x5rsbap8b15akfh7wj7pwskuzi7ahz8oq6cobd99d4r3b7',
+          extra: { decimals: 30 },
+        },
+      ],
+    };
+    const { supported, unsupported } = parseBody(body);
+    expect(unsupported).toHaveLength(0);
+    expect(supported).toEqual([
+      {
+        chain: 'nano',
+        decimals: 30,
+        price_raw: '10000000000000000000000000000',
+        asset: 'XNO',
+        pay_to: 'nano_3i1aq1cchnmbn9x5rsbap8b15akfh7wj7pwskuzi7ahz8oq6cobd99d4r3b7',
+        protocol: 'x402',
+      },
+    ]);
+  });
+
+  it('keeps non-exact schemes on nano:mainnet unsupported', () => {
+    const { supported, unsupported } = parseBody({ accepts: [{ scheme: 'upto', network: 'nano:mainnet', amount: '1' }] });
+    expect(supported).toHaveLength(0);
+    expect(unsupported).toEqual([expect.objectContaining({ scheme: 'upto', network: 'nano:mainnet' })]);
+  });
+
   it('surfaces unsupported x402 rails with hints when known', () => {
     const body = {
       accepts: [{ scheme: 'exact', network: 'eip155:137', maxAmountRequired: '100' }],

@@ -226,6 +226,17 @@ The CLI never touches stdout for human chrome when `--json` is passed: every byt
 
 Solana payments route through MPP `solana/charge` (Solana Foundation's `@solana/mpp` package) rather than x402. Tempo is always MPP via `mppx/client`. Base is the only x402 rail pay funds directly.
 
+### Nano (opt-in)
+
+`nano` is an opt-in x402 `exact` rail on `nano:mainnet`, used only when named with `--chain nano`. It is never auto-selected and `wallet create` without `--chain` does not create it. XNO has no USD price inside pay, so `--max-spend` and `limits` cannot bound it: `pay --chain nano` requires `--max-spend-xno` and refuses with `limit_required` without it. Ledger entries carry `price_xno`, never `price_usd`.
+
+```bash
+agentscore-pay wallet create --chain nano
+agentscore-pay pay POST https://merchant.example/api --chain nano -d '{}' --max-spend-xno 0.05
+```
+
+The client publishes a state send block to the 402's `payTo` (`nano_` or legacy `xrb_`) and sends `{ "blockHash": "..." }` as the x402 payload. Proof of work comes from the node's `work_generate`, so `NANO_RPC_URL` must point at a node or proxy that serves it.
+
 ## Rail selection
 
 The CLI ships with **no default rail preference**. Algorithm:
@@ -520,6 +531,7 @@ The npm package itself is published with [npm provenance](https://docs.npmjs.com
 | `SOLANA_DEVNET_RPC_URL` | override Solana Devnet RPC endpoint |
 | `TEMPO_RPC_URL` | override Tempo mainnet RPC endpoint |
 | `TEMPO_TESTNET_RPC_URL` | override Tempo testnet RPC endpoint |
+| `NANO_RPC_URL` | Nano node RPC used by `--chain nano` (must serve `work_generate`) |
 | `AGENTSCORE_API_KEY` | API key for identity commands (`assess`, `sessions`, `credentials`, `associate-wallet`) |
 
 ## Relationship to other AgentScore packages

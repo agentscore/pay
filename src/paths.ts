@@ -1,6 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import type { Chain } from './constants';
+import type { WalletChain } from './constants';
 
 export const DEFAULT_WALLET_NAME = 'default';
 
@@ -18,11 +18,11 @@ export function walletsDir(): string {
   return join(baseDir(), 'wallets');
 }
 
-export function keystorePath(chain: Chain, name: string = DEFAULT_WALLET_NAME): string {
+export function keystorePath(chain: WalletChain, name: string = DEFAULT_WALLET_NAME): string {
   return join(walletsDir(), `${chain}-${name}.json`);
 }
 
-export function legacyKeystorePath(chain: Chain): string {
+export function legacyKeystorePath(chain: WalletChain): string {
   return join(walletsDir(), `${chain}.json`);
 }
 
