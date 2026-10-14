@@ -1,6 +1,14 @@
 export const SUPPORTED_CHAINS = ['base', 'solana', 'tempo'] as const;
 export type Chain = (typeof SUPPORTED_CHAINS)[number];
 
+/**
+ * Rails reachable only through an explicit `--chain`. They are never auto-selected,
+ * never created by default, and never priced in USD, so the USDC-centred commands
+ * (balance totals, limits, fund) keep their meaning.
+ */
+export const OPT_IN_CHAINS = ['nano'] as const;
+export type WalletChain = Chain | (typeof OPT_IN_CHAINS)[number];
+
 export const SUPPORTED_NETWORKS = ['mainnet', 'testnet'] as const;
 export type Network = (typeof SUPPORTED_NETWORKS)[number];
 
@@ -11,6 +19,7 @@ const DEFAULT_RPC = {
   solana_devnet: 'https://api.devnet.solana.com',
   tempo_mainnet: 'https://rpc.tempo.xyz',
   tempo_testnet: 'https://rpc.moderato.tempo.xyz',
+  nano_mainnet: 'https://rpc.nano.to',
 } as const;
 
 function rpcUrl(envKey: string, fallback: string): string {
@@ -72,6 +81,17 @@ export type SvmConfig = {
   rpcUrl: string;
   network: string;
 };
+
+export type NanoConfig = {
+  network: string;
+  decimals: number;
+  rpcUrl: string;
+};
+
+/** Nano has one native asset (XNO); amounts are integer raw, 1 XNO = 10^30 raw. */
+export function nanoConfig(): NanoConfig {
+  return { network: 'nano:mainnet', decimals: 30, rpcUrl: rpcUrl('NANO_RPC_URL', DEFAULT_RPC.nano_mainnet) };
+}
 
 export function evmConfig(chain: 'base' | 'tempo', network: Network = 'mainnet'): EvmConfig {
   if (chain === 'base') {

@@ -1,32 +1,35 @@
 import * as base from './chains/base';
+import * as nano from './chains/nano';
 import * as solana from './chains/solana';
 import * as tempo from './chains/tempo';
 import { CliError } from './errors';
 import { decryptSecret, encryptSecret, keystoreExists, loadKeystore, saveKeystore } from './keystore';
 import { DEFAULT_WALLET_NAME } from './paths';
-import type { Chain, Network } from './constants';
+import type { Network, WalletChain } from './constants';
 
 export interface Wallet {
-  chain: Chain;
+  chain: WalletChain;
   address: string;
   secret: Buffer;
   name?: string;
 }
 
-function generateKey(chain: Chain): Buffer {
+function generateKey(chain: WalletChain): Buffer {
   if (chain === 'base') return base.generateKey();
+  if (chain === 'nano') return nano.generateKey();
   if (chain === 'solana') return solana.generateKey();
   return tempo.generateKey();
 }
 
-async function deriveAddress(chain: Chain, secret: Buffer): Promise<string> {
+async function deriveAddress(chain: WalletChain, secret: Buffer): Promise<string> {
   if (chain === 'base') return base.keyToAddress(secret);
+  if (chain === 'nano') return nano.keyToAddress(secret);
   if (chain === 'solana') return solana.keyToAddress(secret);
   return tempo.keyToAddress(secret);
 }
 
 export async function createWallet(
-  chain: Chain,
+  chain: WalletChain,
   passphrase: string,
   existing?: Buffer,
   name: string = DEFAULT_WALLET_NAME,
@@ -45,7 +48,7 @@ export async function createWallet(
 }
 
 export async function loadWallet(
-  chain: Chain,
+  chain: WalletChain,
   passphrase: string,
   name: string = DEFAULT_WALLET_NAME,
 ): Promise<Wallet> {
@@ -65,6 +68,7 @@ export async function loadWallet(
 export function getQrUri(wallet: Wallet, amountUsd?: number, network: Network = 'mainnet'): string {
   if (wallet.chain === 'base') return base.qrUri(wallet.address, amountUsd, network);
   if (wallet.chain === 'solana') return solana.qrUri(wallet.address, amountUsd, network);
+  if (wallet.chain === 'nano') return nano.qrUri(wallet.address);
   return tempo.qrUri(wallet.address, amountUsd, network);
 }
 

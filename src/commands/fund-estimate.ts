@@ -87,7 +87,8 @@ export async function fundEstimate(opts: FundEstimateOptions): Promise<FundEstim
     quotes.map(async (q) => {
       const funded = await keystoreExists(q.chain);
       let balance: number | null = null;
-      if (funded) {
+      // A nano quote is in XNO, so there is no USD balance to weigh it against.
+      if (funded && q.chain !== 'nano') {
         const ks = await loadKeystore(q.chain);
         balance = await balanceUsd(q.chain, network, ks.address);
       }

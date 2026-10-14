@@ -5,6 +5,7 @@ import {
   walletAddress,
   walletCreate,
   walletExport,
+  walletImport,
   walletList,
   walletRemove,
   walletShowMnemonic,
@@ -75,5 +76,20 @@ describe('wallet commands', () => {
     const result = await walletCreate({});
     expect(result.created.map((c) => c.chain).sort()).toEqual(['solana', 'tempo']);
     expect(result.skipped.map((c) => c.chain)).toEqual(['base']);
+  });
+
+  it('creates nano only when named, never as part of the default set', async () => {
+    const all = await walletCreate({});
+    expect(all.created.map((c) => c.chain).sort()).toEqual(['base', 'solana', 'tempo']);
+    const nano = await walletCreate({ chain: 'nano' });
+    expect(nano.created[0]).toMatchObject({ chain: 'nano', qr_uri: expect.stringMatching(/^nano:nano_/) });
+    expect(nano.created[0]!.address).toMatch(/^nano_[13][13456789abcdefghijkmnopqrstuwxyz]{59}$/);
+  });
+
+  it('imports a raw nano key into a keystore under its nano_ address', async () => {
+    const key = '9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f';
+    const result = await walletImport({ chain: 'nano', key });
+    expect(result.address).toBe('nano_3i1aq1cchnmbn9x5rsbap8b15akfh7wj7pwskuzi7ahz8oq6cobd99d4r3b7');
+    await expect(walletAddress({ chain: 'nano' })).resolves.toMatchObject({ address: result.address });
   });
 });

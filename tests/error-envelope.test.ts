@@ -402,6 +402,7 @@ describe('exitCodeForError mapping', () => {
     ['merchant_spec_violation', EXIT_CODES.PAYMENT_REJECTED],
     ['max_spend_exceeded', EXIT_CODES.PAYMENT_REJECTED],
     ['limit_exceeded', EXIT_CODES.PAYMENT_REJECTED],
+    ['limit_required', EXIT_CODES.PAYMENT_REJECTED],
     ['insufficient_balance', EXIT_CODES.INSUFFICIENT_FUNDS],
     ['no_funded_rail', EXIT_CODES.INSUFFICIENT_FUNDS],
     ['multi_rail_candidates', EXIT_CODES.MULTI_RAIL_AMBIGUITY],

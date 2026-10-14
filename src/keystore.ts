@@ -9,7 +9,7 @@ import {
   legacyKeystorePath,
   walletsDir,
 } from './paths';
-import type { Chain } from './constants';
+import type { WalletChain } from './constants';
 
 export { keystorePath } from './paths';
 
@@ -30,7 +30,7 @@ function scryptAsync(passphrase: string, salt: Buffer, keylen: number, opts: Scr
 
 export interface KeystoreFile {
   version: 1;
-  chain: Chain;
+  chain: WalletChain;
   address: string;
   name?: string;
   encryption: {
@@ -91,7 +91,7 @@ export async function saveKeystore(file: KeystoreFile): Promise<string> {
   return path;
 }
 
-async function readKeystoreFromPath(path: string, chain: Chain): Promise<KeystoreFile> {
+async function readKeystoreFromPath(path: string, chain: WalletChain): Promise<KeystoreFile> {
   const raw = await readFile(path, 'utf-8');
   const parsed = JSON.parse(raw) as KeystoreFile;
   if (parsed.version !== 1) throw new Error(`Unsupported keystore version: ${parsed.version}`);
@@ -99,7 +99,7 @@ async function readKeystoreFromPath(path: string, chain: Chain): Promise<Keystor
   return parsed;
 }
 
-export async function loadKeystore(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<KeystoreFile> {
+export async function loadKeystore(chain: WalletChain, name: string = DEFAULT_WALLET_NAME): Promise<KeystoreFile> {
   if (!isValidWalletName(name)) throw new Error(`Invalid wallet name: ${name}`);
   try {
     return await readKeystoreFromPath(_keystorePath(chain, name), chain);
@@ -117,7 +117,7 @@ export async function loadKeystore(chain: Chain, name: string = DEFAULT_WALLET_N
   }
 }
 
-function missingKeystore(chain: Chain, name: string): CliError {
+function missingKeystore(chain: WalletChain, name: string): CliError {
   return new CliError('no_wallet', `No ${chain} keystore for wallet "${name}".`, {
     nextSteps: {
       action: 'create_or_import_wallet',
@@ -127,7 +127,7 @@ function missingKeystore(chain: Chain, name: string): CliError {
   });
 }
 
-export async function keystoreExists(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<boolean> {
+export async function keystoreExists(chain: WalletChain, name: string = DEFAULT_WALLET_NAME): Promise<boolean> {
   if (!isValidWalletName(name)) return false;
   try {
     await readFile(_keystorePath(chain, name), 'utf-8');
@@ -145,7 +145,7 @@ export async function keystoreExists(chain: Chain, name: string = DEFAULT_WALLET
   }
 }
 
-export async function listWallets(chain: Chain): Promise<string[]> {
+export async function listWallets(chain: WalletChain): Promise<string[]> {
   let entries: string[];
   try {
     entries = await readdir(walletsDir());
@@ -167,7 +167,7 @@ export async function listWallets(chain: Chain): Promise<string[]> {
   return [...names].sort();
 }
 
-export async function deleteKeystore(chain: Chain, name: string = DEFAULT_WALLET_NAME): Promise<string[]> {
+export async function deleteKeystore(chain: WalletChain, name: string = DEFAULT_WALLET_NAME): Promise<string[]> {
   if (!isValidWalletName(name)) throw new Error(`Invalid wallet name: ${name}`);
   const removed: string[] = [];
   const newPath = _keystorePath(chain, name);

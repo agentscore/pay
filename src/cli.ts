@@ -39,7 +39,7 @@ import {
   walletShowMnemonic,
 } from './commands/wallet';
 import { whoami } from './commands/whoami';
-import { SUPPORTED_CHAINS, SUPPORTED_NETWORKS } from './constants';
+import { OPT_IN_CHAINS, SUPPORTED_CHAINS, SUPPORTED_NETWORKS } from './constants';
 import { CliError, exitCodeForError } from './errors';
 
 declare const __VERSION__: string;
@@ -47,6 +47,10 @@ declare const __VERSION__: string;
 const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0-dev';
 
 const chainSchema = z.enum(SUPPORTED_CHAINS).describe('Blockchain rail (base, solana, tempo)');
+// Keystore and pay commands also take opt-in rails, which are only ever used when named.
+const walletChainSchema = z
+  .enum([...SUPPORTED_CHAINS, ...OPT_IN_CHAINS])
+  .describe('Blockchain rail (base, solana, tempo; nano only when named)');
 const networkSchema = z.enum(SUPPORTED_NETWORKS).default('mainnet').describe('Mainnet (default) or testnet');
 const walletNameSchema = z.string().default('default').describe('Named keystore, pass a name to pick a non-default wallet');
 
@@ -209,7 +213,7 @@ export function buildCli() {
     mcp: false,
     description: 'Generate a new encrypted keystore. Omit --chain to create all three chains.',
     options: z.object({
-      chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
+      chain: walletChainSchema.optional().describe('Blockchain rail (base, solana, tempo; nano only when named)'),
       name: walletNameSchema,
       mnemonic: z.boolean().optional().describe('Generate a BIP-39 mnemonic and derive keys from it'),
     }),
@@ -232,7 +236,7 @@ export function buildCli() {
       key: z.string().optional().describe('Hex private key (EVM) or base64 private-key seed (Solana)'),
     }),
     options: z.object({
-      chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
+      chain: walletChainSchema.optional().describe('Blockchain rail (base, solana, tempo; nano only when named)'),
       name: walletNameSchema,
       mnemonic: z.string().optional().describe('BIP-39 mnemonic phrase (12 or 24 words, quoted)'),
     }),
@@ -260,7 +264,7 @@ export function buildCli() {
 
   wallet.command('list', {
     description: 'List all named keystores per chain',
-    options: z.object({ chain: chainSchema.optional().describe('Filter to one chain') }),
+    options: z.object({ chain: walletChainSchema.optional().describe('Filter to one chain') }),
     examples: [
       { description: 'List every named wallet across all chains' },
       { options: { chain: 'base' }, description: 'List only base wallets' },
@@ -294,7 +298,7 @@ export function buildCli() {
   wallet.command('address', {
     description: 'Print a wallet address',
     options: z.object({
-      chain: chainSchema,
+      chain: walletChainSchema,
       name: walletNameSchema,
     }),
     examples: [
@@ -317,7 +321,7 @@ export function buildCli() {
     hint: 'The exported key gives full control of the wallet to anyone who reads it. Pipe to an encrypted store; never to a shared shell history.',
     outputPolicy: 'agent-only',
     options: z.object({
-      chain: chainSchema,
+      chain: walletChainSchema,
       name: walletNameSchema,
       danger: z.boolean().optional().describe('Acknowledge the risk of this destructive operation'),
       skipConfirm: z.boolean().optional().describe('Skip the type-EXPORT prompt (for scripting)'),
@@ -344,7 +348,7 @@ export function buildCli() {
     description: 'Delete a keystore. DANGER, irrecoverable unless you have the BIP-39 mnemonic backup.',
     hint: 'No undo. Run `wallet show-mnemonic --danger` first if you want to be able to restore.',
     options: z.object({
-      chain: chainSchema,
+      chain: walletChainSchema,
       name: walletNameSchema,
       danger: z.boolean().optional().describe('Acknowledge the risk of this destructive operation'),
       skipConfirm: z.boolean().optional().describe('Skip the type-EXPORT prompt (for scripting)'),
@@ -758,12 +762,13 @@ export function buildCli() {
       url: z.string().describe('URL to pay'),
     }),
     options: z.object({
-      chain: chainSchema.optional().describe('Blockchain rail (base, solana, tempo)'),
+      chain: walletChainSchema.optional().describe('Blockchain rail (base, solana, tempo; nano only when named)'),
       network: networkSchema,
       name: walletNameSchema,
       data: z.string().optional().describe('Request body'),
       header: z.array(z.string()).optional().describe("Additional header (repeatable, 'Name: value')"),
       maxSpend: z.coerce.number().optional().describe('Reject payments above this USD amount'),
+      maxSpendXno: z.string().optional().describe('Reject payments above this XNO amount (required with --chain nano)'),
       timeout: z.coerce.number().optional().describe('Abort the merchant request if it takes longer than N seconds'),
       retries: z.coerce.number().optional().describe('Retry transient network errors up to N times'),
       dryRun: z.boolean().optional().describe('Print the payment plan without signing or sending'),
@@ -805,6 +810,7 @@ export function buildCli() {
           body: c.options.data,
           headers: parseHeaders(c.options.header),
           maxSpendUsd: c.options.maxSpend,
+          maxSpendXno: c.options.maxSpendXno,
           timeoutSeconds: c.options.timeout,
           retries: c.options.retries,
           dryRun: c.options.dryRun,

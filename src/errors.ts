@@ -11,6 +11,7 @@ export type ErrorCode =
   | 'transfer_reverted'
   | 'max_spend_exceeded'
   | 'limit_exceeded'
+  | 'limit_required'
   | 'network_error'
   | 'rpc_error'
   | 'unknown_chain'
@@ -68,6 +69,7 @@ export function exitCodeForError(code: ErrorCode): ExitCode {
       return EXIT_CODES.INSUFFICIENT_FUNDS;
     case 'max_spend_exceeded':
     case 'limit_exceeded':
+    case 'limit_required':
     case 'transfer_reverted':
       return EXIT_CODES.PAYMENT_REJECTED;
     case 'multi_rail_candidates':
@@ -103,6 +105,7 @@ const RPC_ENV_VARS: Record<string, string> = {
   'solana-testnet': 'SOLANA_DEVNET_RPC_URL',
   tempo: 'TEMPO_RPC_URL',
   'tempo-testnet': 'TEMPO_TESTNET_RPC_URL',
+  nano: 'NANO_RPC_URL',
 };
 
 export function wrapRpcError(chain: string, network: string, err: unknown): CliError {
