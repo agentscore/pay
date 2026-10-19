@@ -111,9 +111,7 @@ export function parseBody(body: unknown, headers?: Headers): ParsedRails {
   if (Array.isArray(record.accepted_methods)) {
     const amountUsd = Number((record.amount_usd as string | undefined) ?? '0');
     for (const m of record.accepted_methods as MppAccept[]) {
-      let chain: Chain | null = null;
-      if (m.method?.startsWith('tempo/')) chain = 'tempo';
-      else chain = chainFromNetworkId(m.network);
+      const chain: Chain | null = m.method?.startsWith('tempo/') ? 'tempo' : chainFromNetworkId(m.network);
       if (!chain) {
         unsupported.push({
           protocol: 'mpp',
