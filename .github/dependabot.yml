@@ -16,11 +16,6 @@ updates:
       minor-patch:
         update-types: ["minor", "patch"]
     ignore:
-      # eslint 10 defaults churn lint org-wide; upgrade is a deliberate cross-repo pass (2026-07-08)
-      - dependency-name: "eslint"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@eslint/js"
-        update-types: ["version-update:semver-major"]
       # TS majors are a deliberate org-wide pass, not a routine bump
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]

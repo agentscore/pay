@@ -3,9 +3,9 @@
 # `bunx <tool>` resolves the tool independently of this project, so it can fetch
 # a different major and then fail, or pass, for reasons that have nothing to do
 # with the code being checked. That is not hypothetical here: this repo
-# deliberately holds eslint at 9 and TypeScript at 6 while 10 and 7 are
-# published, so `bunx eslint` and `bunx tsc` would pull exactly the majors the
-# manifest pins away from. `bunx` also writes to the lockfile as a side effect.
+# deliberately holds TypeScript at 6 while 7 is published, so `bunx tsc`
+# would pull exactly the major the manifest pins away from. `bunx` also writes
+# to the lockfile as a side effect.
 #
 # A bare `tsc --noEmit` has a second problem: it judges the current source
 # against whatever build output is lying around, so it goes through the pinned
