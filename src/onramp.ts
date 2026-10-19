@@ -123,7 +123,7 @@ export async function createOnrampSession(input: CreateOnrampSessionInput): Prom
         stripe_request_id?: string;
       };
     }
-    let parsed: ParsedError | null = null;
+    let parsed: ParsedError | null;
     try { parsed = text ? (JSON.parse(text) as ParsedError) : null; } catch { parsed = null; }
     throw new OnrampApiError(
       parsed?.error?.code ?? 'http_error',
@@ -170,7 +170,7 @@ export async function getOnrampQuote(input: CreateOnrampQuoteInput): Promise<Onr
         stripe_request_id?: string;
       };
     }
-    let parsed: ParsedError | null = null;
+    let parsed: ParsedError | null;
     try { parsed = text ? (JSON.parse(text) as ParsedError) : null; } catch { parsed = null; }
     throw new OnrampApiError(
       parsed?.error?.code ?? 'http_error',

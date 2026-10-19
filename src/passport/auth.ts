@@ -198,7 +198,7 @@ export async function refreshAccessToken(input: RefreshAccessTokenInput): Promis
 
   const body = await response.text();
   if (!response.ok) {
-    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    let parsed: { error?: { code?: string; message?: string } } | null;
     try {
       parsed = body ? JSON.parse(body) : null;
     } catch {
@@ -249,7 +249,7 @@ async function mintPublicSession(input: {
   });
   const body = await response.text();
   if (!response.ok) {
-    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    let parsed: { error?: { code?: string; message?: string } } | null;
     try {
       parsed = body ? JSON.parse(body) : null;
     } catch {
@@ -291,7 +291,7 @@ async function pollPublicSession(input: {
   );
   const body = await response.text();
   if (!response.ok) {
-    let parsed: { error?: { code?: string; message?: string } } | null = null;
+    let parsed: { error?: { code?: string; message?: string } } | null;
     try {
       parsed = body ? JSON.parse(body) : null;
     } catch {
