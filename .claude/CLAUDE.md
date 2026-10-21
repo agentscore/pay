@@ -52,18 +52,14 @@ Both paths preserve POST bodies through the 402 round-trip. The CLI's passphrase
 - **knip**, dead-code check. `bun run knip`.
 - **Lefthook**, git hooks. Pre-commit: lint. Pre-push: typecheck.
 
-## Patched dependencies
+## incur and the compiled binary
 
-`patches/incur@<version>.patch` rewrites incur's `dist/Mcp.js` so the two MCP
-transport specifiers are literal dynamic imports. Bun's compile tracing cannot
-follow incur's `importModule = (specifier) => import(specifier)` indirection, so
-without it the compiled binary cannot resolve the stdio transport, while the
-node dist works fine. Rebase the patch at every incur bump and drop it once
-incur emits literal specifiers.
-
-Keep the patch to the `dist/Mcp.js` hunk only. `bun patch --commit` also records
-deletions of example `.bin` symlinks that exist in bun's cache copy but not in
-`node_modules`, and their paths embed a local home directory; trim those by hand.
+Bun's compile tracing cannot follow a dynamic `import(specifier)` whose
+specifier is a variable, so an incur release that loads its MCP transports that
+way builds a binary that cannot resolve the stdio transport, while the node dist
+works fine. incur 0.7.1 emits literal specifiers, so no patch is carried; if a
+later release regresses, patch its `dist/Mcp.js` with `bun patch` and keep the
+patch to that one hunk.
 
 Because the binary is what breaks, verify an incur change against the **compiled
 binary**, not the node dist: build it, check `--version` reports the injected
