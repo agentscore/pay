@@ -1,12 +1,12 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "agentscore-pay": "./dist/index.js"
+    "agentscore-pay": "dist/index.js"
   },
   "files": [
     "dist"
@@ -47,7 +47,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentscore/pay"
+    "url": "git+https://github.com/agentscore/pay.git"
   },
   "homepage": "https://www.agentscore.com",
   "bugs": {
@@ -58,7 +58,7 @@
     "bun": ">=1.3.0 <2"
   },
   "dependencies": {
-    "@agent-score/sdk": "^2.9.3",
+    "@agent-score/sdk": "^2.9.4",
     "@clack/prompts": "^1.8.1",
     "@scure/bip39": "^2.4.0",
     "@solana-program/system": "^0.16.0",
@@ -72,14 +72,14 @@
     "incur": "0.7.1",
     "mppx": "0.15.0",
     "qrcode-terminal": "^0.12.0",
-    "viem": "2.57.8"
+    "viem": "2.57.11"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.5",
     "@types/qrcode-terminal": "^0.12.2",
     "@vitest/coverage-v8": "^5.0.5",
-    "dotenv": "^18.0.8",
+    "dotenv": "^18.0.9",
     "eslint": "^10.13.0",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-unused-imports": "^4.4.1",
@@ -92,7 +92,7 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
-    "viem": "2.57.8"
+    "viem": "2.57.11"
   },
   "packageManager": "bun@1.4.4"
 }
