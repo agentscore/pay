@@ -1,8 +1,19 @@
 # OSV-Scanner allowlist. Each entry must document why the advisory is not
 # exploitable in this codebase. Keep this list minimal and revisit on review.
-#
-# Empty on purpose: every advisory this tree carries currently has a reachable
-# fix. The brace-expansion entry that lived here is gone because upstream
-# backported the DoS fix to the 1.x line (1.1.17, then 1.1.18 for the follow-up
-# bypass), so the "no fixed release on 1.x" that justified it is no longer true
-# and minimatch@3's own `^1.1.7` range takes the fix with no override.
+
+# zod 3.25.76: GHSA-mrhx-c7xc-m3w5 covers every release below 4.6.6 and no 3.x
+# fix exists. The hoisted zod is on a fixed 4.x; this entry is scoped to the 3.x
+# copies nested under @x402/core and @x402/evm, whose latest releases still
+# require zod ^3, so a 4.x regression still fails the scan. The flaw is memory
+# growth when an array schema with no length limit rejects a very large array.
+# No merchant-controlled input reaches these copies: the client decodes a 402's
+# PAYMENT-REQUIRED header and a v1 body with JSON.parse and no schema, and the
+# zod 3 parses on the client path validate facilitator responses only. Lift when
+# the x402 packages accept zod 4.
+[[PackageOverrides]]
+name = "zod"
+version = "3.25.76"
+ecosystem = "npm"
+effectiveUntil = 2027-01-24
+vulnerability.ignore = true
+reason = "GHSA-mrhx-c7xc-m3w5 has no zod 3.x fix and the x402 packages still require zod ^3. No merchant-controlled input reaches these copies: the 402 is decoded with JSON.parse, and the zod 3 parses validate facilitator responses only."
