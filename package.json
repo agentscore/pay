@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/pay",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "CLI wallet for one-shell-command agent payments across x402 (Base) and MPP (Tempo, Solana)",
   "type": "module",
   "main": "./dist/index.js",
@@ -63,27 +63,27 @@
     "@scure/bip39": "^2.4.0",
     "@solana-program/system": "^0.16.0",
     "@solana-program/token": "^0.18.0",
-    "@solana/kit": "^8.5.0",
+    "@solana/kit": "^8.6.0",
     "@solana/mpp": "^0.7.0",
     "@x402/core": "2.29.0",
     "@x402/evm": "2.29.0",
     "@x402/fetch": "2.29.0",
     "ed25519-hd-key": "^2.0.0",
     "incur": "0.7.1",
-    "mppx": "0.16.0",
+    "mppx": "0.17.0",
     "qrcode-terminal": "^0.12.0",
-    "viem": "2.57.13"
+    "viem": "2.57.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/qrcode-terminal": "^0.12.2",
     "@vitest/coverage-v8": "^5.0.5",
     "dotenv": "^18.0.9",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-unused-imports": "^4.4.1",
-    "knip": "^6.43.0",
+    "knip": "^6.44.1",
     "lefthook": "^2.2.2",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
@@ -92,7 +92,7 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
-    "viem": "2.57.13"
+    "viem": "2.57.14"
   },
   "packageManager": "bun@1.4.4"
 }

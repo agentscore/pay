@@ -1,2 +1,16 @@
 # OSV-Scanner allowlist. Each entry must document why the advisory is not
 # exploitable in this codebase. Keep this list minimal and revisit on review.
+
+# minimatch: GHSA-g3hv-75wg-m249 (DoS through globparts amplification) is fixed
+# only in 11.0.1; no 10.x release carries it. Every copy in this lock is lint
+# tooling (eslint and its config-array, typescript-eslint's typescript-estree,
+# eslint-plugin-import-x) matching patterns we write ourselves, and none of it
+# ships in the published package. Their ^10 ranges do not admit 11. Remove the
+# entry when its parents' latest releases admit 11.
+[[PackageOverrides]]
+name = "minimatch"
+version = "10.2.6"
+ecosystem = "npm"
+effectiveUntil = 2027-01-31
+vulnerability.ignore = true
+reason = "No fixed 10.x; pulled at ^10 by eslint, @eslint/config-array, typescript-estree and eslint-plugin-import-x; lint tooling only, not in the published package."
