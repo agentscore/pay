@@ -15,7 +15,7 @@ concurrency:
 jobs:
   integration:
     name: Testnet smoke (${{ matrix.chain }} / ${{ matrix.network }})
-    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-2vcpu-ubuntu-2604-arm
     timeout-minutes: 15
     strategy:
       fail-fast: false
